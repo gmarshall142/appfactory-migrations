@@ -1,0 +1,13 @@
+I have created a repo for database creation and migrations:
+https://github.com/gmarshall142/appfactory-migrations
+
+What this is:
+This is the start of a project for allowing us to do database migrations (updates) to multiple database instances in order to keep them in sync.  It uses an open source project called Flyway (https://flywaydb.org/ and https://github.com/flyway/flyway) which provides versioning for a database storing update information for each database instance.  One of the advantages of flyway is that it can use standard SQL scripts as migration scripts avoiding XML or DSL (Domain Specific Language) which would add to the learning curve.  The SQL scripts can also be used outside of flyway so work invested in the scripts will not be wasted if flyway is not an option.
+
+Confirm whether flyway is an alternative:
+Flyway is an open source Java project which is packaged as JAR file.  I need help determining whether this can be deployed on NMCI servers.  It is possible that it could be run from a DMZ server provided a JDBC connection can be made to the server/s being updated.
+
+Next steps:
+- develop migrations as changes are made to the database - NOTE: while I am the only one working on this project I may continue to update the initial migration script.
+- develop the steps needed to use this project in various environments where Postgres will run.
+- test the use of the migrations when making changes to dev machines
