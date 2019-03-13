@@ -1,12 +1,18 @@
 # appfactory-migrations
 
-docker run -it boxfuse/flyway:5.2.4 -user=$POSTGRES_USER -password=$POSTGRES_PSWD -url=jdbc:postgresql://$POSTGRES_HOST:5432/appfactory info
+### Overview
+The appfactory-migrations repo contains [flyway](https://flywaydb.org/ "Flyway link") migrations for the 
+Postgresql __appfactory__ database.  The project contains a bash script for calling flyway and uses the 
+conf/appfactory.conf configuration file which provides flyway settings for the appfactory database and schemas.
 
-docker run -it --net="host" boxfuse/flyway:5.2.4 -user=gmarshall -password='P@ssw0rd' -url=jdbc:postgresql://192.168.1.129:5432/appfactory info
+Setting up the database requires the manual creation of roles, the appfactory database, and the schemas.  Since the roles
+will be present in an instance even if the database is dropped and recreated they can be added manually when the postgres
+database is setup.  The script __scripts/create-dataabase-schemas.sql__ can be run to create the database, schemas, and 
+assign the owner as needed.  This would be normal in a developer or test instance.
 
-./flyway -user=gmarshall -password='P@ssw0rd' -url=jdbc:postgresql://localhost:5432/appfactory info
+#### Environment Variables
 
-./flyway -user=$POSTGRES_USER -password=$POSTGRES_PSWD -url=jdbc:postgresql://$POSTGRES_HOST:5432/appfactory info
+#### flyway.sh
 
 #### Create roles (if roles have not been created in the postgres instance)
 create role appowner with login password '*password*';  
@@ -21,3 +27,6 @@ ALTER SCHEMA metadata OWNER TO appowner;
 
 #### Create baseline
 ./flyway.sh baseline
+
+#### Migrations
+./flyway.sh migrate
