@@ -1,0 +1,16 @@
+# https://github.com/github/gitignore/blob/master/Node.gitignore #
+##################################################################
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# dotenv environment variables file
+.env
+
+# Custom
+.idea
+dist
+.DS_STORE
