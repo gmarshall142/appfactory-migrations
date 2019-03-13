@@ -11,8 +11,14 @@ database is setup.  The script __scripts/create-dataabase-schemas.sql__ can be r
 assign the owner as needed.  This would be normal in a developer or test instance.
 
 #### Environment Variables
+__FLYWAY_HOME__ - path to flyway  
+__POSTGRES_OWNER__ - owner role  
+__POSTGRES_OWNER_PSWD__ - owner role password  
 
 #### flyway.sh
+A bash script for running __flyway__ is included with the intention of using environment variables and the 
+conf/appfactory.conf configuration file that provides the settings needed to update the __appfactory__ database.  The
+appfactory.conf file can be modified as needed by each database instance.
 
 #### Create roles (if roles have not been created in the postgres instance)
 create role appowner with login password '*password*';  
