@@ -40,3 +40,16 @@ cd workspace/app-factory/appfactory-migrations
 
 #### Migrations
 ./flyway.sh migrate
+
+#### Running __flyway__ in Docker
+Flyway can be run from a Docker container using instructions found on the [flyway](https://flywaydb.org/ "Flyway link") 
+site.  The issues in running the from Docker center on accessing a custom configuration file and the database URL.  
+A __flyway-docker.sh__ script has been included which uses the __conf/appfactory.conf__ configuration file and resolves issues 
+connecting with the Postgresql database running on the host.  The following steps were key:
+* Config file - create a docker volume by adding a reference to the local __conf__ directory and use the volume in the
+configFiles option:
+  * -v "$(pwd)":/host
+  * -configFiles=/host/conf/appfactory.conf
+* Postgresql URL - in this case the connection was to a postgresql database running on the host.  In order to resolve 
+__localhost__ as the host machine it was necessary to use the __host.docker.internal__ name as the DNS.
+  * -url=jdbc:postgresql://host.docker.internal:5432/appfactory
