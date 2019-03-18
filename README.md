@@ -31,6 +31,11 @@ ALTER SCHEMA app OWNER TO appowner;
 CREATE SCHEMA metadata;  
 ALTER SCHEMA metadata OWNER TO appowner;
 
+#### Check instance version info
+cd workspace/app-factory/appfactory-migrations  
+./flyway.sh info  
+[[/images/fly-info.png|Flyway info results]]
+
 #### Create baseline
 ./flyway.sh baseline
 
