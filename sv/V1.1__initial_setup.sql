@@ -1961,7 +1961,7 @@ BEGIN
     IF _tablename = 'roleassignments' THEN
       RETURN QUERY
       EXECUTE
-        'SELECT
+        'SELECT DISTINCT ON (label)
           CONCAT_WS('' '', u.firstname, u.lastname) as label,
           u.id as value,
           ''{}''::jsonb
@@ -1974,7 +1974,7 @@ BEGIN
           r.appid = ' || _appid || '
           AND ra.roleid = r.id
           AND (u.id = ra.userid OR u.id = ug.userid)
-        ORDER BY CONCAT_WS('' '', u.lastname, u.firstname);';
+        ORDER BY label;';
     ELSEIF _tablename = 'appbunos' THEN
       RETURN QUERY
       EXECUTE
@@ -2016,7 +2016,7 @@ END;
 $$;
 
 
-ALTER FUNCTION metadata.getresourcevalues(idresource character varying) OWNER TO appowner;
+ALTER FUNCTION metadata.getresourcevalues(idresource character varying) owner to appowner;
 
 --
 -- Name: loadappbunos(integer); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -2761,6 +2761,44 @@ ALTER TABLE app.activities_id_seq OWNER TO appowner;
 --
 
 ALTER SEQUENCE app.activities_id_seq OWNED BY app.activity.id;
+
+
+--
+-- Name: adhoc_queries; Type: TABLE; Schema: app; Owner: appowner
+--
+
+CREATE TABLE app.adhoc_queries (
+    id integer NOT NULL,
+    name character varying(20),
+    appid integer NOT NULL,
+    jsondata jsonb,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE app.adhoc_queries OWNER TO appowner;
+
+--
+-- Name: adhoc_queries_id_seq; Type: SEQUENCE; Schema: app; Owner: appowner
+--
+
+CREATE SEQUENCE app.adhoc_queries_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE app.adhoc_queries_id_seq OWNER TO appowner;
+
+--
+-- Name: adhoc_queries_id_seq; Type: SEQUENCE OWNED BY; Schema: app; Owner: appowner
+--
+
+ALTER SEQUENCE app.adhoc_queries_id_seq OWNED BY app.adhoc_queries.id;
 
 
 --
@@ -4331,10 +4369,32 @@ ALTER SEQUENCE metadata.urlactions_id_seq OWNED BY metadata.urlactions.id;
 
 
 --
+-- Name: adhoc_queries_id_seq; Type: SEQUENCE; Schema: public; Owner: appowner
+--
+
+CREATE SEQUENCE public.adhoc_queries_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.adhoc_queries_id_seq OWNER TO appowner;
+
+--
 -- Name: activity id; Type: DEFAULT; Schema: app; Owner: appowner
 --
 
 ALTER TABLE ONLY app.activity ALTER COLUMN id SET DEFAULT nextval('app.activities_id_seq'::regclass);
+
+
+--
+-- Name: adhoc_queries id; Type: DEFAULT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries ALTER COLUMN id SET DEFAULT nextval('app.adhoc_queries_id_seq'::regclass);
 
 
 --
@@ -4594,6 +4654,14 @@ ALTER TABLE ONLY metadata.urlactions ALTER COLUMN id SET DEFAULT nextval('metada
 --
 
 COPY app.activity (id, appid, label, description, createdat, updatedat, jsondata) FROM stdin;
+\.
+
+
+--
+-- Data for Name: adhoc_queries; Type: TABLE DATA; Schema: app; Owner: appowner
+--
+
+COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat) FROM stdin;
 \.
 
 
@@ -6588,6 +6656,13 @@ SELECT pg_catalog.setval('app.activities_id_seq', 88, true);
 
 
 --
+-- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
+--
+
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 35, true);
+
+
+--
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
@@ -6598,7 +6673,7 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 925, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 945, true);
 
 
 --
@@ -6619,7 +6694,7 @@ SELECT pg_catalog.setval('app.groups_id_seq', 11, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 269, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 277, true);
 
 
 --
@@ -6738,7 +6813,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 498, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 513, true);
 
 
 --
@@ -6752,7 +6827,7 @@ SELECT pg_catalog.setval('metadata.applications_id_seq', 68, true);
 -- Name: apptables_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.apptables_id_seq', 122, true);
+SELECT pg_catalog.setval('metadata.apptables_id_seq', 124, true);
 
 
 --
@@ -6794,7 +6869,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 172, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 176, true);
 
 
 --
@@ -6882,11 +6957,34 @@ SELECT pg_catalog.setval('metadata.urlactions_id_seq', 23, true);
 
 
 --
+-- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: appowner
+--
+
+SELECT pg_catalog.setval('public.adhoc_queries_id_seq', 1, false);
+
+
+--
 -- Name: activity activities_pkey; Type: CONSTRAINT; Schema: app; Owner: appowner
 --
 
 ALTER TABLE ONLY app.activity
     ADD CONSTRAINT activities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: adhoc_queries adhoc_queries_pk; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries
+    ADD CONSTRAINT adhoc_queries_pk PRIMARY KEY (id);
+
+
+--
+-- Name: adhoc_queries adhoc_queries_pk_2; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries
+    ADD CONSTRAINT adhoc_queries_pk_2 UNIQUE (appid, name);
 
 
 --
@@ -7225,6 +7323,13 @@ CREATE UNIQUE INDEX activities_id_uindex ON app.activity USING btree (id);
 
 
 --
+-- Name: adhoc_queries_id_uindex; Type: INDEX; Schema: app; Owner: appowner
+--
+
+CREATE UNIQUE INDEX adhoc_queries_id_uindex ON app.adhoc_queries USING btree (id);
+
+
+--
 -- Name: appbunos_id_uindex; Type: INDEX; Schema: app; Owner: appowner
 --
 
@@ -7503,6 +7608,14 @@ CREATE UNIQUE INDEX urlactions_id_uindex ON metadata.urlactions USING btree (id)
 
 ALTER TABLE ONLY app.activity
     ADD CONSTRAINT activities_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
+
+
+--
+-- Name: adhoc_queries adhoc_queries_applications_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries
+    ADD CONSTRAINT adhoc_queries_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
 
 
 --
@@ -8190,13 +8303,6 @@ GRANT ALL ON FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec 
 
 
 --
--- Name: FUNCTION getresourcevalues(idresource character varying); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.getresourcevalues(idresource character varying) TO appuser;
-
-
---
 -- Name: FUNCTION loadappbunos(idapp integer); Type: ACL; Schema: metadata; Owner: appowner
 --
 
@@ -8341,70 +8447,84 @@ GRANT ALL ON FUNCTION metadata.workflowstateupdate(idtable integer, idtransition
 --
 
 GRANT ALL ON TABLE app.activity TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.activity TO appuser;
+GRANT ALL ON TABLE app.activity TO appuser;
 
 
 --
 -- Name: SEQUENCE activities_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.activities_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.activities_id_seq TO appuser;
+
+
+--
+-- Name: TABLE adhoc_queries; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.adhoc_queries TO appuser;
+
+
+--
+-- Name: SEQUENCE adhoc_queries_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.adhoc_queries_id_seq TO appuser;
 
 
 --
 -- Name: TABLE appbunos; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.appbunos TO appuser;
+GRANT ALL ON TABLE app.appbunos TO appuser;
 
 
 --
 -- Name: SEQUENCE appbunos_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.appbunos_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.appbunos_id_seq TO appuser;
 
 
 --
 -- Name: TABLE appdata; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.appdata TO appuser;
+GRANT ALL ON TABLE app.appdata TO appuser;
 
 
 --
 -- Name: SEQUENCE appdata_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.appdata_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.appdata_id_seq TO appuser;
 
 
 --
 -- Name: TABLE bunos; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.bunos TO appuser;
+GRANT ALL ON TABLE app.bunos TO appuser;
 
 
 --
 -- Name: SEQUENCE bunos_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.bunos_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.bunos_id_seq TO appuser;
 
 
 --
 -- Name: TABLE groups; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.groups TO appuser;
+GRANT ALL ON TABLE app.groups TO appuser;
 
 
 --
 -- Name: SEQUENCE groups_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.groups_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.groups_id_seq TO appuser;
 
 
 --
@@ -8412,14 +8532,14 @@ GRANT SELECT,USAGE ON SEQUENCE app.groups_id_seq TO appuser;
 --
 
 GRANT ALL ON TABLE app.issues TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.issues TO appuser;
+GRANT ALL ON TABLE app.issues TO appuser;
 
 
 --
 -- Name: SEQUENCE issues_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.issues_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.issues_id_seq TO appuser;
 
 
 --
@@ -8427,14 +8547,14 @@ GRANT SELECT,USAGE ON SEQUENCE app.issues_id_seq TO appuser;
 --
 
 GRANT ALL ON TABLE app.issuetypes TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.issuetypes TO appuser;
+GRANT ALL ON TABLE app.issuetypes TO appuser;
 
 
 --
 -- Name: SEQUENCE issuetypes_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.issuetypes_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.issuetypes_id_seq TO appuser;
 
 
 --
@@ -8442,14 +8562,14 @@ GRANT SELECT,USAGE ON SEQUENCE app.issuetypes_id_seq TO appuser;
 --
 
 GRANT ALL ON TABLE app.masterdata TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.masterdata TO appuser;
+GRANT ALL ON TABLE app.masterdata TO appuser;
 
 
 --
 -- Name: SEQUENCE mastertypes_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.mastertypes_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.mastertypes_id_seq TO appuser;
 
 
 --
@@ -8457,70 +8577,70 @@ GRANT SELECT,USAGE ON SEQUENCE app.mastertypes_id_seq TO appuser;
 --
 
 GRANT ALL ON TABLE app.priority TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.priority TO appuser;
+GRANT ALL ON TABLE app.priority TO appuser;
 
 
 --
 -- Name: SEQUENCE priority_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.priority_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.priority_id_seq TO appuser;
 
 
 --
 -- Name: TABLE resourcetypes; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.resourcetypes TO appuser;
+GRANT ALL ON TABLE app.resourcetypes TO appuser;
 
 
 --
 -- Name: SEQUENCE resourcetypes_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.resourcetypes_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.resourcetypes_id_seq TO appuser;
 
 
 --
 -- Name: TABLE roleassignments; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.roleassignments TO appuser;
+GRANT ALL ON TABLE app.roleassignments TO appuser;
 
 
 --
 -- Name: SEQUENCE roleassignments_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.roleassignments_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.roleassignments_id_seq TO appuser;
 
 
 --
 -- Name: TABLE rolerestrictions; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.rolerestrictions TO appuser;
+GRANT ALL ON TABLE app.rolerestrictions TO appuser;
 
 
 --
 -- Name: SEQUENCE rolepermissions_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.rolepermissions_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.rolepermissions_id_seq TO appuser;
 
 
 --
 -- Name: TABLE roles; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.roles TO appuser;
+GRANT ALL ON TABLE app.roles TO appuser;
 
 
 --
 -- Name: SEQUENCE roles_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.roles_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.roles_id_seq TO appuser;
 
 
 --
@@ -8528,98 +8648,98 @@ GRANT SELECT,USAGE ON SEQUENCE app.roles_id_seq TO appuser;
 --
 
 GRANT ALL ON TABLE app.status TO devuser;
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.status TO appuser;
+GRANT ALL ON TABLE app.status TO appuser;
 
 
 --
 -- Name: SEQUENCE status_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.status_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.status_id_seq TO appuser;
 
 
 --
 -- Name: TABLE usergroups; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.usergroups TO appuser;
+GRANT ALL ON TABLE app.usergroups TO appuser;
 
 
 --
 -- Name: SEQUENCE usergroups_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.usergroups_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.usergroups_id_seq TO appuser;
 
 
 --
 -- Name: TABLE users; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.users TO appuser;
+GRANT ALL ON TABLE app.users TO appuser;
 
 
 --
 -- Name: SEQUENCE users_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.users_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.users_id_seq TO appuser;
 
 
 --
 -- Name: TABLE workflow_status; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.workflow_status TO appuser;
+GRANT ALL ON TABLE app.workflow_status TO appuser;
 
 
 --
 -- Name: SEQUENCE workflow_actionresponse_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.workflow_actionresponse_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.workflow_actionresponse_id_seq TO appuser;
 
 
 --
 -- Name: TABLE workflow_actions; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.workflow_actions TO appuser;
+GRANT ALL ON TABLE app.workflow_actions TO appuser;
 
 
 --
 -- Name: SEQUENCE workflow_actions_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.workflow_actions_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.workflow_actions_id_seq TO appuser;
 
 
 --
 -- Name: TABLE workflow_states; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.workflow_states TO appuser;
+GRANT ALL ON TABLE app.workflow_states TO appuser;
 
 
 --
 -- Name: SEQUENCE workflow_states_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.workflow_states_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.workflow_states_id_seq TO appuser;
 
 
 --
 -- Name: TABLE workflow_statetransitions; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.workflow_statetransitions TO appuser;
+GRANT ALL ON TABLE app.workflow_statetransitions TO appuser;
 
 
 --
 -- Name: SEQUENCE workflow_statetransitions_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.workflow_statetransitions_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.workflow_statetransitions_id_seq TO appuser;
 
 
 --
