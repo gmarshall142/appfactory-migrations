@@ -2778,7 +2778,7 @@ ALTER SEQUENCE app.activities_id_seq OWNED BY app.activity.id;
 
 CREATE TABLE app.adhoc_queries (
     id integer NOT NULL,
-    name character varying(20),
+    name character varying(60),
     appid integer NOT NULL,
     jsondata jsonb,
     createdat timestamp without time zone,
