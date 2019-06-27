@@ -8329,7 +8329,6 @@ ALTER TABLE ONLY metadata.urlactions
 -- Name: SCHEMA app; Type: ACL; Schema: -; Owner: appowner
 --
 
-GRANT ALL ON SCHEMA app TO devuser;
 GRANT USAGE ON SCHEMA app TO appuser;
 
 
@@ -8337,7 +8336,6 @@ GRANT USAGE ON SCHEMA app TO appuser;
 -- Name: SCHEMA metadata; Type: ACL; Schema: -; Owner: appowner
 --
 
-GRANT ALL ON SCHEMA metadata TO devuser;
 GRANT USAGE ON SCHEMA metadata TO appuser;
 
 
@@ -8674,7 +8672,6 @@ GRANT ALL ON FUNCTION metadata.workflowstateupdate(idtable integer, idtransition
 -- Name: TABLE activity; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.activity TO devuser;
 GRANT ALL ON TABLE app.activity TO appuser;
 
 
@@ -8759,7 +8756,6 @@ GRANT ALL ON SEQUENCE app.groups_id_seq TO appuser;
 -- Name: TABLE issues; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.issues TO devuser;
 GRANT ALL ON TABLE app.issues TO appuser;
 
 
@@ -8774,7 +8770,6 @@ GRANT ALL ON SEQUENCE app.issues_id_seq TO appuser;
 -- Name: TABLE issuetypes; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.issuetypes TO devuser;
 GRANT ALL ON TABLE app.issuetypes TO appuser;
 
 
@@ -8789,7 +8784,6 @@ GRANT ALL ON SEQUENCE app.issuetypes_id_seq TO appuser;
 -- Name: TABLE masterdata; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.masterdata TO devuser;
 GRANT ALL ON TABLE app.masterdata TO appuser;
 
 
@@ -8804,7 +8798,6 @@ GRANT ALL ON SEQUENCE app.mastertypes_id_seq TO appuser;
 -- Name: TABLE priority; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.priority TO devuser;
 GRANT ALL ON TABLE app.priority TO appuser;
 
 
@@ -8882,7 +8875,6 @@ GRANT ALL ON SEQUENCE app.roles_id_seq TO appuser;
 -- Name: TABLE status; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.status TO devuser;
 GRANT ALL ON TABLE app.status TO appuser;
 
 
@@ -8981,7 +8973,6 @@ GRANT ALL ON SEQUENCE app.workflow_statetransitions_id_seq TO appuser;
 -- Name: TABLE actions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.actions TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.actions TO appuser;
 
 
@@ -9010,7 +9001,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.apiactions_id_seq TO appuser;
 -- Name: TABLE appcolumns; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.appcolumns TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.appcolumns TO appuser;
 
 
@@ -9039,7 +9029,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.applications_id_seq TO appuser;
 -- Name: TABLE apptables; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.apptables TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.apptables TO appuser;
 
 
@@ -9082,7 +9071,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.controltypes_id_seq TO appuser;
 -- Name: TABLE datatypes; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.datatypes TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.datatypes TO appuser;
 
 
@@ -9097,7 +9085,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.datatypes_id_seq TO appuser;
 -- Name: TABLE events; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.events TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.events TO appuser;
 
 
@@ -9112,7 +9099,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.events_id_seq TO appuser;
 -- Name: TABLE fieldcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.fieldcategories TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.fieldcategories TO appuser;
 
 
@@ -9127,7 +9113,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.fieldcategories_id_seq TO appuser;
 -- Name: TABLE formeventactions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.formeventactions TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formeventactions TO appuser;
 
 
@@ -9142,7 +9127,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.formeventactions_id_seq TO appuser;
 -- Name: TABLE formresources; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.formresources TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formresources TO appuser;
 
 
@@ -9178,7 +9162,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.issues_id_seq TO appuser;
 -- Name: TABLE menuicons; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menuicons TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuicons TO appuser;
 
 
@@ -9193,7 +9176,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuicons_id_seq TO appuser;
 -- Name: TABLE menuitems; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menuitems TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuitems TO appuser;
 
 
@@ -9208,7 +9190,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuitems_id_seq TO appuser;
 -- Name: TABLE menupaths; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menupaths TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menupaths TO appuser;
 
 
@@ -9223,7 +9204,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menupaths_id_seq TO appuser;
 -- Name: TABLE pageforms; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.pageforms TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.pageforms TO appuser;
 
 
@@ -9252,7 +9232,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.pages_id_seq TO appuser;
 -- Name: TABLE systemcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.systemcategories TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.systemcategories TO appuser;
 
 

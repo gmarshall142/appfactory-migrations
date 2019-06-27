@@ -15,7 +15,6 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
-
 --
 -- Name: field_composite; Type: TYPE; Schema: metadata; Owner: appowner
 --
@@ -173,6 +172,113 @@ $$;
 
 
 ALTER FUNCTION app.findtransitionnotificationusers(idtable integer, idstatetransition integer) OWNER TO appowner;
+
+--
+-- Name: getappusers(integer); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.getappusers(idapp integer) RETURNS TABLE(userid integer, firstname character varying, mi character varying, lastname character varying, email character varying, roleid integer, rolename character varying, appname character varying)
+    LANGUAGE plpgsql
+    AS $$
+
+  DECLARE
+
+  BEGIN
+    RETURN QUERY
+    select u.id as userid, u.firstname, u.mi, u.lastname, u.email, role.id as roleid, role.name as rolename, app.name as appname
+    from metadata.applications app,
+         app.roles role,
+         app.roleassignments ra,
+         app.users as u
+    where app.id = idapp
+    and role.appid = app.id
+    and ra.roleid = role.id
+    and u.id = ra.userid
+    UNION
+    select u.id as userid, u.firstname, u.mi, u.lastname, u.email, role.id as roleid, role.name as rolename, app.name as appname
+    from metadata.applications app,
+         app.roles role,
+         app.roleassignments ra,
+         app.groups g,
+         app.usergroups ug,
+         app.users as u
+    where app.id = idapp
+    and role.appid = app.id
+    and ra.roleid = role.id
+    and g.id = ra.groupid
+    and ug.groupid = g.id
+    and u.id = ug.userid
+    order by roleid, userid;
+  END
+$$;
+
+
+ALTER FUNCTION app.getappusers(idapp integer) OWNER TO appowner;
+
+--
+-- Name: getuserroles(integer); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.getuserroles(iduser integer) RETURNS TABLE(roleid integer, rolename character varying, userid integer, groupid integer, groupname character varying, appid integer)
+    LANGUAGE plpgsql
+    AS $$
+
+  DECLARE
+
+  BEGIN
+    RETURN QUERY
+    select ra.roleid, r.name as rolename, ra.userid, ra.groupid, null as groupname, r.appid
+    from app.roleassignments ra,
+         app.roles r
+    where ra.userid = iduser
+    and r.id = ra.roleid
+    UNION
+    select ra.roleid, r.name as rolename, ra.userid, ra.groupid, g.name as groupname, r.appid
+    from app.usergroups ug,
+         app.groups g,
+         app.roleassignments ra,
+         app.roles r
+    where ug.userid = iduser
+    and g.id = ug.groupid
+    and ra.groupid = g.id
+    and r.id = ra.roleid
+    order by roleid;
+  END
+$$;
+
+
+ALTER FUNCTION app.getuserroles(iduser integer) OWNER TO appowner;
+
+--
+-- Name: getuserrolesasarray(integer); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.getuserrolesasarray(iduser integer) RETURNS integer[]
+    LANGUAGE plpgsql
+    AS $$
+
+  DECLARE
+	  userRoles integer[] := ARRAY[]::integer[];
+	  user_role RECORD;
+	  user_roles CURSOR(id INTEGER) FOR SELECT * FROM app.getUserRoles(id);
+
+  BEGIN
+    IF (iduser IS NOT NULL) THEN
+      OPEN user_roles(iduser);
+      LOOP
+        FETCH user_roles INTO user_role;
+        EXIT WHEN NOT FOUND;
+        RAISE NOTICE 'roleid: %', user_role.roleid;
+        userRoles := array_append(userRoles, user_role.roleid);
+      END LOOP;
+    END IF;
+
+    RETURN userRoles;
+  END
+$$;
+
+
+ALTER FUNCTION app.getuserrolesasarray(iduser integer) OWNER TO appowner;
 
 --
 -- Name: getusersinroles(integer[]); Type: FUNCTION; Schema: app; Owner: appowner
@@ -712,145 +818,33 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric) RETURNS json
     AS $$
 
   DECLARE
+    resp JSON;
     result JSON;
-    rec_field RECORD;
     execStr TEXT;
     tableName TEXT;
     tableIdColumn TEXT := 'id';
     selectStr TEXT := '';
     fromStr TEXT := '';
     whereStr TEXT := '';
-    colLabel TEXT;
-    colTable TEXT;
-    colSelect TEXT;
-    relationColName TEXT;
-    masterTableCount INTEGER;
-    masterTableName TEXT;
+    idx INTEGER;
 
     cur_fields CURSOR(id INTEGER)
     FOR SELECT * FROM metadata.appformGetFields(id);
 
 	BEGIN
-    CREATE TEMP TABLE lookup(tablename VARCHAR);
-
     OPEN cur_fields(idtable);
 
-    LOOP
-      FETCH cur_fields into rec_field;
-      EXIT WHEN NOT FOUND;
-
-      colLabel := '';
-      colSelect  := '';
-      colTable := 'tbl.';
-
-      RAISE NOTICE '** columnname: %', rec_field.columnname;
-
-      IF (rec_field.columnname != tableIdColumn) THEN
-
-        IF (rec_field.jsonfield = true) THEN
-
-          -- =========================================================
-          -- json column
-          -- =========================================================
-          colTable := '';
-          colSelect  := 'tbl.jsondata->>''' || rec_field.columnname || '''';
-          colLabel := ' as ' || rec_field.columnname;
-
-          IF (rec_field.mastertable IS NOT NULL) THEN
-            -- =========================================================
-            -- related table
-            -- =========================================================
-            IF (rec_field.datatype = 'integer[]') THEN
-              -- =========================================================
-              -- array of references
-              -- =========================================================
-              RAISE NOTICE '************************* datatype: %', rec_field.datatype;
-              -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
-              colTable := 'ARRAY(SELECT ' || rec_field.masterdisplay ||
-                          ' FROM app.' || rec_field.mastertable ||
-                          ' WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->''' || rec_field.columnname || ''')::integer ) )';
-              RAISE NOTICE 'colTable: %', colTable;
-              colSelect := '';
-            ELSE
-              -- =========================================================
-              -- single reference
-              -- =========================================================
-              -- check for whether there are multiple references to the same table
-              INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
-              masterTableName := rec_field.mastertable;
-              SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
-              RAISE NOTICE '************* count: %', masterTableCount;
-              IF (masterTableCount > 1) THEN
-                -- there are multiple references to the same table so make them unique using the Count
-                masterTableName := masterTableName || masterTableCount;
-              END IF;
-              IF (rec_field.masterdisplay ~ '||') THEN
-                -- TODO: process compound display: add mastertable to each column, create procedure, provide logic for standard columns as well
-                colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
-              ELSE
-                colTable := masterTableName || '.';
-                colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
-              END IF;
-              relationColName := 'CAST(coalesce(tbl.jsondata->>''' || rec_field.columnname || ''', ''0'') AS INTEGER)';
-              fromStr := fromStr || ' LEFT OUTER JOIN app.' || rec_field.mastertable || ' as ' || masterTableName ||
-                         ' ON ' || masterTableName || '.' || rec_field.mastercolumn || ' = ' || relationColName;
-            END IF;
-          END IF;
-
-        ELSE
-
-          -- =========================================================
-          -- standard column
-          -- =========================================================
-          colSelect := rec_field.columnname;
-          colLabel  := ' as ' || rec_field.columnname;
-
-          IF (rec_field.mastertable IS NOT NULL) THEN
-            INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
-            masterTableName := rec_field.mastertable;
-            SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
-            IF (masterTableCount > 1) THEN
-              masterTableName := masterTableName || masterTableCount;
-            END IF;
-            -- =========================================================
-            -- related table
-            -- =========================================================
-            IF (rec_field.mastertable = 'apptables') THEN
-              RAISE NOTICE '**** mastertable = apptables';
-            ELSE
-              colTable := masterTableName || '.';
-              colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
-              relationColName  := 'tbl.' || rec_field.columnname;
-              fromStr := fromStr || ' LEFT OUTER JOIN app.' || rec_field.mastertable || ' as ' || masterTableName ||
-                         ' ON ' || masterTableName || '.' || rec_field.mastercolumn || ' = ' || relationColName;
-            END IF;
-          END IF;
-
-        END IF;
-
-        IF (rec_field.columnname != 'jsondata') THEN
---           RAISE NOTICE '----------------------------------------';
---           RAISE NOTICE 'selectStr: %', selectStr;
---           RAISE NOTICE 'colTable: %  colSelect: %  colLabel: %', colTable, colSelect, colLabel;
-          selectStr := selectStr || ', ' || colTable || colSelect || colLabel;
---           RAISE NOTICE 'new selectStr: %', selectStr;
-        END IF;
-      ELSE
-        -- =========================================================
-        -- table id
-        -- =========================================================
-        tableName := rec_field.tablename;
-        RAISE NOTICE 'tableName: %', tableName;
-        IF (tableName = 'appdata' OR tableName = 'masterdata') THEN
-          whereStr := ' WHERE tbl.apptableid = ' || idtable || ' ';
-        ELSIF (tableName != 'users') THEN
-          whereStr := ' WHERE tbl.appid = ' || rec_field.appid || ' ';
-        END IF;
-      END IF;
-
-    END LOOP;  -- cursor records
+    execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', 0);';
+    EXECUTE execStr INTO resp;
 
     CLOSE cur_fields;
+
+    tableName := resp->>'tableName';
+    tableIdColumn := 'id';
+    selectStr := resp->>'selectStr';
+    fromStr := resp->>'fromStr';
+    idx := strpos(resp->>'whereStr', 'and');
+    whereStr := substring(resp->>'whereStr', 0, idx);
 
 --     RAISE NOTICE '----------------------------------------';
 --     RAISE NOTICE 'tableIdColumn: %  tableName:  %', tableIdColumn, tableName;
@@ -862,13 +856,10 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric) RETURNS json
 --     RAISE NOTICE 'whereStr: .%.', whereStr;
 --     RAISE NOTICE '';
 --     RAISE NOTICE '----------------------------------------';
---     SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = 'users';
---     RAISE NOTICE 'masterTableCount: %', masterTableCount;
---     RAISE NOTICE '----------------------------------------';
 
-    execStr := 'SELECT tbl.' || tableIdColumn || selectStr ||
+    execStr := 'SELECT ' || selectStr ||
                ' FROM app.' || tableName || ' tbl' || fromStr ||
-               whereStr ||
+               ' WHERE ' || whereStr ||
                ' ORDER BY ' || 'tbl.' || tableIdColumn;
     RAISE NOTICE '----------------------------------------';
     RAISE NOTICE 'execStr: %', execStr;
@@ -876,10 +867,8 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric) RETURNS json
     EXECUTE 'SELECT array_to_json(array_agg(row_to_json(t))) FROM (' || execStr || ') t;' INTO result;
     RAISE NOTICE 'result: %', result;
 
-    DROP TABLE lookup;
-
     IF (result is null) THEN
-  		RETURN '{}';
+  		RETURN '[]';
     ELSE
     	RETURN result;
 	  END IF;
@@ -1078,8 +1067,9 @@ CREATE FUNCTION metadata.appformgetdatatable(idtable numeric) RETURNS json
 
 	BEGIN
     headerStr :=
-    'select label as text, columnname as value, displayorder
-    from metadata.appcolumns
+    'select col.label as text, col.columnname as value, col.displayorder, dt.name as datatype
+    from metadata.appcolumns as col
+    left outer join metadata.datatypes as dt on dt.id = col.datatypeid
     where apptableid = ' || idtable || '
     order by displayorder';
     RAISE NOTICE 'headerStr: %', headerStr;
@@ -1304,6 +1294,70 @@ $$;
 ALTER FUNCTION metadata.datamapgettableoptions(idapp numeric) OWNER TO appowner;
 
 --
+-- Name: fetchdatamodel(numeric); Type: FUNCTION; Schema: metadata; Owner: appowner
+--
+
+CREATE FUNCTION metadata.fetchdatamodel(idapp numeric) RETURNS TABLE(id integer, appid integer, label character varying, tablename character varying, description character varying, createdat timestamp without time zone, updatedat timestamp without time zone, appcolumns json)
+    LANGUAGE plpgsql
+    AS $$
+
+  DECLARE
+    result JSON;
+    execStr TEXT;
+
+  BEGIN
+		RETURN QUERY
+      SELECT
+        tbl.id,
+        tbl.appid,
+        tbl.label,
+        tbl.tablename,
+        tbl.description,
+        tbl.createdat,
+        tbl.updatedat,
+        (
+          select array_to_json(array_agg(row_to_json(t))) from (
+            select
+            cols.id,
+            cols.columnname,
+            cols.label,
+            cols.datatypeid,
+            cols.mastertable,
+            cols.apptableid,
+            cols.jsonfield,
+            dt.name as datatype,
+            (select row_to_json(t) from (
+              select
+              t.id,
+              t.tablename,
+              c.id,
+              c.columnname,
+              d.name as datatype
+              from
+              metadata.apptables t,
+              metadata.appcolumns c
+              left outer join metadata.datatypes as d on d.id = c.datatypeid
+              where
+              t.tablename = cols.mastertable
+              and c.apptableid = t.id
+              and c.columnname = metadata.getColumnFromDisplayName(cols.masterdisplay::text)
+              ) t
+            ) as refcol
+            from metadata.appcolumns as cols
+            left outer join metadata.datatypes as dt on dt.id = cols.datatypeid
+            where cols.apptableid = tbl.id AND (cols.columnname != 'apptableid' AND cols.columnname != 'jsondata')
+          ) t
+        ) as appcolumns
+      FROM metadata.apptables AS tbl
+      WHERE tbl.appid = idapp
+      ORDER BY tbl.label ASC;
+	END;
+$$;
+
+
+ALTER FUNCTION metadata.fetchdatamodel(idapp numeric) OWNER TO appowner;
+
+--
 -- Name: formrecordadd(integer, integer[], text[]); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
@@ -1465,7 +1519,7 @@ CREATE FUNCTION metadata.formrecordfindbyid(idform integer, idrec integer) RETUR
 
     OPEN cur_fields(tableId);
 
-    execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', ' || idrec || ');';
+    execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', ' || idrec || ', true);';
     EXECUTE execStr INTO resp;
 
     CLOSE cur_fields;
@@ -1560,6 +1614,9 @@ CREATE FUNCTION metadata.formrecordupdate(idform integer, idrec integer, fieldid
     tableName := resp->>'tableName';
     tableCol := resp->>'tableCol';
     setStr := resp->>'setStr';
+    RAISE NOTICE 'tableName: %', tableName;
+    RAISE NOTICE 'tableCold: %', tableCol;
+    RAISE NOTICE 'setStr: %', setStr;
 
     execStr := 'UPDATE app.' || tableName || ' SET ' || setStr || ' WHERE id = ' || idrec ||
                ' RETURNING app.' || tableName || '.' || tableCol || ';';
@@ -1571,8 +1628,6 @@ CREATE FUNCTION metadata.formrecordupdate(idform integer, idrec integer, fieldid
       execStr
     INTO id_val;
 
-    -- TODO: replace with call to appformFindById in order to flatten jsondata
---     EXECUTE 'SELECT row_to_json(t) FROM ( SELECT * FROM app.' || tableName || ' WHERE id = ' || id_val || ' ) t;' INTO result;
     EXECUTE 'SELECT row_to_json(t) FROM ( SELECT * FROM metadata.formRecordFindById(' || idform || ', ' || idrec || ')) t;' INTO result;
     RETURN result;
   END;
@@ -1640,6 +1695,7 @@ CREATE FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids 
     apptableValueStr text := '';
     quotes text;
     comma text;
+    fieldVal text;
     firstJsonField boolean := true;
     valueFnd boolean := false;
     attrKeys text[];
@@ -1669,17 +1725,24 @@ CREATE FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids 
             valueFnd := true;
             RAISE NOTICE 'columnname: %  datatype: %  jsonfield %  text: %', rec_field.columnname, rec_field.datatype, rec_field.jsonfield, fieldvals[idx];
 
-            IF (rec_field.datatype = 'text' OR rec_field.datatype = 'timestamp' OR rec_field.datatype = 'json' OR rec_field.datatype = 'varchar') THEN
+            RAISE NOTICE 'rec_field.datatype: %', rec_field.datatype;
+            IF (rec_field.datatype = 'text' OR rec_field.datatype = 'timestamp' OR rec_field.datatype = 'json' OR rec_field.datatype = 'varchar' OR rec_field.datatype = 'integer[]') THEN
               quotes := '''';
             ELSE
               quotes := '';
+            END IF;
+            IF (rec_field.datatype = 'integer[]') THEN
+              -- change the array string
+              fieldVal := replace(replace(fieldvals[idx], '[', '{'), ']', '}');
+            ELSE
+              fieldVal := fieldvals[idx];
             END IF;
 
             -- TODO: combine the following two if tests and process jsondata at the end
             IF (rec_field.jsonfield) THEN
               -- json data -------------------------------------
-             IF (rec_field.columnname != 'jsondata') THEN
-                 IF (firstJsonField) THEN
+              IF (rec_field.columnname != 'jsondata') THEN
+                IF (firstJsonField) THEN
                   comma := '';
                   firstJsonField := false;
                 ELSE
@@ -1690,18 +1753,19 @@ CREATE FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids 
                 ELSE
                   quotes := '';
                 END IF;
-                jsonStr := jsonStr || comma || '"' || rec_field.columnname || '": ' || quotes || fieldvals[idx] || quotes;
+                jsonStr := jsonStr || comma || '"' || rec_field.columnname || '": ' || quotes || fieldVal || quotes;
               END IF;
             ELSIF (rec_field.columnname <> 'createdat') THEN
               -- standard fields -----------------------------
               fieldsStr := fieldsStr || ', ' || rec_field.columnname;
-              valuesStr := valuesStr || ', ' || quotes || fieldvals[idx] || quotes;
+              valuesStr := valuesStr || ', ' || quotes || fieldVal || quotes;
               IF (char_length(setStr) > 0) THEN
                 comma := ', ';
               ELSE
                 comma := '';
               END IF;
-              setStr := setStr || comma || rec_field.columnname || ' = ' || quotes || fieldvals[idx] || quotes;
+              setStr := setStr || comma || rec_field.columnname || ' = ' || quotes || fieldVal || quotes;
+              RAISE NOTICE 'setStr: %', setStr;
               EXIT;  -- stop looping thru fieldids
             END IF;
           END IF;
@@ -1747,10 +1811,10 @@ $$;
 ALTER FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids integer[], fieldvals text[]) OWNER TO appowner;
 
 --
--- Name: getcolumnelementsfromrecord(refcursor, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
+-- Name: getcolumnelementsfromrecord(refcursor, integer, boolean); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
-CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec integer) RETURNS json
+CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec integer, idandref boolean DEFAULT false) RETURNS json
     LANGUAGE plpgsql
     AS $$
 
@@ -1768,6 +1832,7 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
     relationColName TEXT;
     masterTableCount INTEGER;
     masterTableName TEXT;
+    masterdisplayPos INTEGER;
 
     attrKeys text[];
     attrVals text[];
@@ -1798,10 +1863,12 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
           colLabel := ' as ' || rec_field.columnname;
 
           IF (rec_field.mastertable IS NOT NULL) THEN
-            -- add ID information
-            selectStr := selectStr || ', ' || colTable || colSelect || colLabel;
-            -- strip id from end of columnname
-            colLabel := left(colLabel, -2);
+            IF (idAndRef) THEN
+              -- add ID information
+              selectStr := selectStr || ', ' || colTable || colSelect || colLabel;
+              -- strip id from end of columnname
+              colLabel := left(colLabel, -2);
+            END IF;
 
             -- =========================================================
             -- related table
@@ -1830,7 +1897,7 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
                 -- there are multiple references to the same table so make them unique using the Count
                 masterTableName := masterTableName || masterTableCount;
               END IF;
-              IF (rec_field.masterdisplay ~ '||') THEN
+               IF (rec_field.masterdisplay ~ '||') THEN
                 -- TODO: process compound display: add mastertable to each column, create procedure, provide logic for standard columns as well
                 colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
               ELSE
@@ -1852,28 +1919,51 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
           colLabel  := ' as ' || rec_field.columnname;
 
           IF (rec_field.mastertable IS NOT NULL) THEN
-            -- add ID information
-            selectStr := selectStr || ', ' || colTable || colSelect || colLabel;
-            -- strip id from end of columnname
-            colLabel := left(colLabel, -2);
-
-            INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
-            masterTableName := rec_field.mastertable;
-            SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
-            IF (masterTableCount > 1) THEN
-              masterTableName := masterTableName || masterTableCount;
+            IF (idAndRef) THEN
+              -- add ID information
+              selectStr := selectStr || ', ' || colTable || colSelect || colLabel;
+              -- strip id from end of columnname
+              colLabel := left(colLabel, -2);
             END IF;
-            -- =========================================================
-            -- related table
-            -- =========================================================
-            IF (rec_field.mastertable = 'apptables') THEN
-              RAISE NOTICE '**** mastertable = apptables';
+
+            IF (rec_field.datatype = 'integer[]') THEN
+              -- =========================================================
+              -- array of references
+              -- =========================================================
+              RAISE NOTICE '************************* datatype: %', rec_field.datatype;
+              -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
+              colTable := 'ARRAY(SELECT ' || rec_field.masterdisplay ||
+                          ' FROM app.' || rec_field.mastertable ||
+                          ' WHERE id IN ( SELECT unnest(tbl.' || rec_field.columnname || ') ) )';
+              RAISE NOTICE 'colTable: %', colTable;
+              colSelect := '';
             ELSE
-              colTable := masterTableName || '.';
-              colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
-              relationColName  := 'tbl.' || rec_field.columnname;
-              fromStr := fromStr || ' LEFT OUTER JOIN app.' || rec_field.mastertable || ' as ' || masterTableName ||
-                         ' ON ' || masterTableName || '.' || rec_field.mastercolumn || ' = ' || relationColName;
+              -- =========================================================
+              -- single reference
+              -- =========================================================
+              INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
+              masterTableName := rec_field.mastertable;
+              SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
+              IF (masterTableCount > 1) THEN
+                masterTableName := masterTableName || masterTableCount;
+              END IF;
+              -- =========================================================
+              -- related table
+              -- =========================================================
+              IF (rec_field.mastertable = 'apptables') THEN
+                RAISE NOTICE '**** mastertable = apptables';
+              ELSE
+                colTable := masterTableName || '.';
+
+                colSelect := regexp_replace(rec_field.masterdisplay, rec_field.mastertable, masterTableName, 'g');
+                relationColName  := 'tbl.' || rec_field.columnname;
+                fromStr := fromStr || ' LEFT OUTER JOIN app.' || rec_field.mastertable || ' as ' || masterTableName ||
+                           ' ON ' || masterTableName || '.' || rec_field.mastercolumn || ' = ' || relationColName;
+                IF (POSITION('.' in rec_field.masterdisplay) > 0) THEN
+                  RAISE NOTICE '****************** masterdisplay: %  pos: %', rec_field.masterdisplay, masterdisplayPos;
+                  colTable := '';
+                END IF;
+              END IF;
             END IF;
           END IF;
 
@@ -1890,7 +1980,7 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
         tableId := rec_field.apptableid;
         RAISE NOTICE 'tableName: %', tableName;
         IF (tableName = 'appdata' OR tableName = 'masterdata') THEN
-          whereStr := ' tbl.apptableid = ' || tableId || ' and tbl.id = ' || idrec;
+          whereStr := ' tbl.apptableid = ' || tableid || ' and tbl.id = ' || idrec;
         ELSIF (tableName != 'users') THEN
           whereStr := ' tbl.appid = ' || rec_field.appid || ' and tbl.id = ' || idrec;
         END IF;
@@ -1907,7 +1997,33 @@ CREATE FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec intege
 $$;
 
 
-ALTER FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec integer) OWNER TO appowner;
+ALTER FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec integer, idandref boolean) OWNER TO appowner;
+
+--
+-- Name: getcolumnfromdisplayname(text); Type: FUNCTION; Schema: metadata; Owner: appowner
+--
+
+CREATE FUNCTION metadata.getcolumnfromdisplayname(str text) RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE
+  pos integer;
+
+BEGIN
+  pos := position('.' in str);
+
+  IF(pos > 0) THEN
+    RETURN substr(str, pos+1);
+  ELSE
+    RETURN str;
+  END IF;
+END;
+
+$$;
+
+
+ALTER FUNCTION metadata.getcolumnfromdisplayname(str text) OWNER TO appowner;
 
 --
 -- Name: getresourcevalues(character varying); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -2016,7 +2132,7 @@ END;
 $$;
 
 
-ALTER FUNCTION metadata.getresourcevalues(idresource character varying) owner to appowner;
+ALTER FUNCTION metadata.getresourcevalues(idresource character varying) OWNER TO appowner;
 
 --
 -- Name: loadappbunos(integer); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -2217,33 +2333,51 @@ $$;
 ALTER FUNCTION metadata.menuitemadd(item json) OWNER TO appowner;
 
 --
--- Name: menusfindall(); Type: FUNCTION; Schema: metadata; Owner: appowner
+-- Name: menusfindall(integer); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
-CREATE FUNCTION metadata.menusfindall() RETURNS TABLE(id integer, parentid integer, label character varying, routerpath character varying, icon character varying, appid integer, pageid integer, active integer, itemposition integer, syspath character varying, subitems integer[])
+CREATE FUNCTION metadata.menusfindall(iduser integer DEFAULT NULL::integer) RETURNS TABLE(id integer, parentid integer, label character varying, routerpath character varying, icon character varying, appid integer, pageid integer, active integer, itemposition integer, syspath character varying, subitems integer[])
     LANGUAGE plpgsql
     AS $$
-	BEGIN
+	DECLARE
+	  userRoles integer[] := ARRAY[]::integer[];
+	  user_role RECORD;
+	  user_roles CURSOR(id INTEGER) FOR SELECT * FROM app.getUserRoles(id);
+
+    BEGIN
+	    IF (iduser IS NOT NULL) THEN
+	      OPEN user_roles(iduser);
+	      LOOP
+          FETCH user_roles INTO user_role;
+          EXIT WHEN NOT FOUND;
+          RAISE NOTICE 'roleid: %', user_role.roleid;
+          userRoles := array_append(userRoles, user_role.roleid);
+        END LOOP;
+	    END IF;
+
+    RAISE NOTICE 'userRoles: %', userRoles;
 		RETURN QUERY
 		SELECT
-      items.id,
-      items.parentid,
-      items.label,
-      items.routerpath,
-      (select icons.icon from metadata.menuicons icons where icons.id = items.iconid),
-      items.appid,
-      items.pageid,
-      items.active,
-      items.position as itemposition,
-      (select mp.syspath from metadata.menupaths mp where mp.id = items.pathid) as syspath,
-      array(select subs.id from metadata.menuitems subs where subs.parentid = items.id) as subitems
-		FROM metadata.menuitems items
-    ORDER BY syspath, itemposition;
+            items.id,
+            items.parentid,
+            items.label,
+	          items.routerpath,
+            (select icons.icon from metadata.menuicons icons where icons.id = items.iconid),
+            items.appid,
+            items.pageid,
+            items.active,
+            items.position as itemposition,
+            (select mp.syspath from metadata.menupaths mp where mp.id = items.pathid) as syspath,
+            array(select subs.id from metadata.menuitems subs where subs.parentid = items.id) as subitems
+	  FROM metadata.menuitems items
+	       LEFT OUTER JOIN metadata.pages as page ON items.pageid = page.id
+    WHERE items.pageid = 0 OR (page.allowedroles is null OR page.allowedroles = '{}' OR page.allowedroles && userRoles)
+		ORDER BY syspath, itemposition;
 	END;
 $$;
 
 
-ALTER FUNCTION metadata.menusfindall() OWNER TO appowner;
+ALTER FUNCTION metadata.menusfindall(iduser integer) OWNER TO appowner;
 
 --
 -- Name: pageadd(json); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -2371,17 +2505,30 @@ $$;
 ALTER FUNCTION metadata.pageformsadd(idapp numeric, idpage numeric, idappcolumn numeric, descr text, jsonvalue jsonb) OWNER TO appowner;
 
 --
--- Name: pageformsfindbyid(numeric, numeric); Type: FUNCTION; Schema: metadata; Owner: appowner
+-- Name: pageformsfindbyid(numeric, numeric, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
-CREATE FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) RETURNS TABLE(appid integer, pageid integer, title character varying, formid integer, tableid integer, columnid integer, columnname character varying, formtitle character varying, description character varying, formjson jsonb, pageactions json)
+CREATE FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric, iduser integer DEFAULT NULL::integer) RETURNS TABLE(appid integer, pageid integer, title character varying, formid integer, tableid integer, columnid integer, columnname character varying, description character varying, formjson jsonb, pageactions json)
     LANGUAGE plpgsql
     AS $$
 
   DECLARE
     actions JSON := metadata.pageFormsGetActionsByPage(idpage);
+	  userRoles integer[] := ARRAY[]::integer[];
+	  user_role RECORD;
+	  user_roles CURSOR(id INTEGER) FOR SELECT * FROM app.getUserRoles(id);
 
 	BEGIN
+    IF (iduser IS NOT NULL) THEN
+      OPEN user_roles(iduser);
+      LOOP
+        FETCH user_roles INTO user_role;
+        EXIT WHEN NOT FOUND;
+        RAISE NOTICE 'roleid: %', user_role.roleid;
+        userRoles := array_append(userRoles, user_role.roleid);
+      END LOOP;
+    END IF;
+
 		RETURN QUERY
 		SELECT
       page.appid,
@@ -2391,7 +2538,6 @@ CREATE FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) RETURN
       pf.apptableid as tableid,
       pf.columnid,
       pf.columnname,
-      pf.title as formtitle,
       pf.description,
       pf.jsondata as formjson,
       actions as pageactions
@@ -2406,7 +2552,6 @@ CREATE FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) RETURN
             col.apptableid,
             col.id as columnid,
             col.columnname,
-            pf.title,
             pf.description,
             pf.jsondata
           FROM
@@ -2416,12 +2561,13 @@ CREATE FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) RETURN
       ON
         pf.pageid = page.id
     WHERE
-      page.appid = idapp AND page.id = idpage;
+      page.appid = idapp AND page.id = idpage
+      AND (page.allowedroles is null OR page.allowedroles = '{}' OR page.allowedroles && userRoles);
 	END;
 $$;
 
 
-ALTER FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) OWNER TO appowner;
+ALTER FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric, iduser integer) OWNER TO appowner;
 
 --
 -- Name: pageformsgetactionsbypage(numeric); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -2769,11 +2915,12 @@ ALTER SEQUENCE app.activities_id_seq OWNED BY app.activity.id;
 
 CREATE TABLE app.adhoc_queries (
     id integer NOT NULL,
-    name character varying(20),
+    name character varying(60),
     appid integer NOT NULL,
     jsondata jsonb,
     createdat timestamp without time zone,
-    updatedat timestamp without time zone DEFAULT now()
+    updatedat timestamp without time zone DEFAULT now(),
+    reporttemplateid integer
 );
 
 
@@ -3114,6 +3261,45 @@ ALTER SEQUENCE app.priority_id_seq OWNED BY app.priority.id;
 
 
 --
+-- Name: reporttemplates; Type: TABLE; Schema: app; Owner: appowner
+--
+
+CREATE TABLE app.reporttemplates (
+    id integer NOT NULL,
+    appid integer NOT NULL,
+    name character varying(60) NOT NULL,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now(),
+    primarytableid integer,
+    jsondata jsonb
+);
+
+
+ALTER TABLE app.reporttemplates OWNER TO appowner;
+
+--
+-- Name: reporttemplates_id_seq; Type: SEQUENCE; Schema: app; Owner: appowner
+--
+
+CREATE SEQUENCE app.reporttemplates_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE app.reporttemplates_id_seq OWNER TO appowner;
+
+--
+-- Name: reporttemplates_id_seq; Type: SEQUENCE OWNED BY; Schema: app; Owner: appowner
+--
+
+ALTER SEQUENCE app.reporttemplates_id_seq OWNED BY app.reporttemplates.id;
+
+
+--
 -- Name: resourcetypes; Type: TABLE; Schema: app; Owner: appowner
 --
 
@@ -3235,7 +3421,8 @@ CREATE TABLE app.roles (
     description character varying(256),
     appid integer NOT NULL,
     createdat timestamp without time zone,
-    updatedat timestamp without time zone DEFAULT now()
+    updatedat timestamp without time zone DEFAULT now(),
+    jsondata jsonb
 );
 
 
@@ -3398,7 +3585,8 @@ CREATE TABLE app.workflow_status (
     description character varying(20),
     createdat timestamp without time zone,
     updatedat timestamp without time zone DEFAULT now(),
-    appid integer NOT NULL
+    appid integer NOT NULL,
+    jsondata jsonb
 );
 
 
@@ -3435,7 +3623,10 @@ CREATE TABLE app.workflow_actions (
     name character varying(100),
     description character varying(128),
     active boolean,
-    appid integer
+    appid integer,
+    jsondata jsonb,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
 );
 
 
@@ -3476,7 +3667,9 @@ CREATE TABLE app.workflow_states (
     appid integer NOT NULL,
     issuetypeid integer,
     jsondata jsonb,
-    initialstate boolean DEFAULT false
+    initialstate boolean DEFAULT false,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
 );
 
 
@@ -3514,7 +3707,11 @@ CREATE TABLE app.workflow_statetransitions (
     stateinid integer,
     stateoutid integer,
     label character varying(100),
-    appid integer
+    appid integer,
+    jsondata jsonb,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now(),
+    allowedroles integer[]
 );
 
 
@@ -4072,7 +4269,7 @@ CREATE TABLE metadata.menuitems (
     label character varying(40),
     iconid integer,
     appid integer,
-    pageid integer,
+    pageid integer DEFAULT 0 NOT NULL,
     active integer DEFAULT 1,
     "position" integer,
     pathid integer,
@@ -4152,8 +4349,7 @@ CREATE TABLE metadata.pageforms (
     updatedat timestamp without time zone DEFAULT now(),
     systemcategoryid integer,
     appcolumnid integer,
-    description character varying(128),
-    title character varying(40)
+    description character varying(128)
 );
 
 
@@ -4190,7 +4386,8 @@ CREATE TABLE metadata.pages (
     appid integer NOT NULL,
     title character varying(40) NOT NULL,
     name character varying(30),
-    description character varying(60)
+    description character varying(60),
+    allowedroles integer[]
 );
 
 
@@ -4454,6 +4651,13 @@ ALTER TABLE ONLY app.priority ALTER COLUMN id SET DEFAULT nextval('app.priority_
 
 
 --
+-- Name: reporttemplates id; Type: DEFAULT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.reporttemplates ALTER COLUMN id SET DEFAULT nextval('app.reporttemplates_id_seq'::regclass);
+
+
+--
 -- Name: resourcetypes id; Type: DEFAULT; Schema: app; Owner: appowner
 --
 
@@ -4661,7 +4865,7 @@ COPY app.activity (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: adhoc_queries; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat) FROM stdin;
+COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat, reporttemplateid) FROM stdin;
 \.
 
 
@@ -5114,6 +5318,10 @@ COPY app.groups (id, name, description, createdat, updatedat) FROM stdin;
 6	admins	Project Administrators	2018-12-07 04:24:40.034	2018-12-07 18:19:23.555
 10	TD Tracker Users	TD Tracker users group	2018-12-07 18:30:02.817	2018-12-07 18:30:02.817
 11	managers1	Test managers 1	2019-02-27 20:54:24.989	2019-02-27 20:54:24.989
+17	Squadron	General squadron user	2019-05-16 15:16:14.505	2019-05-16 15:16:14.505
+16	FST	Fleet Support Team group	2019-05-16 19:15:36.04	2019-05-16 15:24:38.219
+15	FSR	Field Service Representative group	2019-05-16 19:15:22.826	2019-05-16 15:25:03.696
+18	OEM	Original Equipment Manufacturer group	2019-05-16 15:27:52.695	2019-05-16 15:27:52.695
 \.
 
 
@@ -5150,6 +5358,14 @@ COPY app.priority (id, appid, label, description, createdat, updatedat, jsondata
 
 
 --
+-- Data for Name: reporttemplates; Type: TABLE DATA; Schema: app; Owner: appowner
+--
+
+COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata) FROM stdin;
+\.
+
+
+--
 -- Data for Name: resourcetypes; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
@@ -5162,6 +5378,8 @@ COPY app.resourcetypes (id, name) FROM stdin;
 --
 
 COPY app.roleassignments (id, roleid, userid, groupid, createdat, updatedat) FROM stdin;
+79	36	\N	1	2019-05-14 12:51:47.291	2019-05-14 12:51:51.963
+95	36	\N	6	2019-05-28 12:34:30.800446	2019-05-28 12:34:30.800446
 \.
 
 
@@ -5177,7 +5395,8 @@ COPY app.rolerestrictions (id, resourcetypeid, appid, roleid, visible, editable,
 -- Data for Name: roles; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.roles (id, name, description, appid, createdat, updatedat) FROM stdin;
+COPY app.roles (id, name, description, appid, createdat, updatedat, jsondata) FROM stdin;
+36	System Administrators	System admins for maintenance of applications	0	2019-05-14 16:45:27.003	2019-05-28 12:34:30.802	\N
 \.
 
 
@@ -5212,6 +5431,15 @@ COPY app.usergroups (id, userid, groupid, createdat, updatedat) FROM stdin;
 32	13	6	2019-02-27 21:18:21.334095	2019-02-27 21:18:21.334095
 33	2174	6	2019-02-27 21:21:57.822569	2019-02-27 21:21:57.822569
 34	2174	11	2019-02-27 21:21:57.822569	2019-02-27 21:21:57.822569
+41	33	15	2019-05-16 17:00:30.211943	2019-05-16 17:00:30.211943
+42	34	15	2019-05-16 17:01:04.741426	2019-05-16 17:01:04.741426
+43	36	16	2019-05-16 17:02:21.810356	2019-05-16 17:02:21.810356
+44	35	16	2019-05-16 17:02:40.783454	2019-05-16 17:02:40.783454
+45	37	18	2019-05-16 17:03:54.696959	2019-05-16 17:03:54.696959
+46	38	18	2019-05-16 17:04:20.516743	2019-05-16 17:04:20.516743
+47	10	17	2019-05-16 18:18:12.921876	2019-05-16 18:18:12.921876
+48	11	17	2019-05-16 18:18:17.95073	2019-05-16 18:18:17.95073
+49	12	17	2019-05-16 18:18:23.496915	2019-05-16 18:18:23.496915
 \.
 
 
@@ -5456,9 +5684,9 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 2242	0	thomas.h.bonner@navy.mil	Thomas	H	Bonner	\N				CN=BONNER.THOMAS.HOWARD.JR.1134101578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BONNER.THOMAS.HOWARD.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
 2244	1	leanne.booth@navy.mil	Leanne		Booth	3	2524649978			CN=BOOTH.LEANNE.M.1262186683,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230678274	BOOTH.LEANNE.M	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
 1725	1	travis.makarowski@navy.mil	Travis		Makarowski	4	2524646396			CN=MAKAROWSKI.TRAVIS.W.1141323233,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	TRAVIS MAKAROWSKI	21	23	1	18	0	\N	\N	\N	4	\N	0	\N
-12	\N	chris.projecttasks@email.com	Chris	A	Projecttasks3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:19:29.179053	\N	\N	\N	\N	1	\N
 2246	1	travis.borkowski@usmc.mil	Travis		Borkowski	5	8585778089			CN=BORKOWSKI.TRAVIS.CHRISTOPHER.1242523730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242523730	BORKOWSKI.TRAVIS.CHRISTOPHER	7	48	3	4	0	\N	\N	\N	3	\N	0	\N
 2248	1	brad.bosman@usmc.mil	Brad		Bosman	5	9104494357	4494357		CN=BOSMAN.BRAD.WILLIAM.1411008432,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411008432	BOSMAN.BRAD.WILLIAM	5	25	3	2	0	\N	\N	\N	3	\N	0	\N
+34	\N	sebastian.mills@fsr.mil	Sebastian	B	Mills	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:01:04.665282	\N	\N	\N	\N	1	\N
 2250	0	andrew.boston@usmc.mil	Andrew	M	Boston	\N				CN=BOSTON.ANDREW.MARK.1387733848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BOSTON.ANDREW.MARK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
 2252	1	kennth.bowden@usmc.mil	Kenneth		Bowden	5	9104497231			CN=BOWDEN.KENNETH.WEST.1365099894,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365099894	BOWDEN.KENNETH.WEST	5	25	3	2	0	\N	\N	\N	3	\N	0	1
 2254	1	joshua.bowen.1@us.af.mil	Joshua		Bowen	5	0163854461	2384613		CN=BOWEN.JOSHUA.NATHAN.1258473244,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258473244	BOWEN.JOSHUA.NATHAN	6	4	3	13	0	\N	\N	\N	1	\N	0	2
@@ -5735,6 +5963,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3210	1	brian.mays@usmc.mil	Brian		Mays	5	9104495661			CN=MAYS.BRIAN.DEE.1285995775,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1285995775		6	49	3	2	0	\N	\N	\N	3	\N	0	\N
 3227	1	thoffer@bh.com	Thomas		Hoffer	4	8173726048			CN=Thomas Hoffer,OU=Bell Helicopter\\, Textron\\, INC,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	1	1
 3228	1	tamiller@bh.com	Todd		Miller	4	8175906047		8172806048	CN=Todd Allen Miller,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	2	2	0	\N	\N	\N	3	\N	0	1
+25	\N	claire.metcalfe@all.com	Claire	N	Metcalfe	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:40:38.362506	\N	\N	\N	\N	1	\N
 3231	1	evan.hansen@usmc.mil	Evan		Hansen	5	8585774289			CN=HANSEN.EVAN.ALLEN.1501091940,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501091940		3	23	3	6	0	\N	\N	\N	3	\N	1	1
 3241	0	morgan.walker@boxer.usmc.mil	Morgan		Walker	5	8585778091	2678091		CN=WALKER.MORGAN.JONATHAN.1187212843,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187212843		17	48	3	4	0	\N	\N	\N	3	\N	0	1
 3249	1	mike.goncalves@usmc.mil	Mike		Goncalves	5	7607253262			CN=GONCALVES.MIKE.1460497953,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460497953		4	28	3	8	0	\N	\N	\N	3	\N	1	1
@@ -5770,6 +5999,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3193	1	jared.barrow@usmc.mil	Jared		Barrow	3	8585774298			CN=BARROW.JARED.JOSEPH.1461992451,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461992451		4	23	3	4	0	\N	\N	\N	3	\N	1	1
 3196	1	edward.m.bolish@boeing.com	Edward		Bolish	3	6105914613	4566544566		CN=Edward.M.Bolish.14213,OU=people,O=boeing,C=us	1065484494		21	9	1	17	0	\N	\N	\N	3	\N	0	\N
 3197	1	xerdan.canlas@lha6.navy.mil	Xerdan		Canlas	5	6195563897			CN=CANLAS.XERDAN.L.1265181585,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265181585		5	158	3	6	0	\N	\N	\N	4	\N	1	1
+26	\N	harry.berry@all.com	Harry	\N	Berry	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:41:00.863923	\N	\N	\N	\N	1	\N
 3198	1	brandi.parker@us.af.mil	Brandi		Parker	5	8508841309			CN=PARKER.BRANDI.LEIGH.1178994138,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1178994138		6	2	3	11	0	\N	\N	\N	1	\N	0	2
 3201	0	shival.ramroop@usmc.mil	Shival		Ramroop	5	8585778143			CN=RAMROOP.SHIVAL.NICHOLAS.1255481408,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255481408		6	43	3	4	0	\N	\N	\N	3	\N	0	1
 3202	1	gabriel.s.marrow@boeing.com	Gabriel		Marrow	3	2523674895	5714944		CN=MARROW.GABRIEL.S.III.1056554935,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1056554935		20	17	2	80	0	\N	\N	\N	3	\N	0	\N
@@ -5838,6 +6068,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 2350	1	walter.dehaan@usmc.mil	Walter		Dehaan	5	9104497367	7527367		CN=DEHAAN.WALTER.ALLEN.1254285583,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254285583	DEHAAN.WALTER.ALLEN	7	54	3	2	0	\N	\N	\N	3	\N	0	1
 2352	1	michael.demars@usmc.mil	Michael		Demars	1	9104497376	7228011		CN=DEMARS.MICHAEL.JOSEPH.1283462230,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283462230	DEMARS.MICHAEL.JOSEPH	11	54	3	2	0	\N	\N	\N	3	\N	0	\N
 2354	1	rose.denbleyker@usmc.mil	Rose		Denbleyker	3	8585778349			CN=DENBLEYKER.ROSE.VICTORIA.1395330345,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395330345	DENBLEYKER.ROSE.VICTORIA	21	15	1	4	0	\N	\N	\N	3	\N	0	1
+36	\N	carol.fisher@fst.mil	Carol	D	Fisher	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:02:21.730429	\N	\N	\N	\N	1	\N
 2356	0	ryan.dibble@whmo.mil	Ryan	C	Dibble	\N				CN=DIBBLE.RYAN.CHRISTOPHER.1266320694,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DIBBLE.RYAN.CHRISTOPHER	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
 2358	1	walker.dillenbeck@usmc.mil	Walker		Dillenbeck	5	8585779400			CN=DILLENBECK.WALKER.JARRED.1454460622,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454460622	DILLENBECK.WALKER.JARRED	5	60	3	4	0	\N	\N	\N	3	\N	0	\N
 2360	0	james.dodson@navy.mil	James	L	Dodson	\N				CN=DODSON.JAMES.LEONARD.1122247453, OU=USN, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	Dodson,James L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
@@ -5872,6 +6103,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 1768	1	lori.birchfield@navy.mil	Lori		Birchfield	5	2522692150	123123123		CN=BIRCHFIELD.LORI.A.1051055540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
 2006	1	lawrinda.stone@navy.mil	Lawrinda		Stone	3	2524648770			CN=STONE.LAWRINDA.M.1230678274,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	15	1	18	0	\N	\N	\N	3	\N	0	1
 2065	1	jchmartin@bh.com	Joseph		Martin	5	8508812651			CN=MARTIN.JOSEPH.CURT.1130630924,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1130630924		20	16	2	11	0	\N	\N	\N	1	\N	0	2
+35	\N	brian.davidson@fst.mil	Brian	C	Davidson	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 21:01:55.564	\N	\N	\N	\N	1	\N
 2066	1	ronald.d.page@boeing.com	Ronald		Page	5	8508812645	6412645		CN=PAGE.RONALD.D.1170990079,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	16	2	11	0	\N	\N	\N	1	\N	0	2
 2426	1	william.j.frazier@usmc.mil	William		Frazier	5	9104497127			CN=FRAZIER.WILLIAM.JAMES.1385724485,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1385724485	FRAZIER.WILLIAM.JAMES	15	49	3	2	0	\N	\N	\N	3	\N	0	1
 2428	1	brian.freeman@usmc.mil	Brian		Freeman	5	9102651561			CN=FREEMAN.BRIAN.SHAWN.1186089118,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186089118	FREEMAN.BRIAN.SHAWN	7	49	3	77	0	\N	\N	\N	3	\N	0	1
@@ -5907,6 +6139,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3524	1	bradford.yazzie@us.af.mil	Bradford		Yazzie	5	5058535089			CN=YAZZIE.BRADFORD.RYAN.1292988091,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292988091		5	6	3	5	0	\N	\N	\N	1	\N	1	\N
 3525	1	charles.beltram@usmc.mil	Charles		Beltram	3	7607631487			CN=BELTRAM.CHARLES.AARON.II.1246365705,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246365705		7	57	3	8	0	\N	\N	\N	3	\N	1	\N
 3528	1	timothy.stumpf@us.af.mil	Timothy		Stumpf	5	3122381862			CN=STUMPF.TIMOTHY.GEORGE.1252608911,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252608911		7	4	3	13	0	\N	\N	\N	1	\N	1	\N
+37	\N	alexandra.poole@oem.com	Alexandra	E	Poole	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:03:54.621326	\N	\N	\N	\N	1	\N
 3530	1	howard.pinnell@navy.mil	Howard		Pinnell	4	3017575186			CN=PINNELL.HOWARD.PERRY.1051795578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051795578		21	38	1	9	0	\N	\N	\N	4	\N	1	\N
 3535	1	christopher.stinnett@usmc.mil	Christopher		Stinnett	5	6109555149			CN=STINNETT.CHRISTOPHER.LOREN.1265628873,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265628873		7	55	3	81	0	\N	\N	\N	3	\N	1	\N
 3536	1	james.dodson@navy.mil	James		Dodson	4	3013427483			CN=DODSON.JAMES.LEONARD.1122247453,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1122247453		21	38	1	9	0	\N	\N	\N	4	\N	1	\N
@@ -5942,6 +6175,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3510	1	thomas.gaskell.2.ctr@us.af.mil	Thomas		Gaskell	5	3142384396	2384396		CN=GASKELL.THOMAS.P.1093078221,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	21	2	13	0	\N	\N	\N	1	\N	1	\N
 3511	1	eric.crespo@usmc.mil	Eric		Crespo	3	9104494794	9104494		CN=CRESPO.ERIC.NICHOLAS.1295281630,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295281630		6	25	3	2	0	\N	\N	\N	3	\N	0	\N
 3527	1	calieb.prunty@usmc.mil	Calieb		Prunty	3	7607253262			CN=PRUNTY.CALIEB.LEROY.1465177779,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465177779		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
+38	\N	sally.graham@oem.com	Sally	F	Graham	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:04:20.433573	\N	\N	\N	\N	1	\N
 3529	1	joseph.alarcon@us.af.mil	Joseph		Alarcon	3	5058533497	2533497		CN=ALARCON.JOSEPH.E.1137307177,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137307177		8	6	3	5	0	\N	\N	\N	1	\N	1	\N
 3534	1	david.e.carlson@navy.mil	David		Carlson	3	7323231805			CN=CARLSON.DAVID.E.1228939338,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1228939338		21	35	1	3	0	\N	\N	\N	3	\N	1	\N
 3539	1	dustin.g.jones@usmc.mil	Dustin		Jones	5	9282696874			CN=JONES.DUSTIN.GENE.1365911734,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365911734		5	62	3	2	0	\N	\N	\N	3	\N	0	\N
@@ -5977,6 +6211,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3456	1	v327mxgqa@us.af.mil	Derek		Bean	5	5757840919			CN=BEAN.DEREK.REED.1420537189,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1420537189		5	3	3	12	0	\N	\N	\N	1	\N	0	\N
 3471	1	thomas.francoeur@usmc.mil	Thomas		Francoeur	5	3156362583			CN=FRANCOEUR.THOMAS.W.1006168058,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1006168058		8	27	3	7	0	\N	\N	\N	3	\N	0	1
 3472	1	michael.winn@usmc.mil	Michael		Winn	5	7607253262			CN=WINN.MICHAEL.ROBERT.1395235954,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395235954		5	28	3	8	0	\N	\N	\N	3	\N	1	\N
+39	\N	michelle.bower@modapprover.org	Michelle	G	Bower	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:08.204674	\N	\N	\N	\N	1	\N
 3474	0	berry.tanner@usmc.mil	Tanner		Berry	5	7607253262			CN=BERRY.TANNER.MICHAEL.1502277223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502277223		3	28	3	8	0	\N	\N	\N	3	\N	0	\N
 3482	1	kendrick.anderson@usmc.mil	Kendrick		Anderson	5	7607255871			CN=ANDERSON.KENDRICK.ROBERT.1465553410,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465553410		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
 3217	1	daryl.henderson@us.af.mil	Daryl		Henderson	4	8508842091	5792091		CN=HENDERSON.DARYL.LEON.1275484519,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275484519		6	8	3	11	0	\N	\N	\N	1	\N	1	2
@@ -6047,6 +6282,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3509	1	devin.guthrie@navy.mil	Devin		Guthrie	3	2424646282			CN=GUTHRIE.DEVIN.G.1028980694,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1028980694		20	10	1	17	0	\N	\N	\N	4	\N	1	\N
 3514	1	michael.long2@navy.mil	Michael		Long	3	7323234212			CN=LONG.MICHAEL.JOSEPH.JR.1517656549,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1517656549		20	35	1	3	0	\N	\N	\N	4	\N	1	\N
 3532	1	gary.holland.6@us.af.mil	Gary		Holland	5	5058535089	2535089		CN=HOLLAND.GARY.ALLEN.1136944408,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136944408		7	6	1	5	0	\N	\N	\N	1	\N	1	\N
+40	\N	jane.mcgrath@modapprover.org	Jane	H	McGrath	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:31.403728	\N	\N	\N	\N	1	\N
 3533	1	marcelle.novak@navy.mil	Marcelle		Novak	3	2524646690			CN=NOVAK.MARCELLE.E.1091131311,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1091131311		20	15	1	18	0	\N	\N	\N	3	\N	0	\N
 3268	1	eric.t.quigley@boeing.com	Eric		Quigley	3	6105917641			CN=QUIGLEY.ERIC.T.1025976920,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025976920		20	9	2	18	0	\N	\N	\N	3	\N	0	\N
 3272	1	steven.westerdale@us.af.mil	Steven		Westerdale	5	5757840919			CN=WESTERDALE.STEVEN.CRAIG.1364003150,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364003150		5	3	3	12	0	\N	\N	\N	1	\N	1	2
@@ -6082,6 +6318,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3437	1	frederick.thomason@navy.mil	Frederick		Thomason	5	9104495424			CN=THOMASON.FREDERICK.I.JR.1229504602,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229504602		21	10	1	11	0	\N	\N	\N	4	\N	0	\N
 3438	1	david.e.pope@navy.mil	David		Pope	5	9104495708	7515708		CN=POPE.DAVID.E.1192399749,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		21	10	1	11	0	\N	\N	\N	4	\N	1	1
 3453	1	david.gullick.ctr@navy.mil	David		Gullick	3	2405614519			CN=GULLICK.DAVID.RAY.1032094313,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1032094313		20	38	2	9	0	\N	\N	\N	1	\N	0	2
+41	\N	jan.nolan@modteam.org	Jan		Nolan	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:08:55.160078	\N	\N	\N	\N	1	\N
 3262	1	andrew.torres@usmc.mil	Andrew		Torres	5	8585776624			CN=TORRES.ANDREW.1367369244,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367369244		5	23	3	4	0	\N	\N	\N	3	\N	0	\N
 3264	1	megan.graf@us.af.mil	Megan		Graf	4	3084337595			CN=GRAF.MEGAN.VANESSA.1273642494,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273642494		6	3	3	12	0	\N	\N	\N	1	\N	1	2
 3266	1	ellick.wilson.ctr@navy.mil	Ellick		Wilson	3	2524646639			CN=WILSON.ELLICK.R.1229776009,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229776009		21	10	2	18	0	\N	\N	\N	3	\N	1	1
@@ -6117,6 +6354,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3479	1	andre.l.johnson@usmc.mil	Andre		Johnson	5	8582573656			CN=JOHNSON.ANDRE.LAVAL TYLER.1143765977,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1143765977		10	55	3	81	0	\N	\N	\N	3	\N	0	\N
 3480	1	jpimentel@bh.com	Jeremy		Pimentel	3	8585776833			CN=PIMENTEL.JEREMY.RUBEN.1298072811,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	31	2	4	0	\N	\N	\N	3	\N	0	\N
 3487	1	michael.p.williams1@usmc.mil	Michael		Williams	4	7607255871	7607255		CN=WILLIAMS.MICHAEL.PATRICK.1463032609,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463032609		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
+42	\N	charles.walsh@modteam.org	Charles	\N	Walsh	\N	1115551212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:09:16.745487	\N	\N	\N	\N	1	\N
 3263	1	gary.karlson@us.af.mil	Gary		Karlson	1	5058535593	2635593		CN=KARLSON.GARY.LEON.JR.1250591337,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	6	3	5	0	\N	\N	\N	1	\N	1	2
 3271	1	sikhan.chin@usmc.mil	Sikhan		Chin	5	3156366206	6366206		CN=CHIN.SIKHAN.ELIJAH.1235601415,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235601415		12	50	3	7	0	\N	\N	\N	3	\N	0	\N
 3273	1	marquis.little@usmc.mil	Marquis		Little	5	7574445453			CN=LITTLE.MARQUIS.NATHANIEL.1246103964,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246103964		5	149	3	79	0	\N	\N	\N	3	\N	1	1
@@ -6224,12 +6462,14 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 7	\N	donna.tdtracker2	Donna	\N	Tdtracker2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:39:39.899019	\N	\N	\N	\N	1	\N
 8	\N	sean.tdtracker3@email.com	Sean	\N	Tdtracker3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:40:00.711216	\N	\N	\N	\N	1	\N
 9	\N	superuser.tdtrackeradmin@email.com	Superuser		Tdtrackeradmin	\N		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:12:40.507562	\N	\N	\N	\N	1	\N
-10	\N	bob.projecttasks1@email.com	Bob		Projecttasks1	\N		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:18:31.758668	\N	\N	\N	\N	1	\N
-11	\N	fred.projecttasks2	Fred	Q	Projecttasks2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:19:02.917501	\N	\N	\N	\N	1	\N
 4	\N	blah.blahblah@email.com	Blah	A	Blahblah	\N	1231231234	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-09 05:18:50.651	\N	\N	\N	\N	1	\N
 15	\N	smanager2@navy.mil	Sue	B	Manager2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:18.479	\N	\N	\N	\N	1	\N
 16	\N	gmanager3@navy.mil	Guy	C	Manager3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:40.896	\N	\N	\N	\N	1	\N
 2174	1	david.abbott.16@us.af.mil	David		Abbott	5	5058537389	2637389113		CN=ABBOTT.DAVID.J.1248049800,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABBOTT.DAVID.J	20	6	1	5	0	\N	\N	\N	1	\N	0	\N
+11	\N	fred.projecttasks2@squadron.mil	Fred	Q	Projecttasks2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:02.917	\N	\N	\N	\N	1	\N
+33	\N	matt.bailey@fsr.mil	Matt	A	Bailey	\N	111-555-1212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 19:14:55.885	\N	\N	\N	\N	1	\N
+10	\N	bob.projecttasks1@squadron.mil	Bob		Projecttasks1	\N		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 10:18:31.758	\N	\N	\N	\N	1	\N
+12	\N	chris.projecttasks@squadron.mil	Chris	A	Projecttasks3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:29.179	\N	\N	\N	\N	1	\N
 \.
 
 
@@ -6237,7 +6477,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 -- Data for Name: workflow_actions; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.workflow_actions (id, name, description, active, appid) FROM stdin;
+COPY app.workflow_actions (id, name, description, active, appid, jsondata, createdat, updatedat) FROM stdin;
 \.
 
 
@@ -6245,7 +6485,7 @@ COPY app.workflow_actions (id, name, description, active, appid) FROM stdin;
 -- Data for Name: workflow_states; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.workflow_states (id, name, description, statusid, workflowstatusid, appid, issuetypeid, jsondata, initialstate) FROM stdin;
+COPY app.workflow_states (id, name, description, statusid, workflowstatusid, appid, issuetypeid, jsondata, initialstate, createdat, updatedat) FROM stdin;
 \.
 
 
@@ -6253,7 +6493,7 @@ COPY app.workflow_states (id, name, description, statusid, workflowstatusid, app
 -- Data for Name: workflow_statetransitions; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.workflow_statetransitions (id, actionid, stateinid, stateoutid, label, appid) FROM stdin;
+COPY app.workflow_statetransitions (id, actionid, stateinid, stateoutid, label, appid, jsondata, createdat, updatedat, allowedroles) FROM stdin;
 \.
 
 
@@ -6261,7 +6501,7 @@ COPY app.workflow_statetransitions (id, actionid, stateinid, stateoutid, label, 
 -- Data for Name: workflow_status; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.workflow_status (id, name, description, createdat, updatedat, appid) FROM stdin;
+COPY app.workflow_status (id, name, description, createdat, updatedat, appid, jsondata) FROM stdin;
 \.
 
 
@@ -6382,6 +6622,9 @@ COPY metadata.columntemplate (id, tablename, label, datatypeid, length, jsonfiel
 14	issues	Activity	1	\N	f	activity	id	\N	label	activityid
 68	priority	JSON data	5	\N	t	\N	\N	\N	\N	jsondata
 12	issues	Issue Type	1	100	f	issuetypes	id	\N	label	issuetypeid
+69	roles	ID	1	\N	f	\N	\N	\N	\N	id
+70	roles	Name	7	60	f	\N	\N	\N	\N	name
+71	roles	Description	7	256	f	\N	\N	\N	\N	description
 \.
 
 
@@ -6508,25 +6751,25 @@ COPY metadata.menuitems (id, parentid, label, iconid, appid, pageid, active, "po
 2	\N	Home	11	0	1	1	1	1	\N
 5	\N	Support	26	0	7	1	5	1	\N
 3	\N	Applications	27	0	0	1	3	1	apps
-33	4	Form Builder	9	0	29	1	1	10	formbuilder
-42	41	Menu Maintenance	\N	0	34	1	1	10	menuedit
-43	41	Menu Tree	\N	0	35	1	2	10	menutree
-46	44	Pages	\N	0	37	1	2	10	pagemaint
-45	44	Applications	\N	0	36	1	1	10	appmaint
 4	\N	Administration	9	0	0	1	4	1	\N
-111	44	Tables & Columns	\N	\N	\N	\N	3	10	tablemaint
-120	44	Form Actions	\N	0	70	1	4	10	actionmaint
-118	4	Lookup Tables	9	0	68	1	2	10	lookuptable
+35	4	Contact Us	26	0	0	1	7	10	contactus
+162	4	Application Bunos	9	0	76	1	3	10	appbunos
+41	4	Menu Maintenance	\N	0	0	1	5	10	sysadmin
+43	41	Menu Tree	\N	0	35	1	2	10	menutree
+42	41	Menu Maintenance	\N	0	34	1	1	10	menuedit
+45	44	Applications	\N	0	36	1	1	10	appmaint
+44	4	App Maintenance	\N	0	0	1	4	10	\N
+46	44	Pages	\N	0	37	1	2	10	pagemaint
+131	4	User / Role Maintenance	\N	0	0	1	6	10	\N
+130	44	App Resources	\N	0	75	1	6	10	appresources
 133	131	User Maintenance	\N	0	76	1	1	10	usermaint
 134	131	Group Maintenance	\N	0	76	1	2	10	groupmaint
 137	131	Role Maintenance	\N	0	76	1	3	10	rolemaint
-35	4	Contact Us	26	0	0	1	7	10	contactus
-41	4	Menu Maintenance	\N	0	0	1	5	10	sysadmin
-44	4	App Maintenance	\N	0	0	1	4	10	\N
-131	4	User / Role Maintenance	\N	0	0	1	6	10	\N
-162	4	Application Bunos	9	0	76	1	3	10	appbunos
-130	44	App Resources	\N	0	75	1	6	10	appresources
-172	44	Server Request Actions	\N	0	\N	1	5	10	requestactionmaint
+118	4	Lookup Tables	9	0	68	1	2	10	lookuptable
+120	44	Form Actions	\N	0	70	1	4	10	actionmaint
+33	4	Form Builder	9	0	29	1	1	10	formbuilder
+111	44	Tables & Columns	\N	0	77	\N	3	10	tablemaint
+172	44	Server Request Actions	\N	0	78	1	5	10	requestactionmaint
 \.
 
 
@@ -6555,11 +6798,11 @@ COPY metadata.menupaths (syspath, sysname, shortname, id) FROM stdin;
 -- Data for Name: pageforms; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.pageforms (id, pageid, jsondata, createdat, updatedat, systemcategoryid, appcolumnid, description, title) FROM stdin;
-18	1	{"components": [{"id": "emrhfm", "key": "textField", "mask": false, "type": "textfield", "input": true, "label": "Text Field", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customDefaultValue": ""}, {"id": "eah2di8", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-09 20:06:36.487981	2018-08-09 20:06:36.487981	\N	\N	\N	\N
-29	1	{"components": [{"id": "e1uiyjn", "key": "htmlelement", "tag": "p", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "Simple Page <br/>\\n<br/>\\nWith Custom Component", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "euxhscr", "key": "myBtn", "mask": false, "size": "lg", "type": "customcomponent", "block": false, "input": true, "label": "My Custom Component", "theme": "warning", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": false, "customDefaultValue": ""}, {"id": "e6xcskc", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 15:47:42.089989	2018-08-17 15:47:42.089989	\N	\N	\N	\N
-32	30	{"components": [{"id": "ehme4q", "key": "htmlelement", "tag": "h3", "mask": false, "type": "htmlelement", "attrs": [{"attr": "style", "value": "color: blue"}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "Email", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "eca7myt", "key": "panel", "type": "panel", "input": false, "label": "Panel", "theme": "default", "title": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "tableView": false, "breadcrumb": "default", "components": [{"id": "e4p9vwh", "key": "yourEmailAddress", "mask": false, "type": "textfield", "input": true, "label": "Your Email Address", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "enlqw1o", "key": "subject", "mask": false, "type": "textfield", "input": true, "label": "Subject", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "e71s85", "key": "message", "mask": false, "rows": 3, "type": "textarea", "input": true, "label": "Message", "editor": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "wysiwyg": false, "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "customDefaultValue": ""}], "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": false, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customDefaultValue": ""}, {"id": "e6eby0t", "key": "htmlelement2", "tag": "br", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "erpu7es", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 19:31:42.934354	2018-08-17 19:31:42.934354	\N	\N	\N	\N
-33	31	{"components": [{"id": "exhpj2q", "key": "subject", "mask": false, "type": "textfield", "input": true, "label": "Subject", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "etp18j", "key": "message", "mask": false, "rows": 10, "type": "textarea", "input": true, "label": "Submit Request Details Here:", "editor": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "wysiwyg": false, "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "customDefaultValue": ""}, {"id": "e67v8t", "dir": "", "key": "attachment", "url": "", "mask": false, "tags": [], "type": "file", "image": false, "input": true, "label": "Attachment:", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "storage": "url", "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"json": "", "custom": "", "unique": false, "required": false, "customMessage": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "imageSize": "200", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "properties": [{"key": "", "value": ""}], "uploadOnly": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "json": "", "show": null, "when": null}, "customClass": "", "description": "", "fileMaxSize": "1GB", "fileMinSize": "0KB", "filePattern": "*", "labelMargin": 3, "placeholder": "", "defaultValue": [], "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customConditional": "", "customDefaultValue": ""}, {"id": "ezjdk2a", "key": "htmlelement2", "tag": "br", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "ebg71pe", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 19:35:30.174846	2018-08-17 19:35:30.174846	\N	\N	\N	\N
+COPY metadata.pageforms (id, pageid, jsondata, createdat, updatedat, systemcategoryid, appcolumnid, description) FROM stdin;
+18	1	{"components": [{"id": "emrhfm", "key": "textField", "mask": false, "type": "textfield", "input": true, "label": "Text Field", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customDefaultValue": ""}, {"id": "eah2di8", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-09 20:06:36.487981	2018-08-09 20:06:36.487981	\N	\N	\N
+29	1	{"components": [{"id": "e1uiyjn", "key": "htmlelement", "tag": "p", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "Simple Page <br/>\\n<br/>\\nWith Custom Component", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "euxhscr", "key": "myBtn", "mask": false, "size": "lg", "type": "customcomponent", "block": false, "input": true, "label": "My Custom Component", "theme": "warning", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": false, "customDefaultValue": ""}, {"id": "e6xcskc", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 15:47:42.089989	2018-08-17 15:47:42.089989	\N	\N	\N
+32	30	{"components": [{"id": "ehme4q", "key": "htmlelement", "tag": "h3", "mask": false, "type": "htmlelement", "attrs": [{"attr": "style", "value": "color: blue"}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "Email", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "eca7myt", "key": "panel", "type": "panel", "input": false, "label": "Panel", "theme": "default", "title": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "tableView": false, "breadcrumb": "default", "components": [{"id": "e4p9vwh", "key": "yourEmailAddress", "mask": false, "type": "textfield", "input": true, "label": "Your Email Address", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "enlqw1o", "key": "subject", "mask": false, "type": "textfield", "input": true, "label": "Subject", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "e71s85", "key": "message", "mask": false, "rows": 3, "type": "textarea", "input": true, "label": "Message", "editor": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "wysiwyg": false, "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "customDefaultValue": ""}], "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": false, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customDefaultValue": ""}, {"id": "e6eby0t", "key": "htmlelement2", "tag": "br", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "erpu7es", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 19:31:42.934354	2018-08-17 19:31:42.934354	\N	\N	\N
+33	31	{"components": [{"id": "exhpj2q", "key": "subject", "mask": false, "type": "textfield", "input": true, "label": "Subject", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "allowMultipleMasks": false, "customDefaultValue": ""}, {"id": "etp18j", "key": "message", "mask": false, "rows": 10, "type": "textarea", "input": true, "label": "Submit Request Details Here:", "editor": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "wysiwyg": false, "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "pattern": "", "maxWords": "", "minWords": "", "required": false, "maxLength": "", "minLength": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "inputMask": "", "inputType": "text", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "showCharCount": false, "showWordCount": false, "calculateValue": "", "customDefaultValue": ""}, {"id": "e67v8t", "dir": "", "key": "attachment", "url": "", "mask": false, "tags": [], "type": "file", "image": false, "input": true, "label": "Attachment:", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "storage": "url", "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"json": "", "custom": "", "unique": false, "required": false, "customMessage": "", "customPrivate": false}, "autofocus": false, "hideLabel": false, "imageSize": "200", "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": true, "properties": [{"key": "", "value": ""}], "uploadOnly": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "json": "", "show": null, "when": null}, "customClass": "", "description": "", "fileMaxSize": "1GB", "fileMinSize": "0KB", "filePattern": "*", "labelMargin": 3, "placeholder": "", "defaultValue": [], "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "customConditional": "", "customDefaultValue": ""}, {"id": "ezjdk2a", "key": "htmlelement2", "tag": "br", "mask": false, "type": "htmlelement", "attrs": [{"attr": "", "value": ""}], "input": false, "label": "", "hidden": false, "prefix": "", "suffix": "", "unique": false, "content": "", "dbIndex": false, "tooltip": "", "disabled": false, "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "className": "", "hideLabel": false, "protected": false, "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": false, "labelPosition": "top", "calculateValue": "", "refreshOnChange": false, "customDefaultValue": ""}, {"id": "ebg71pe", "key": "submit", "size": "md", "type": "button", "block": false, "input": true, "label": "Submit", "theme": "primary", "action": "submit", "hidden": false, "prefix": "", "suffix": "", "unique": false, "dbIndex": false, "tooltip": "", "disabled": false, "leftIcon": "", "multiple": false, "tabindex": "", "validate": {"custom": "", "required": false, "customPrivate": false}, "autofocus": false, "hideLabel": false, "protected": false, "rightIcon": "", "tableView": true, "errorLabel": "", "labelWidth": 30, "persistent": false, "validateOn": "change", "clearOnHide": true, "conditional": {"eq": "", "show": null, "when": null}, "customClass": "", "description": "", "labelMargin": 3, "placeholder": "", "defaultValue": null, "dataGridLabel": true, "labelPosition": "top", "calculateValue": "", "disableOnInvalid": true, "customDefaultValue": ""}]}	2018-08-17 19:35:30.174846	2018-08-17 19:35:30.174846	\N	\N	\N
 \.
 
 
@@ -6567,24 +6810,26 @@ COPY metadata.pageforms (id, pageid, jsondata, createdat, updatedat, systemcateg
 -- Data for Name: pages; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.pages (id, appid, title, name, description) FROM stdin;
-4	0	Dashboard	dashboard	system dashboard
-8	0	Help	help	system help
-7	0	Support	support	system support
-1	0	Home	home	system home
-6	0	Administration	administration	system administration
-0	0	NONE	nopage	empty page
-29	0	Form Builder	formbuilder	Form Builder Page
-30	0	Contact Us	emailadmins	Admin contact email
-31	0	Create Change Request	websiteissues	Admin website issues
-34	0	Menu Item Maintenance	menumaint	Add/Edit Menu Item
-35	0	Menu Tree	menutree	Show menu items as a tree
-37	0	Page Maintenance	pagemaint	Page maintainance page
-36	0	Application Maintenance	appmaint	Application maintainance page
-68	0	Lookup Table Maintenance	lookuptable	Lookup table record maintenance by application.
-70	0	Form Actions Maintenance	actionmaint	Form actions maintenance
-75	0	Application Resources	appresources	Application Resource Maintenance
-76	0	Application Users	appusers	Application users maintenance
+COPY metadata.pages (id, appid, title, name, description, allowedroles) FROM stdin;
+4	0	Dashboard	dashboard	system dashboard	\N
+8	0	Help	help	system help	\N
+7	0	Support	support	system support	\N
+1	0	Home	home	system home	\N
+6	0	Administration	administration	system administration	\N
+0	0	NONE	nopage	empty page	\N
+30	0	Contact Us	emailadmins	Admin contact email	\N
+31	0	Create Change Request	websiteissues	Admin website issues	\N
+37	0	Page Maintenance	pagemaint	Page maintainance page	{36}
+34	0	Menu Item Maintenance	menumaint	Add/Edit Menu Item	{36}
+35	0	Menu Tree	menutree	Show menu items as a tree	{36}
+70	0	Form Actions Maintenance	actionmaint	Form actions maintenance	{36}
+68	0	Lookup Table Maintenance	lookuptable	Lookup table record maintenance by application.	{36}
+29	0	Form Builder	formbuilder	Form Builder Page	{36}
+75	0	Application Resources	appresources	Application Resource Maintenance	{36}
+76	0	Application Users	appusers	Application users maintenance	{36}
+36	0	Application Maintenance	appmaint	Application maintainance page	{36}
+77	0	Table and Column Maintenance	tablemaint	Application Table and Columns Maintenance	{36}
+78	0	Server Actions Maitenance	serveractionmaint	Application server actions maintenance	{36}
 \.
 
 
@@ -6659,7 +6904,7 @@ SELECT pg_catalog.setval('app.activities_id_seq', 88, true);
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 35, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 43, true);
 
 
 --
@@ -6673,7 +6918,7 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 945, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1200, true);
 
 
 --
@@ -6687,21 +6932,21 @@ SELECT pg_catalog.setval('app.bunos_id_seq', 4469, true);
 -- Name: groups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.groups_id_seq', 11, true);
+SELECT pg_catalog.setval('app.groups_id_seq', 18, true);
 
 
 --
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 277, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 357, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 32, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 39, true);
 
 
 --
@@ -6719,6 +6964,13 @@ SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
 
 
 --
+-- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
+--
+
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 3, true);
+
+
+--
 -- Name: resourcetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
@@ -6729,7 +6981,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, false);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 53, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 95, true);
 
 
 --
@@ -6743,7 +6995,7 @@ SELECT pg_catalog.setval('app.rolepermissions_id_seq', 1, false);
 -- Name: roles_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roles_id_seq', 27, true);
+SELECT pg_catalog.setval('app.roles_id_seq', 41, true);
 
 
 --
@@ -6757,14 +7009,14 @@ SELECT pg_catalog.setval('app.status_id_seq', 45, true);
 -- Name: usergroups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.usergroups_id_seq', 34, true);
+SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
 
 
 --
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 16, true);
+SELECT pg_catalog.setval('app.users_id_seq', 42, true);
 
 
 --
@@ -6785,14 +7037,14 @@ SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 88, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 164, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 218, true);
 
 
 --
@@ -6813,28 +7065,28 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 513, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 535, true);
 
 
 --
 -- Name: applications_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.applications_id_seq', 68, true);
+SELECT pg_catalog.setval('metadata.applications_id_seq', 76, true);
 
 
 --
 -- Name: apptables_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.apptables_id_seq', 124, true);
+SELECT pg_catalog.setval('metadata.apptables_id_seq', 128, true);
 
 
 --
 -- Name: columntemplate_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.columntemplate_id_seq', 68, true);
+SELECT pg_catalog.setval('metadata.columntemplate_id_seq', 71, true);
 
 
 --
@@ -6869,14 +7121,14 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 176, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 221, true);
 
 
 --
 -- Name: formresources_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formresources_id_seq', 46, true);
+SELECT pg_catalog.setval('metadata.formresources_id_seq', 50, true);
 
 
 --
@@ -6904,7 +7156,7 @@ SELECT pg_catalog.setval('metadata.menuicons_id_seq', 28, true);
 -- Name: menuitems_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.menuitems_id_seq', 172, true);
+SELECT pg_catalog.setval('metadata.menuitems_id_seq', 198, true);
 
 
 --
@@ -6918,14 +7170,14 @@ SELECT pg_catalog.setval('metadata.menupaths_id_seq', 13, true);
 -- Name: pageforms_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pageforms_id_seq', 77, true);
+SELECT pg_catalog.setval('metadata.pageforms_id_seq', 81, true);
 
 
 --
 -- Name: pages_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pages_id_seq', 97, true);
+SELECT pg_catalog.setval('metadata.pages_id_seq', 117, true);
 
 
 --
@@ -7057,6 +7309,14 @@ ALTER TABLE ONLY app.users
 
 ALTER TABLE ONLY app.priority
     ADD CONSTRAINT priority_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reporttemplates reporttemplates_pkey; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.reporttemplates
+    ADD CONSTRAINT reporttemplates_pkey PRIMARY KEY (id);
 
 
 --
@@ -7393,6 +7653,13 @@ CREATE UNIQUE INDEX priority_id_uindex ON app.priority USING btree (id);
 
 
 --
+-- Name: reporttemplates_id_uindex; Type: INDEX; Schema: app; Owner: appowner
+--
+
+CREATE UNIQUE INDEX reporttemplates_id_uindex ON app.reporttemplates USING btree (id);
+
+
+--
 -- Name: resourcetypes_id_uindex; Type: INDEX; Schema: app; Owner: appowner
 --
 
@@ -7619,6 +7886,14 @@ ALTER TABLE ONLY app.adhoc_queries
 
 
 --
+-- Name: adhoc_queries adhoc_queries_reporttemplates_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries
+    ADD CONSTRAINT adhoc_queries_reporttemplates_id_fk FOREIGN KEY (reporttemplateid) REFERENCES app.reporttemplates(id);
+
+
+--
 -- Name: appbunos appbunos_applications_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
 --
 
@@ -7731,6 +8006,22 @@ ALTER TABLE ONLY app.priority
 
 
 --
+-- Name: reporttemplates reporttemplates_applications_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.reporttemplates
+    ADD CONSTRAINT reporttemplates_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
+
+
+--
+-- Name: reporttemplates reporttemplates_apptables_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.reporttemplates
+    ADD CONSTRAINT reporttemplates_apptables_id_fk FOREIGN KEY (primarytableid) REFERENCES metadata.apptables(id);
+
+
+--
 -- Name: roleassignments roleassignments_groups_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
 --
 
@@ -7743,7 +8034,7 @@ ALTER TABLE ONLY app.roleassignments
 --
 
 ALTER TABLE ONLY app.roleassignments
-    ADD CONSTRAINT roleassignments_roles_id_fk FOREIGN KEY (roleid) REFERENCES app.roles(id);
+    ADD CONSTRAINT roleassignments_roles_id_fk FOREIGN KEY (roleid) REFERENCES app.roles(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -8038,7 +8329,6 @@ ALTER TABLE ONLY metadata.urlactions
 -- Name: SCHEMA app; Type: ACL; Schema: -; Owner: appowner
 --
 
-GRANT ALL ON SCHEMA app TO devuser;
 GRANT USAGE ON SCHEMA app TO appuser;
 
 
@@ -8046,7 +8336,6 @@ GRANT USAGE ON SCHEMA app TO appuser;
 -- Name: SCHEMA metadata; Type: ACL; Schema: -; Owner: appowner
 --
 
-GRANT ALL ON SCHEMA metadata TO devuser;
 GRANT USAGE ON SCHEMA metadata TO appuser;
 
 
@@ -8076,13 +8365,6 @@ GRANT ALL ON FUNCTION app.findrolesbystatetransition(idtable integer, idstatetra
 --
 
 GRANT ALL ON FUNCTION app.findtransitionnotificationusers(idtable integer, idstatetransition integer) TO appuser;
-
-
---
--- Name: FUNCTION getusersinroles(roleids integer[]); Type: ACL; Schema: app; Owner: appowner
---
-
-GRANT ALL ON FUNCTION app.getusersinroles(roleids integer[]) TO appuser;
 
 
 --
@@ -8163,13 +8445,6 @@ GRANT ALL ON FUNCTION metadata.appdatadelete(idtable integer, idrec integer) TO 
 
 
 --
--- Name: FUNCTION appdatafindall(idtable numeric); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.appdatafindall(idtable numeric) TO appuser;
-
-
---
 -- Name: FUNCTION appdatafindbyid(idtable integer, idrec integer); Type: ACL; Schema: metadata; Owner: appowner
 --
 
@@ -8188,13 +8463,6 @@ GRANT ALL ON FUNCTION metadata.appdataupdate(idtable integer, idrec integer, fie
 --
 
 GRANT ALL ON FUNCTION metadata.appformfindbyid(idrec numeric) TO appuser;
-
-
---
--- Name: FUNCTION appformgetdatatable(idtable numeric); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.appformgetdatatable(idtable numeric) TO appuser;
 
 
 --
@@ -8268,38 +8536,10 @@ GRANT ALL ON FUNCTION metadata.formrecorddelete(idform integer, idrec integer) T
 
 
 --
--- Name: FUNCTION formrecordfindbyid(idform integer, idrec integer); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.formrecordfindbyid(idform integer, idrec integer) TO appuser;
-
-
---
--- Name: FUNCTION formrecordupdate(idform integer, idrec integer, fieldids integer[], fieldvals text[]); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.formrecordupdate(idform integer, idrec integer, fieldids integer[], fieldvals text[]) TO appuser;
-
-
---
 -- Name: FUNCTION getappresources(idapp numeric); Type: ACL; Schema: metadata; Owner: appowner
 --
 
 GRANT ALL ON FUNCTION metadata.getappresources(idapp numeric) TO appuser;
-
-
---
--- Name: FUNCTION getcolumnelementsfromfielddata(ref refcursor, fieldids integer[], fieldvals text[]); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids integer[], fieldvals text[]) TO appuser;
-
-
---
--- Name: FUNCTION getcolumnelementsfromrecord(ref refcursor, idrec integer); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.getcolumnelementsfromrecord(ref refcursor, idrec integer) TO appuser;
 
 
 --
@@ -8338,13 +8578,6 @@ GRANT ALL ON FUNCTION metadata.menuitemadd(item json) TO appuser;
 
 
 --
--- Name: FUNCTION menusfindall(); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.menusfindall() TO appuser;
-
-
---
 -- Name: FUNCTION pageadd(item json); Type: ACL; Schema: metadata; Owner: appowner
 --
 
@@ -8370,13 +8603,6 @@ GRANT ALL ON FUNCTION metadata.pagefindbyid(idpage numeric) TO appuser;
 --
 
 GRANT ALL ON FUNCTION metadata.pageformsadd(idapp numeric, idpage numeric, idappcolumn numeric, descr text, jsonvalue jsonb) TO appuser;
-
-
---
--- Name: FUNCTION pageformsfindbyid(idapp numeric, idpage numeric); Type: ACL; Schema: metadata; Owner: appowner
---
-
-GRANT ALL ON FUNCTION metadata.pageformsfindbyid(idapp numeric, idpage numeric) TO appuser;
 
 
 --
@@ -8446,7 +8672,6 @@ GRANT ALL ON FUNCTION metadata.workflowstateupdate(idtable integer, idtransition
 -- Name: TABLE activity; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.activity TO devuser;
 GRANT ALL ON TABLE app.activity TO appuser;
 
 
@@ -8531,7 +8756,6 @@ GRANT ALL ON SEQUENCE app.groups_id_seq TO appuser;
 -- Name: TABLE issues; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.issues TO devuser;
 GRANT ALL ON TABLE app.issues TO appuser;
 
 
@@ -8546,7 +8770,6 @@ GRANT ALL ON SEQUENCE app.issues_id_seq TO appuser;
 -- Name: TABLE issuetypes; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.issuetypes TO devuser;
 GRANT ALL ON TABLE app.issuetypes TO appuser;
 
 
@@ -8561,7 +8784,6 @@ GRANT ALL ON SEQUENCE app.issuetypes_id_seq TO appuser;
 -- Name: TABLE masterdata; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.masterdata TO devuser;
 GRANT ALL ON TABLE app.masterdata TO appuser;
 
 
@@ -8576,7 +8798,6 @@ GRANT ALL ON SEQUENCE app.mastertypes_id_seq TO appuser;
 -- Name: TABLE priority; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.priority TO devuser;
 GRANT ALL ON TABLE app.priority TO appuser;
 
 
@@ -8585,6 +8806,13 @@ GRANT ALL ON TABLE app.priority TO appuser;
 --
 
 GRANT ALL ON SEQUENCE app.priority_id_seq TO appuser;
+
+
+--
+-- Name: TABLE reporttemplates; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.reporttemplates TO appuser;
 
 
 --
@@ -8647,7 +8875,6 @@ GRANT ALL ON SEQUENCE app.roles_id_seq TO appuser;
 -- Name: TABLE status; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT ALL ON TABLE app.status TO devuser;
 GRANT ALL ON TABLE app.status TO appuser;
 
 
@@ -8746,7 +8973,6 @@ GRANT ALL ON SEQUENCE app.workflow_statetransitions_id_seq TO appuser;
 -- Name: TABLE actions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.actions TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.actions TO appuser;
 
 
@@ -8775,7 +9001,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.apiactions_id_seq TO appuser;
 -- Name: TABLE appcolumns; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.appcolumns TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.appcolumns TO appuser;
 
 
@@ -8804,7 +9029,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.applications_id_seq TO appuser;
 -- Name: TABLE apptables; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.apptables TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.apptables TO appuser;
 
 
@@ -8847,7 +9071,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.controltypes_id_seq TO appuser;
 -- Name: TABLE datatypes; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.datatypes TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.datatypes TO appuser;
 
 
@@ -8862,7 +9085,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.datatypes_id_seq TO appuser;
 -- Name: TABLE events; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.events TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.events TO appuser;
 
 
@@ -8877,7 +9099,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.events_id_seq TO appuser;
 -- Name: TABLE fieldcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.fieldcategories TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.fieldcategories TO appuser;
 
 
@@ -8892,7 +9113,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.fieldcategories_id_seq TO appuser;
 -- Name: TABLE formeventactions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.formeventactions TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formeventactions TO appuser;
 
 
@@ -8907,7 +9127,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.formeventactions_id_seq TO appuser;
 -- Name: TABLE formresources; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.formresources TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formresources TO appuser;
 
 
@@ -8943,7 +9162,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.issues_id_seq TO appuser;
 -- Name: TABLE menuicons; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menuicons TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuicons TO appuser;
 
 
@@ -8958,7 +9176,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuicons_id_seq TO appuser;
 -- Name: TABLE menuitems; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menuitems TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuitems TO appuser;
 
 
@@ -8973,7 +9190,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuitems_id_seq TO appuser;
 -- Name: TABLE menupaths; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.menupaths TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menupaths TO appuser;
 
 
@@ -8988,7 +9204,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menupaths_id_seq TO appuser;
 -- Name: TABLE pageforms; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.pageforms TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.pageforms TO appuser;
 
 
@@ -9017,7 +9232,6 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.pages_id_seq TO appuser;
 -- Name: TABLE systemcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT ALL ON TABLE metadata.systemcategories TO devuser;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.systemcategories TO appuser;
 
 
