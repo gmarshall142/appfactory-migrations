@@ -33,6 +33,8 @@ CREATE SCHEMA app;
 ALTER SCHEMA app OWNER TO appowner;  
 CREATE SCHEMA metadata;  
 ALTER SCHEMA metadata OWNER TO appowner;
+###### check schemas
+\dn  
 
 #### Check instance version info
 cd workspace/app-factory/appfactory-migrations  

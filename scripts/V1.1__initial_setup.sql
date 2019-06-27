@@ -15,37 +15,6 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
---
--- Name: app; Type: SCHEMA; Schema: -; Owner: appowner
---
-
-CREATE SCHEMA app;
-
-
-ALTER SCHEMA app OWNER TO appowner;
-
---
--- Name: metadata; Type: SCHEMA; Schema: -; Owner: appowner
---
-
-CREATE SCHEMA metadata;
-
-
-ALTER SCHEMA metadata OWNER TO appowner;
-
---
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
---
-
-CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner:
---
-
-COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
 
 --
 -- Name: field_composite; Type: TYPE; Schema: metadata; Owner: appowner
@@ -325,7 +294,7 @@ CREATE FUNCTION app.getusersinroles(roleids integer[]) RETURNS TABLE(userid inte
 $$;
 
 
-ALTER FUNCTION app.getusersinroles(roleids integer[]) OWNER TO gmarshall;
+ALTER FUNCTION app.getusersinroles(roleids integer[]) OWNER TO appowner;
 
 --
 -- Name: issuetypesselectvalues(numeric); Type: FUNCTION; Schema: app; Owner: appowner
@@ -2809,7 +2778,7 @@ ALTER SEQUENCE app.activities_id_seq OWNED BY app.activity.id;
 
 CREATE TABLE app.adhoc_queries (
     id integer NOT NULL,
-    name character varying(20),
+    name character varying(60),
     appid integer NOT NULL,
     jsondata jsonb,
     createdat timestamp without time zone,
@@ -3956,26 +3925,6 @@ ALTER TABLE metadata.fieldcategories_id_seq OWNER TO appowner;
 
 ALTER SEQUENCE metadata.fieldcategories_id_seq OWNED BY metadata.fieldcategories.id;
 
-
---
--- Name: flyway_schema_history; Type: TABLE; Schema: metadata; Owner: appowner
---
-
-CREATE TABLE metadata.flyway_schema_history (
-    installed_rank integer NOT NULL,
-    version character varying(50),
-    description character varying(200) NOT NULL,
-    type character varying(20) NOT NULL,
-    script character varying(1000) NOT NULL,
-    checksum integer,
-    installed_by character varying(100) NOT NULL,
-    installed_on timestamp without time zone DEFAULT now() NOT NULL,
-    execution_time integer NOT NULL,
-    success boolean NOT NULL
-);
-
-
-ALTER TABLE metadata.flyway_schema_history OWNER TO appowner;
 
 --
 -- Name: formeventactions; Type: TABLE; Schema: metadata; Owner: appowner
@@ -6538,15 +6487,6 @@ COPY metadata.fieldcategories (id, name, label) FROM stdin;
 
 
 --
--- Data for Name: flyway_schema_history; Type: TABLE DATA; Schema: metadata; Owner: appowner
---
-
-COPY metadata.flyway_schema_history (installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success) FROM stdin;
-1	1.1	initial setup	SQL	V1.1__initial_setup.sql	-328190773	appowner	2019-05-02 11:55:04.808715	1021	t
-\.
-
-
---
 -- Data for Name: formeventactions; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
@@ -7316,14 +7256,6 @@ ALTER TABLE ONLY metadata.fieldcategories
 
 
 --
--- Name: flyway_schema_history flyway_schema_history_pk; Type: CONSTRAINT; Schema: metadata; Owner: appowner
---
-
-ALTER TABLE ONLY metadata.flyway_schema_history
-    ADD CONSTRAINT flyway_schema_history_pk PRIMARY KEY (installed_rank);
-
-
---
 -- Name: formeventactions formeventactions_pkey; Type: CONSTRAINT; Schema: metadata; Owner: appowner
 --
 
@@ -7636,13 +7568,6 @@ CREATE UNIQUE INDEX events_id_uindex ON metadata.events USING btree (id);
 --
 
 CREATE UNIQUE INDEX fieldcategories_id_uindex ON metadata.fieldcategories USING btree (id);
-
-
---
--- Name: flyway_schema_history_s_idx; Type: INDEX; Schema: metadata; Owner: appowner
---
-
-CREATE INDEX flyway_schema_history_s_idx ON metadata.flyway_schema_history USING btree (success);
 
 
 --
