@@ -62,8 +62,8 @@ __localhost__ as the host machine it was necessary to use the __host.docker.inte
 
 ### Notes when updating the initial load script
 If a script for the initial load script is regenerated using pg_dump it is necessary to take the following steps to 
-prepare the SQL script.
-* Remove the create database and create schema lines
-* Change the owner for any new tables or procedures to an owner of 'appowner'.  The owner may be the default user when 
-they were created.
-* Remove any references to 'flyway_schema_history' which may have existed when the database is dumped.
+prepare the SQL script.   
+==> Remove the create database and create schema lines  
+==> Change the owner for any new tables or procedures to an owner of 'appowner'.  The owner may be the default user when 
+they were created.  
+==> Remove any references to 'flyway_schema_history' which may have existed when the database is dumped.
