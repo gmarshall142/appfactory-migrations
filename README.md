@@ -38,13 +38,28 @@ ALTER SCHEMA metadata OWNER TO appowner;
 
 #### Check instance version info
 cd workspace/app-factory/appfactory-migrations  
-./flyway.sh info    
+./flyway.sh info  
+or   
+./flyway-docker.sh info   
 
 #### Create baseline
-./flyway.sh baseline
+./flyway.sh baseline  
+or   
+./flyway-docker.sh baseline 
+###### check flyway history table
+\dt metadata.*;    
+```javascript
+                  List of relations  
+  Schema  |         Name          | Type  |  Owner     
+----------+-----------------------+-------+----------  
+ metadata | flyway_schema_history | table | appowner  
+(1 row)  
+```
 
 #### Migrations
-./flyway.sh migrate
+./flyway.sh migrate  
+or     
+./flyway-docker.sh migrate   
 
 ## Running __flyway__ in Docker
 Flyway can be run from a Docker container using instructions found on the [flyway](https://flywaydb.org/ "Flyway link") 
