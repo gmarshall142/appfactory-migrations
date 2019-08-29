@@ -378,7 +378,9 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer) RETURNS json
   BEGIN
     CREATE TEMP TABLE lookup(tablename VARCHAR);
 
-    SELECT * INTO rec FROM metadata.appcolumns WHERE id = idcolumn;
+    SELECT id, apptableid, columnname, label, datatypeid, length, jsonfield, createdat, updatedat, mastertable,
+           mastercolumn, name, regexp_replace(masterdisplay, '''', '''''', 'g') as masterdisplay, displayorder, active
+           INTO rec FROM metadata.appcolumns WHERE id = idcolumn;
     SELECT * INTO tbl FROM metadata.apptables tbl WHERE id = rec.apptableid;
     tableName := tbl.tablename;
     RAISE NOTICE 'tableName: %', tableName;
@@ -389,11 +391,12 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer) RETURNS json
     END IF;
 
     SELECT row_to_json(rec) INTO result;
-
-
+--     result := regexp_replace(result, '''', '''''', 'g');
+    RAISE NOTICE 'result:';
+    RAISE NOTICE '%', result;
 
   RAISE NOTICE 'start call ------------------------------------------------------------';
-    execStr := 'SELECT * from metadata.getQueryParamsForColumn(''' || result || ''', ''lookup'', true);';
+    execStr := 'SELECT * from app.getQueryParamsForColumn(''' || result || ''', true);';
     EXECUTE execStr INTO resp;
   RAISE NOTICE 'done call ------------------------------------------------------------';
 
@@ -417,13 +420,12 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer) RETURNS json
 
     IF (rec.masterTable IS NOT NULL) THEN
       selectStr := relationColName || ' as value, ' || regexp_replace(selectStr, colLabel, ' as name', 'g');
-      whereStr := whereStr || ' and ' || whereStr2;
+      IF (length(whereStr2) > 0) THEN
+        whereStr := whereStr || ' and ' || whereStr2;
+      END IF;
     ELSE
       selectStr := colSelect || ' as value, ' || colSelect || ' as name';
     END IF;
-
-
-
 
     RAISE NOTICE '======================================';
     RAISE NOTICE 'tableName: %', tableName;
@@ -451,6 +453,187 @@ $$;
 
 
 ALTER FUNCTION app.getcolumnvalues(idcolumn integer) OWNER TO appowner;
+
+--
+-- Name: getqueryparamsforcolumn(json, boolean); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.getqueryparamsforcolumn(recobj json, idandref boolean DEFAULT false) RETURNS json
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  tableName        TEXT;
+  columnName       TEXT;
+  masterTable      TEXT;
+  masterColumn     TEXT;
+  masterDisplay    TEXT;
+  datatype         TEXT;
+  isJsonfield      BOOLEAN;
+  colLabel         TEXT;
+  colTable         TEXT;
+  colSelect        TEXT;
+  selectStr        TEXT := '';
+  fromStr          TEXT := '';
+  whereStr         TEXT := '';
+  relationColName  TEXT;
+  coalesceStr      TEXT;
+  masterTableCount INTEGER;
+  masterTableName  TEXT;
+  masterdisplayPos INTEGER;
+  attrKeys         text[];
+  attrVals         text[];
+
+BEGIN
+  columnName := recObj ->> 'columnname';
+  masterTable := recObj ->> 'mastertable';
+  masterColumn := recObj ->> 'mastercolumn';
+  masterDisplay := recObj ->> 'masterdisplay';
+  datatype := recObj ->> 'datatype';
+  isJsonfield := CAST(recObj ->> 'jsonfield' AS BOOLEAN);
+  RAISE NOTICE '------------------------------------------------------------';
+  RAISE NOTICE 'columnname: %', columnName;
+  RAISE NOTICE 'recObj: %', recObj;
+  RAISE NOTICE 'recObj->jsonfield: %', isJsonfield;
+  colLabel := '';
+  colSelect := '';
+  colTable := 'tbl.';
+
+  IF (isJsonfield = true) THEN
+    -- =========================================================
+    -- json column
+    -- =========================================================
+    colTable := '';
+    colSelect := 'tbl.jsondata->>''' || columnName || '''';
+    colLabel := ' as ' || columnName;
+
+    IF (masterTable IS NOT NULL) THEN
+      IF (idAndRef) THEN
+        -- add ID information
+        selectStr := colTable || colSelect || colLabel;
+        -- strip id from end of columnname
+        colLabel := left(colLabel, -2);
+      END IF;
+
+      -- =========================================================
+      -- related table
+      -- =========================================================
+      IF (datatype = 'integer[]') THEN
+        -- =========================================================
+        -- array of references
+        -- =========================================================
+        RAISE NOTICE '************************* datatype: %', datatype;
+        -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
+        colTable := 'ARRAY(SELECT ' || masterDisplay ||
+                    ' FROM app.' || masterTable ||
+                    ' WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->''' || columnName ||
+                    ''')::integer ) )';
+        RAISE NOTICE 'colTable: %', colTable;
+        colSelect := '';
+      ELSE
+        -- =========================================================
+        -- single reference
+        -- =========================================================
+        -- check for whether there are multiple references to the same table
+--          INSERT INTO lookup (tablename) VALUES (masterTable);
+        EXECUTE 'INSERT INTO lookup (tablename) VALUES (''' || masterTable || ''');';
+        masterTableName := masterTable;
+--          SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
+        EXECUTE 'SELECT COUNT(*) FROM lookup WHERE lookup.tablename = ''' || masterTable ||
+                ''';' INTO masterTableCount;
+        RAISE NOTICE '************* count: %', masterTableCount;
+        IF (masterTableCount > 1) THEN
+          -- there are multiple references to the same table so make them unique using the Count
+          masterTableName := masterTableName || masterTableCount;
+        END IF;
+        IF (masterDisplay ~ '||') THEN
+          -- TODO: process compound display: add mastertable to each column, create procedure, provide logic for standard columns as well
+          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
+        ELSE
+          colTable := masterTableName || '.';
+          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
+        END IF;
+        relationColName = 'tbl.jsondata->>''' || columnName || '''';
+        coalesceStr := 'CAST(coalesce(' || relationColName || ', ''0'') AS INTEGER)';
+        fromStr := fromStr || ' LEFT OUTER JOIN app.' || masterTable || ' as ' || masterTableName ||
+                   ' ON ' || masterTableName || '.' || masterColumn || ' = ' || coalesceStr;
+        whereStr := masterTableName || '.id = ' || coalesceStr;
+      END IF;
+    END IF;
+
+  ELSE
+    -- =========================================================
+    -- standard column
+    -- =========================================================
+    colSelect := columnName;
+    colLabel := ' as ' || columnName;
+
+    IF (masterTable IS NOT NULL) THEN
+      IF (idAndRef) THEN
+        -- add ID information
+        selectStr := colTable || colSelect || colLabel;
+        -- strip id from end of columnname
+        colLabel := left(colLabel, -2);
+      END IF;
+
+      IF (datatype = 'integer[]') THEN
+        -- =========================================================
+        -- array of references
+        -- =========================================================
+        RAISE NOTICE '************************* datatype: %', datatype;
+        -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
+        colTable := 'ARRAY(SELECT ' || masterDisplay ||
+                    ' FROM app.' || masterTable ||
+                    ' WHERE id IN ( SELECT unnest(tbl.' || columnName || ') ) )';
+        RAISE NOTICE 'colTable: %', colTable;
+        colSelect := '';
+      ELSE
+        -- =========================================================
+        -- single reference
+        -- =========================================================
+--         INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
+        EXECUTE 'INSERT INTO lookup (tablename) VALUES (''' || masterTable || ''');';
+        masterTableName := masterTable;
+--         SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = masterTable;
+        EXECUTE 'SELECT COUNT(*) FROM lookup WHERE lookup.tablename = ''' || masterTable ||
+                ''';' INTO masterTableCount;
+        IF (masterTableCount > 1) THEN
+          masterTableName := masterTableName || masterTableCount;
+        END IF;
+        -- =========================================================
+        -- related table
+        -- =========================================================
+        IF (masterTable = 'apptables') THEN
+          RAISE NOTICE '**** mastertable = apptables';
+        ELSE
+          colTable := masterTableName || '.';
+
+          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
+          relationColName := 'tbl.' || columnName;
+          fromStr := fromStr || ' LEFT OUTER JOIN app.' || masterTable || ' as ' || masterTableName ||
+                     ' ON ' || masterTableName || '.' || masterColumn || ' = ' || relationColName;
+          IF (POSITION('.' in masterDisplay) > 0) THEN
+            RAISE NOTICE '****************** masterdisplay: %  pos: %', masterDisplay, masterdisplayPos;
+            colTable := '';
+          END IF;
+        END IF;
+      END IF;
+    END IF;
+
+  END IF;
+
+  IF (columnName != 'jsondata') THEN
+    selectStr := colTable || colSelect || colLabel;
+  END IF;
+
+  RAISE NOTICE '***** columnName: %', columnName;
+  attrKeys := ARRAY ['tableName', 'selectStr', 'fromStr', 'whereStr', 'colSelect', 'colLabel', 'relationColName'];
+  attrVals := ARRAY [tableName, selectStr, fromStr, whereStr, colSelect, colLabel, relationColName];
+  return json_object(attrKeys::text[], attrVals::text[]);
+END;
+$$;
+
+
+ALTER FUNCTION app.getqueryparamsforcolumn(recobj json, idandref boolean) OWNER TO appowner;
 
 --
 -- Name: getuserroles(integer); Type: FUNCTION; Schema: app; Owner: appowner
@@ -2272,190 +2455,6 @@ $$;
 ALTER FUNCTION metadata.getcolumnfromdisplayname(str text) OWNER TO appowner;
 
 --
--- Name: getqueryparamsforcolumn(json, text, boolean); Type: FUNCTION; Schema: metadata; Owner: appowner
---
-
-CREATE FUNCTION metadata.getqueryparamsforcolumn(recobj json, lookup text, idandref boolean DEFAULT false) RETURNS json
-    LANGUAGE plpgsql
-    AS $$
-
-DECLARE
-  tableName        TEXT;
-  columnName       TEXT;
-  masterTable      TEXT;
-  masterColumn     TEXT;
-  masterDisplay    TEXT;
-  datatype         TEXT;
-  isJsonfield      BOOLEAN;
-  tableId          INTEGER;
-  tableIdColumn    TEXT := 'id';
-  colLabel         TEXT;
-  colTable         TEXT;
-  colSelect        TEXT;
-  selectStr        TEXT := '';
-  fromStr          TEXT := '';
-  whereStr         TEXT := '';
-  relationColName  TEXT;
-  coalesceStr      TEXT;
-  masterTableCount INTEGER;
-  masterTableName  TEXT;
-  masterdisplayPos INTEGER;
-  attrKeys         text[];
-  attrVals         text[];
-
-BEGIN
-  columnName := recObj ->> 'columnname';
-  masterTable := recObj ->> 'mastertable';
-  masterColumn := recObj ->> 'mastercolumn';
-  masterDisplay := recObj ->> 'masterdisplay';
-  datatype := recObj ->> 'datatype';
-  isJsonfield := CAST(recObj ->> 'jsonfield' AS BOOLEAN);
-  RAISE NOTICE '------------------------------------------------------------';
-  RAISE NOTICE 'columnname: %', columnName;
-  RAISE NOTICE 'recObj: %', recObj;
-  RAISE NOTICE 'recObj->jsonfield: %', isJsonfield;
-  colLabel := '';
-  colSelect := '';
-  colTable := 'tbl.';
-
-  IF (isJsonfield = true) THEN
-    -- =========================================================
-    -- json column
-    -- =========================================================
-    colTable := '';
-    colSelect := 'tbl.jsondata->>''' || columnName || '''';
-    colLabel := ' as ' || columnName;
-
-    IF (masterTable IS NOT NULL) THEN
-      IF (idAndRef) THEN
-        -- add ID information
-        selectStr := colTable || colSelect || colLabel;
-        -- strip id from end of columnname
-        colLabel := left(colLabel, -2);
-      END IF;
-
-      -- =========================================================
-      -- related table
-      -- =========================================================
-      IF (datatype = 'integer[]') THEN
-        -- =========================================================
-        -- array of references
-        -- =========================================================
-        RAISE NOTICE '************************* datatype: %', datatype;
-        -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
-        colTable := 'ARRAY(SELECT ' || masterDisplay ||
-                    ' FROM app.' || masterTable ||
-                    ' WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->''' || columnName ||
-                    ''')::integer ) )';
-        RAISE NOTICE 'colTable: %', colTable;
-        colSelect := '';
-      ELSE
-        -- =========================================================
-        -- single reference
-        -- =========================================================
-        -- check for whether there are multiple references to the same table
---          INSERT INTO lookup (tablename) VALUES (masterTable);
-        EXECUTE 'INSERT INTO ' || lookup || ' (tablename) VALUES (''' || masterTable || ''');';
-        masterTableName := masterTable;
---          SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = rec_field.mastertable;
-        EXECUTE 'SELECT COUNT(*) FROM ' || lookup || ' WHERE ' || lookup || '.tablename = ''' || masterTable ||
-                ''';' INTO masterTableCount;
-        RAISE NOTICE '************* count: %', masterTableCount;
-        IF (masterTableCount > 1) THEN
-          -- there are multiple references to the same table so make them unique using the Count
-          masterTableName := masterTableName || masterTableCount;
-        END IF;
-        IF (masterDisplay ~ '||') THEN
-          -- TODO: process compound display: add mastertable to each column, create procedure, provide logic for standard columns as well
-          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
-        ELSE
-          colTable := masterTableName || '.';
-          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
-        END IF;
-        relationColName = 'tbl.jsondata->>''' || columnName || '''';
-        coalesceStr := 'CAST(coalesce(' || relationColName || ', ''0'') AS INTEGER)';
-        fromStr := fromStr || ' LEFT OUTER JOIN app.' || masterTable || ' as ' || masterTableName ||
-                   ' ON ' || masterTableName || '.' || masterColumn || ' = ' || coalesceStr;
-        whereStr := masterTableName || '.id = ' || coalesceStr;
-      END IF;
-    END IF;
-
-  ELSE
-    -- =========================================================
-    -- standard column
-    -- =========================================================
-    colSelect := columnName;
-    colLabel := ' as ' || columnName;
-
-    IF (masterTable IS NOT NULL) THEN
-      IF (idAndRef) THEN
-        -- add ID information
-        selectStr := colTable || colSelect || colLabel;
-        -- strip id from end of columnname
-        colLabel := left(colLabel, -2);
-      END IF;
-
-      IF (datatype = 'integer[]') THEN
-        -- =========================================================
-        -- array of references
-        -- =========================================================
-        RAISE NOTICE '************************* datatype: %', datatype;
-        -- ARRAY( SELECT name FROM app.masterdata WHERE id IN ( SELECT jsonb_array_elements_text(tbl.jsondata->'mls')::integer ) ) as mls,
-        colTable := 'ARRAY(SELECT ' || masterDisplay ||
-                    ' FROM app.' || masterTable ||
-                    ' WHERE id IN ( SELECT unnest(tbl.' || columnName || ') ) )';
-        RAISE NOTICE 'colTable: %', colTable;
-        colSelect := '';
-      ELSE
-        -- =========================================================
-        -- single reference
-        -- =========================================================
---         INSERT INTO lookup (tablename) VALUES (rec_field.mastertable);
-        EXECUTE 'INSERT INTO ' || lookup || ' (tablename) VALUES (''' || masterTable || ''');';
-        masterTableName := masterTable;
---         SELECT COUNT(*) INTO masterTableCount FROM lookup WHERE lookup.tablename = masterTable;
-        EXECUTE 'SELECT COUNT(*) FROM ' || lookup || ' WHERE ' || lookup || '.tablename = ''' || masterTable ||
-                ''';' INTO masterTableCount;
-        IF (masterTableCount > 1) THEN
-          masterTableName := masterTableName || masterTableCount;
-        END IF;
-        -- =========================================================
-        -- related table
-        -- =========================================================
-        IF (masterTable = 'apptables') THEN
-          RAISE NOTICE '**** mastertable = apptables';
-        ELSE
-          colTable := masterTableName || '.';
-
-          colSelect := regexp_replace(masterDisplay, masterTable, masterTableName, 'g');
-          relationColName := 'tbl.' || columnName;
-          fromStr := fromStr || ' LEFT OUTER JOIN app.' || masterTable || ' as ' || masterTableName ||
-                     ' ON ' || masterTableName || '.' || masterColumn || ' = ' || relationColName;
-          IF (POSITION('.' in masterDisplay) > 0) THEN
-            RAISE NOTICE '****************** masterdisplay: %  pos: %', masterDisplay, masterdisplayPos;
-            colTable := '';
-          END IF;
-        END IF;
-      END IF;
-    END IF;
-
-  END IF;
-
-  IF (columnName != 'jsondata') THEN
-    selectStr := colTable || colSelect || colLabel;
-  END IF;
-
-  RAISE NOTICE '***** columnName: %', columnName;
-  attrKeys := ARRAY ['tableName', 'selectStr', 'fromStr', 'whereStr', 'colSelect', 'colLabel', 'relationColName'];
-  attrVals := ARRAY [tableName, selectStr, fromStr, whereStr, colSelect, colLabel, relationColName];
-  return json_object(attrKeys::text[], attrVals::text[]);
-END;
-$$;
-
-
-ALTER FUNCTION metadata.getqueryparamsforcolumn(recobj json, lookup text, idandref boolean) OWNER TO appowner;
-
---
 -- Name: getresourcevalues(character varying); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
@@ -3376,7 +3375,8 @@ CREATE TABLE app.adhoc_queries (
     jsondata jsonb,
     createdat timestamp without time zone,
     updatedat timestamp without time zone DEFAULT now(),
-    reporttemplateid integer
+    reporttemplateid integer,
+    ownerid integer
 );
 
 
@@ -3841,7 +3841,8 @@ CREATE TABLE app.reporttemplates (
     createdat timestamp without time zone,
     updatedat timestamp without time zone DEFAULT now(),
     primarytableid integer,
-    jsondata jsonb
+    jsondata jsonb,
+    ownerid integer
 );
 
 
@@ -5500,7 +5501,7 @@ COPY app.activity (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: adhoc_queries; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat, reporttemplateid) FROM stdin;
+COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat, reporttemplateid, ownerid) FROM stdin;
 \.
 
 
@@ -5525,8 +5526,6 @@ COPY app.appdata (id, jsondata, createdat, updatedat, apptableid, appid) FROM st
 --
 
 COPY app.attachments (id, path, uniquename, name, size, createdat, updatedat) FROM stdin;
-125	/uploads	dd68d940-b77a-11e9-9a24-0ff3e90f08da_export.csv	export.csv	623	2019-08-05 12:16:34.012343	2019-08-05 12:16:34.012343
-126	/uploads	e07ad430-b77a-11e9-9a24-0ff3e90f08da_filename.csv	filename.csv	1431	2019-08-05 12:16:39.159133	2019-08-05 12:16:39.159133
 \.
 
 
@@ -6014,7 +6013,7 @@ COPY app.priority (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: reporttemplates; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata) FROM stdin;
+COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata, ownerid) FROM stdin;
 \.
 
 
@@ -6074,8 +6073,6 @@ COPY app.tableattachments (createdat, updatedat, id, attachmentid, apptableid, r
 --
 
 COPY app.userattachments (id, userid, attachmentid, createdat, updatedat) FROM stdin;
-119	3575	125	2019-08-05 12:16:34.012343	2019-08-05 12:16:34.012343
-120	3575	126	2019-08-05 12:16:39.159133	2019-08-05 12:16:39.159133
 \.
 
 
@@ -7576,7 +7573,7 @@ SELECT pg_catalog.setval('app.activities_id_seq', 88, true);
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 50, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 59, true);
 
 
 --
@@ -7590,14 +7587,14 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1298, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1307, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 63, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 64, true);
 
 
 --
@@ -7632,7 +7629,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 380, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 382, true);
 
 
 --
@@ -7660,7 +7657,7 @@ SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 3, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 4, true);
 
 
 --
@@ -7765,7 +7762,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 543, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 545, true);
 
 
 --
@@ -7821,7 +7818,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 241, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 245, true);
 
 
 --
@@ -8661,6 +8658,14 @@ ALTER TABLE ONLY app.adhoc_queries
 
 
 --
+-- Name: adhoc_queries adhoc_queries_users_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.adhoc_queries
+    ADD CONSTRAINT adhoc_queries_users_id_fk FOREIGN KEY (ownerid) REFERENCES app.users(id);
+
+
+--
 -- Name: appbunos appbunos_applications_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
 --
 
@@ -8802,6 +8807,14 @@ ALTER TABLE ONLY app.reporttemplates
 
 ALTER TABLE ONLY app.reporttemplates
     ADD CONSTRAINT reporttemplates_apptables_id_fk FOREIGN KEY (primarytableid) REFERENCES metadata.apptables(id);
+
+
+--
+-- Name: reporttemplates reporttemplates_users_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.reporttemplates
+    ADD CONSTRAINT reporttemplates_users_id_fk FOREIGN KEY (ownerid) REFERENCES app.users(id);
 
 
 --
