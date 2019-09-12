@@ -372,7 +372,7 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer, iduser integer DEFAULT NUL
     selectStr TEXT;
     tableName TEXT;
     fromStr TEXT;
-    whereStr TEXT;
+    whereStr TEXT := '';
     whereStr2 TEXT;
 	  userRoles integer[] := metadata.getUserRolesArray(iduser);
 
@@ -435,6 +435,9 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer, iduser integer DEFAULT NUL
     ELSE
       selectStr := colSelect || ' as value, ' || colSelect || ' as name';
     END IF;
+    IF(whereStr != '') THEN
+      whereStr := ' WHERE ' || whereStr;
+    END IF;
 
     RAISE NOTICE '======================================';
     RAISE NOTICE 'tableName: %', tableName;
@@ -443,13 +446,8 @@ CREATE FUNCTION app.getcolumnvalues(idcolumn integer, iduser integer DEFAULT NUL
     RAISE NOTICE 'whereStr: %', whereStr;
     RAISE NOTICE '======================================';
 
---     execStr := 'SELECT DISTINCT ON (name) ' || selectStr ||
---       ' FROM app.' || tableName || ' as tbl' || fromStr ||
---       ' WHERE ' || whereStr ||
---       ' ORDER BY name';
     execStr := 'SELECT DISTINCT ON (name) ' || selectStr ||
-      ' FROM app.' || tableName || ' as tbl' || fromStr ||
-      ' WHERE ' || whereStr ||
+      ' FROM app.' || tableName || ' as tbl' || fromStr || whereStr ||
       ' ORDER BY name';
 
     RAISE NOTICE 'execStr:';
@@ -493,6 +491,8 @@ DECLARE
   attrVals         text[];
 
 BEGIN
+  CREATE TEMP TABLE lookup(tablename VARCHAR);
+
   columnName := recObj ->> 'columnname';
   masterTable := recObj ->> 'mastertable';
   masterColumn := recObj ->> 'mastercolumn';
@@ -633,6 +633,8 @@ BEGIN
   IF (columnName != 'jsondata') THEN
     selectStr := colTable || colSelect || colLabel;
   END IF;
+
+  DROP TABLE lookup;
 
   RAISE NOTICE '***** columnName: %', columnName;
   attrKeys := ARRAY ['tableName', 'selectStr', 'fromStr', 'whereStr', 'colSelect', 'colLabel', 'relationColName'];
@@ -2455,14 +2457,24 @@ CREATE FUNCTION metadata.getcolumnfromdisplayname(str text) RETURNS text
 
 DECLARE
   pos integer;
+  arr text[];
+  newstr text;
 
 BEGIN
-  pos := position('.' in str);
+  arr := string_to_array(str, ' || ');
+--   RAISE NOTICE '-----------------------';
+--   RAISE NOTICE '%', arr;
+--   RAISE NOTICE 'length: %', array_length(arr, 1);
+  newstr := arr[array_length(arr, 1)];
+--   RAISE NOTICE 'newstr: .%.', newstr;
+--   RAISE NOTICE '-----------------------';
+
+  pos := position('.' in newstr);
 
   IF(pos > 0) THEN
-    RETURN substr(str, pos+1);
+    RETURN substr(newstr, pos+1);
   ELSE
-    RETURN str;
+    RETURN newstr;
   END IF;
 END;
 
@@ -3879,7 +3891,9 @@ CREATE TABLE app.reporttemplates (
     updatedat timestamp without time zone DEFAULT now(),
     primarytableid integer,
     jsondata jsonb,
-    ownerid integer
+    ownerid integer,
+    editaction boolean DEFAULT false,
+    deleteaction boolean DEFAULT false
 );
 
 
@@ -4759,7 +4773,8 @@ CREATE TABLE metadata.formeventactions (
     eventid integer NOT NULL,
     actionid integer NOT NULL,
     actiondata jsonb,
-    pageformid integer NOT NULL
+    pageformid integer,
+    reporttemplateid integer
 );
 
 
@@ -6052,7 +6067,7 @@ COPY app.priority (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: reporttemplates; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata, ownerid) FROM stdin;
+COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata, ownerid, editaction, deleteaction) FROM stdin;
 \.
 
 
@@ -7391,7 +7406,7 @@ COPY metadata.fieldcategories (id, name, label) FROM stdin;
 -- Data for Name: formeventactions; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.formeventactions (id, eventid, actionid, actiondata, pageformid) FROM stdin;
+COPY metadata.formeventactions (id, eventid, actionid, actiondata, pageformid, reporttemplateid) FROM stdin;
 \.
 
 
@@ -7626,7 +7641,7 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1315, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1321, true);
 
 
 --
@@ -7668,7 +7683,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 383, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 385, true);
 
 
 --
@@ -7801,7 +7816,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 546, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 547, true);
 
 
 --
@@ -7857,7 +7872,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 247, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 254, true);
 
 
 --
@@ -9078,6 +9093,14 @@ ALTER TABLE ONLY metadata.formeventactions
 
 ALTER TABLE ONLY metadata.formeventactions
     ADD CONSTRAINT formeventactions_pageforms_id_fk FOREIGN KEY (pageformid) REFERENCES metadata.pageforms(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: formeventactions formeventactions_reporttemplates_id_fk; Type: FK CONSTRAINT; Schema: metadata; Owner: appowner
+--
+
+ALTER TABLE ONLY metadata.formeventactions
+    ADD CONSTRAINT formeventactions_reporttemplates_id_fk FOREIGN KEY (reporttemplateid) REFERENCES app.reporttemplates(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
