@@ -1,5 +1,3 @@
--- noinspection SqlNoDataSourceInspectionForFile
-
 --
 -- PostgreSQL database dump
 --
