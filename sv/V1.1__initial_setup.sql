@@ -1,3 +1,5 @@
+-- noinspection SqlNoDataSourceInspectionForFile
+
 --
 -- PostgreSQL database dump
 --
@@ -1801,6 +1803,81 @@ $$;
 ALTER FUNCTION metadata.fetchdatamodel(idapp numeric, iduser integer) OWNER TO appowner;
 
 --
+-- Name: findrelatedrecords(integer, integer, integer, text); Type: FUNCTION; Schema: metadata; Owner: appowner
+--
+
+CREATE FUNCTION metadata.findrelatedrecords(appcolumnid integer, idrec integer, iduser integer DEFAULT NULL::integer, serverurl text DEFAULT ''::text) RETURNS json
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    rec_field RECORD;
+    resp      JSON;
+    result    JSON;
+    execStr   TEXT;
+    tableName TEXT;
+    selectStr TEXT := 'tbl.id as id';
+    fromStr   TEXT := '';
+    whereStr  TEXT := '';
+    tableId   INTEGER;
+    tableAppId INTEGER;
+    relatedColumn TEXT;
+    cur_fields scroll CURSOR (id INTEGER) FOR SELECT * FROM metadata.appformGetFields(id, iduser);
+
+BEGIN
+    select * into rec_field from metadata.appcolumns where id = appcolumnid;
+    tableId := rec_field.apptableid;
+    select appid into tableAppId from metadata.apptables where id = tableId;
+    RAISE NOTICE '********** appId: %  tableId: %', tableAppId, tableId;
+    IF(rec_field.jsonfield) THEN
+      relatedColumn := 'CAST(coalesce(tbl.jsondata->>''' || rec_field.columnname || ''', ''0'') AS INTEGER)';
+    ELSE
+      relatedColumn := 'tbl.' || rec_field.columnname;
+    END IF;
+
+    OPEN cur_fields(tableId);
+    execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', ' || idrec || ');';
+    EXECUTE execStr INTO resp;
+    CLOSE cur_fields;
+
+    tableName := resp ->> 'tableName';
+    selectStr := resp ->> 'selectStr';
+    fromStr := resp ->> 'fromStr';
+    whereStr := resp ->> 'whereStr';
+
+    RAISE NOTICE 'tableName: %', tableName;
+    RAISE NOTICE 'selectStr: %', selectStr;
+    RAISE NOTICE 'fromStr: %', fromStr;
+    RAISE NOTICE 'whereStr: %', whereStr;
+
+    execStr := 'SELECT ' || selectStr || ', users.firstname, users.mi, users.lastname, users.email, users.phone, ' ||
+               'array(
+                select json_build_object(
+                    ''path'', attach.path,
+                    ''uniquename'', attach.uniquename,
+                    ''name'', attach.name,
+                    ''size'', attach.size,
+                    ''link'', ''' || serverurl || '/files/' || tableAppId || '/'' || attach.uniquename)
+                from app.tableattachments as ta,
+                app.attachments as attach
+                where ta.apptableid=tbl.apptableid and ta.recordid=tbl.id and attach.id=ta.attachmentid
+                ) attachments' ||
+               ' FROM app.' || tableName || ' as tbl ' || fromStr ||
+               ' where tbl.apptableid=' || tableId ||
+               ' AND ' || relatedColumn || '=' || idrec ||
+               ' ORDER BY tbl.updatedat DESC';
+
+    RAISE NOTICE 'execStr:';
+    RAISE NOTICE '%', execStr;
+
+    EXECUTE 'SELECT array_to_json(array_agg(row_to_json(t))) FROM (' || execStr || ') t;' INTO result;
+    RETURN result;
+END;
+$$;
+
+
+ALTER FUNCTION metadata.findrelatedrecords(appcolumnid integer, idrec integer, iduser integer, serverurl text) OWNER TO appowner;
+
+--
 -- Name: formrecordadd(integer, integer[], text[]); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
@@ -3370,6 +3447,74 @@ $$;
 
 ALTER FUNCTION metadata.workflowstateupdate(idtable integer, idtransition integer) OWNER TO appowner;
 
+--
+-- Name: findrelatedrecords(integer, integer, integer); Type: FUNCTION; Schema: public; Owner: appowner
+--
+
+CREATE FUNCTION public.findrelatedrecords(appcolumnid integer, idrec integer, iduser integer DEFAULT NULL::integer) RETURNS json
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    rec_field RECORD;
+    resp      JSON;
+    result    JSON;
+    execStr   TEXT;
+    tableName TEXT;
+    selectStr TEXT := 'tbl.id as id';
+    fromStr   TEXT := '';
+    whereStr  TEXT := '';
+    tableId   INTEGER;
+    relatedColumn TEXT;
+    cur_fields scroll CURSOR (id INTEGER) FOR SELECT * FROM metadata.appformGetFields(id, iduser);
+
+BEGIN
+    select * into rec_field from metadata.appcolumns where id = appcolumnid;
+    tableId := rec_field.apptableid;
+    RAISE NOTICE '********** tableId: %', tableId;
+    IF(rec_field.jsonfield) THEN
+      relatedColumn := 'CAST(coalesce(tbl.jsondata->>''' || rec_field.columnname || ''', ''0'') AS INTEGER)';
+    ELSE
+      relatedColumn := 'tbl.' || rec_field.columnname;
+    END IF;
+
+    OPEN cur_fields(tableId);
+    execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', ' || idrec || ');';
+    EXECUTE execStr INTO resp;
+    CLOSE cur_fields;
+
+    tableName := resp ->> 'tableName';
+    selectStr := resp ->> 'selectStr';
+    fromStr := resp ->> 'fromStr';
+    whereStr := resp ->> 'whereStr';
+
+    RAISE NOTICE 'tableName: %', tableName;
+    RAISE NOTICE 'selectStr: %', selectStr;
+    RAISE NOTICE 'fromStr: %', fromStr;
+    RAISE NOTICE 'whereStr: %', whereStr;
+
+    execStr := 'SELECT ' || selectStr || ', users.firstname, users.mi, users.lastname, users.email, users.phone, ' ||
+               'array(
+                select json_build_object(''id'', attach.id, ''path'', attach.path, ''uniquename'', attach.uniquename, ''name'', attach.name, ''size'', attach.size)
+                from app.tableattachments as ta,
+                app.attachments as attach
+                where ta.apptableid=tbl.apptableid and ta.recordid=tbl.id and attach.id=ta.attachmentid
+                ) attachments' ||
+               ' FROM app.' || tableName || ' as tbl ' || fromStr ||
+               ' where tbl.apptableid=' || tableId ||
+               ' AND ' || relatedColumn || '=' || idrec ||
+               ' ORDER BY tbl.updatedat DESC';
+
+    RAISE NOTICE 'execStr:';
+    RAISE NOTICE '%', execStr;
+
+    EXECUTE 'SELECT array_to_json(array_agg(row_to_json(t))) FROM (' || execStr || ') t;' INTO result;
+    RETURN result;
+END;
+$$;
+
+
+ALTER FUNCTION public.findrelatedrecords(appcolumnid integer, idrec integer, iduser integer) OWNER TO appowner;
+
 SET default_tablespace = '';
 
 SET default_with_oids = false;
@@ -4552,6 +4697,47 @@ ALTER TABLE metadata.applications ALTER COLUMN id ADD GENERATED BY DEFAULT AS ID
 
 
 --
+-- Name: appqueries; Type: TABLE; Schema: metadata; Owner: appowner
+--
+
+CREATE TABLE metadata.appqueries (
+    id integer NOT NULL,
+    procname character varying(60) NOT NULL,
+    appid integer NOT NULL,
+    schema character varying(20) NOT NULL,
+    description character varying(256),
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now(),
+    name character varying(60) NOT NULL,
+    params character varying(20)[]
+);
+
+
+ALTER TABLE metadata.appqueries OWNER TO appowner;
+
+--
+-- Name: appquery_id_seq; Type: SEQUENCE; Schema: metadata; Owner: appowner
+--
+
+CREATE SEQUENCE metadata.appquery_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE metadata.appquery_id_seq OWNER TO appowner;
+
+--
+-- Name: appquery_id_seq; Type: SEQUENCE OWNED BY; Schema: metadata; Owner: appowner
+--
+
+ALTER SEQUENCE metadata.appquery_id_seq OWNED BY metadata.appqueries.id;
+
+
+--
 -- Name: apptables; Type: TABLE; Schema: metadata; Owner: appowner
 --
 
@@ -4701,7 +4887,8 @@ ALTER SEQUENCE metadata.datatypes_id_seq OWNED BY metadata.datatypes.id;
 
 CREATE TABLE metadata.events (
     id integer NOT NULL,
-    name character varying(40)
+    name character varying(40),
+    "description " character varying(128)
 );
 
 
@@ -5436,6 +5623,13 @@ ALTER TABLE ONLY metadata.apiactions ALTER COLUMN id SET DEFAULT nextval('metada
 --
 
 ALTER TABLE ONLY metadata.appcolumns ALTER COLUMN id SET DEFAULT nextval('metadata.appcolumns_id_seq'::regclass);
+
+
+--
+-- Name: appqueries id; Type: DEFAULT; Schema: metadata; Owner: appowner
+--
+
+ALTER TABLE ONLY metadata.appqueries ALTER COLUMN id SET DEFAULT nextval('metadata.appquery_id_seq'::regclass);
 
 
 --
@@ -6443,7 +6637,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3040	1	ramon.f.vasquez1@usmc.mil	Ramon		Vasquez	5	9104496839			CN=VASQUEZ.RAMON.F.1187351568,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187351568	VASQUEZ.RAMON.F	16	25	3	2	0	\N	\N	\N	3	\N	0	\N
 3042	1	timothy.j.vaughn@usmc.mil	Timothy		Vaughn	5	9104496065			CN=VAUGHN.TIMOTHY.JOSHUA.1024275180,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024275180	VAUGHN.TIMOTHY.JOSHUA	4	25	3	2	0	\N	\N	\N	3	\N	0	1
 3044	1	leigha.mabe@usmc.mil	Leigha		Veganunez	3	2544627512			CN=VEGANUNEZ.LEIGHA.MARIE.1462636039,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462636039	VEGANUNEZ.LEIGHA.MARIE	3	25	3	77	0	\N	\N	\N	3	\N	0	1
-13	\N	root.projecttasks4@navy.mil	Root	\N	Projecttasks4	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:20:47.477	\N	\N	\N	\N	1	\N
+10	\N	bob.projecttasks1@squadron.mil	Bob		Projecttasks1	\N	(111)555-1212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 10:18:31.758	\N	\N	\N	\N	1	\N
 3046	1	vvillasenor@bh.com	Victor		Villasenor	5	8172401371		8585776830	CN=VILLASENOROJEDA.VICTOR.IVAN.1273605823,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	VILLASENOROJEDA.VICTOR.IVAN	20	31	2	8	0	\N	\N	\N	3	\N	0	1
 3048	1	mvonbergen@bh.com	Michael		Vonbergen	5	8508812651	6412651		CN=VON BERGEN.MICHAEL.EDWARD.1257076551,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257076551	VON BERGEN.MICHAEL.EDWARD	20	16	2	11	0	\N	\N	\N	1	\N	0	2
 3050	1	christopher.voss@usmc.mil	Christopher		Voss	5	3156367661	6367661		CN=VOSS.CHRISTOPHER.JIN.1138177820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1138177820	VOSS.CHRISTOPHER.JIN	12	53	3	7	0	\N	\N	\N	3	\N	0	\N
@@ -7178,7 +7372,6 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3574	1	travis.maka@navy.mil	Travis		Makarowski	1	2343455432			CN=MAKAROWSKI.TRAVIS.W.1141323233x,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	-1		4	3	1	18	0	\N	\N	\N	2	\N	0	\N
 2	1	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	1	\N
 3	1	testing.test.16@us.af.mil	Testing	Q	Test	5	1112223333	9999999999	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	1	\N
-3575	1	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4				CN=MARSHALL.GEOFF.EDWARD.1065484494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	0	\N
 3573	1	steven.groninga@navy.mil	Steven		Groninga	4	2527208500			CN=GRONINGA.STEVEN.CHARLES.1065484494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	0	\N
 6	\N	dave.tdtracker1@email.com	Dave		Tdtracker1	\N		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 23:37:29.847	\N	\N	\N	\N	1	\N
 7	\N	donna.tdtracker2	Donna	\N	Tdtracker2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:39:39.899019	\N	\N	\N	\N	1	\N
@@ -7188,10 +7381,11 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 15	\N	smanager2@navy.mil	Sue	B	Manager2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:18.479	\N	\N	\N	\N	1	\N
 16	\N	gmanager3@navy.mil	Guy	C	Manager3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:40.896	\N	\N	\N	\N	1	\N
 2174	1	david.abbott.16@us.af.mil	David		Abbott	5	5058537389	2637389113		CN=ABBOTT.DAVID.J.1248049800,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABBOTT.DAVID.J	20	6	1	5	0	\N	\N	\N	1	\N	0	\N
-11	\N	fred.projecttasks2@squadron.mil	Fred	Q	Projecttasks2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:02.917	\N	\N	\N	\N	1	\N
 33	\N	matt.bailey@fsr.mil	Matt	A	Bailey	\N	111-555-1212	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2019-05-16 19:14:55.885	\N	\N	\N	\N	1	\N
-10	\N	bob.projecttasks1@squadron.mil	Bob		Projecttasks1	\N		\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 10:18:31.758	\N	\N	\N	\N	1	\N
-12	\N	chris.projecttasks@squadron.mil	Chris	A	Projecttasks3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:29.179	\N	\N	\N	\N	1	\N
+11	\N	fred.projecttasks2@squadron.mil	Fred	Q	Projecttasks2	\N	567-111-2234	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:02.917	\N	\N	\N	\N	1	\N
+3575	1	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4	252-464-8744			CN=MARSHALL.GEOFF.EDWARD.1065484494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	0	\N
+12	\N	chris.projecttasks@squadron.mil	Chris	A	Projecttasks3	\N	123-111-1234	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:29.179	\N	\N	\N	\N	1	\N
+13	\N	root.projecttasks4@navy.mil	Root	\N	Projecttasks4	\N	333-123-3333	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:20:47.477	\N	\N	\N	\N	1	\N
 \.
 
 
@@ -7239,6 +7433,7 @@ query	4
 loadedit	5
 loaddetail	6
 userattachments	7
+relatedrecord	8
 \.
 
 
@@ -7268,6 +7463,14 @@ COPY metadata.appcolumns (id, apptableid, columnname, label, datatypeid, length,
 
 COPY metadata.applications (id, name, shortname, description) FROM stdin;
 0	System		Application Factory System
+\.
+
+
+--
+-- Data for Name: appqueries; Type: TABLE DATA; Schema: metadata; Owner: appowner
+--
+
+COPY metadata.appqueries (id, procname, appid, schema, description, createdat, updatedat, name, params) FROM stdin;
 \.
 
 
@@ -7382,13 +7585,14 @@ COPY metadata.datatypes (id, name) FROM stdin;
 -- Data for Name: events; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.events (id, name) FROM stdin;
-1	add
-2	edit
-3	delete
-4	load
-5	submit
-6	goto
+COPY metadata.events (id, name, "description ") FROM stdin;
+1	add	\N
+2	edit	\N
+3	delete	\N
+4	load	\N
+5	submit	\N
+6	goto	Simple navigation to another page
+7	gotoDataItem	Save a specified data element for editing and navigate to another page.
 \.
 
 
@@ -7641,21 +7845,21 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1321, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1358, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 68, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 114, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 131, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 159, true);
 
 
 --
@@ -7683,7 +7887,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 385, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 392, true);
 
 
 --
@@ -7753,7 +7957,7 @@ SELECT pg_catalog.setval('app.status_id_seq', 45, true);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 125, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 153, true);
 
 
 --
@@ -7802,7 +8006,7 @@ SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 218, true);
 -- Name: actions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.actions_id_seq', 7, true);
+SELECT pg_catalog.setval('metadata.actions_id_seq', 8, true);
 
 
 --
@@ -7816,7 +8020,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 547, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 549, true);
 
 
 --
@@ -7824,6 +8028,13 @@ SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 547, true);
 --
 
 SELECT pg_catalog.setval('metadata.applications_id_seq', 76, true);
+
+
+--
+-- Name: appquery_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
+--
+
+SELECT pg_catalog.setval('metadata.appquery_id_seq', 1, true);
 
 
 --
@@ -7858,7 +8069,7 @@ SELECT pg_catalog.setval('metadata.datatypes_id_seq', 9, true);
 -- Name: events_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.events_id_seq', 6, true);
+SELECT pg_catalog.setval('metadata.events_id_seq', 7, true);
 
 
 --
@@ -7872,14 +8083,14 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 254, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 266, true);
 
 
 --
 -- Name: formresources_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formresources_id_seq', 50, true);
+SELECT pg_catalog.setval('metadata.formresources_id_seq', 51, true);
 
 
 --
@@ -7907,7 +8118,7 @@ SELECT pg_catalog.setval('metadata.menuicons_id_seq', 28, true);
 -- Name: menuitems_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.menuitems_id_seq', 199, true);
+SELECT pg_catalog.setval('metadata.menuitems_id_seq', 200, true);
 
 
 --
@@ -7921,14 +8132,14 @@ SELECT pg_catalog.setval('metadata.menupaths_id_seq', 13, true);
 -- Name: pageforms_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pageforms_id_seq', 81, true);
+SELECT pg_catalog.setval('metadata.pageforms_id_seq', 82, true);
 
 
 --
 -- Name: pages_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pages_id_seq', 118, true);
+SELECT pg_catalog.setval('metadata.pages_id_seq', 119, true);
 
 
 --
@@ -8204,6 +8415,14 @@ ALTER TABLE ONLY metadata.apiactions
 
 ALTER TABLE ONLY metadata.appcolumns
     ADD CONSTRAINT appcolumns_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: appqueries appquery_pk; Type: CONSTRAINT; Schema: metadata; Owner: appowner
+--
+
+ALTER TABLE ONLY metadata.appqueries
+    ADD CONSTRAINT appquery_pk PRIMARY KEY (id);
 
 
 --
@@ -8566,6 +8785,13 @@ CREATE UNIQUE INDEX apiactions_id_uindex ON metadata.apiactions USING btree (id)
 --
 
 CREATE UNIQUE INDEX appcolumns_id_uindex ON metadata.appcolumns USING btree (id);
+
+
+--
+-- Name: appquery_id_uindex; Type: INDEX; Schema: metadata; Owner: appowner
+--
+
+CREATE UNIQUE INDEX appquery_id_uindex ON metadata.appqueries USING btree (id);
 
 
 --
@@ -9037,6 +9263,14 @@ ALTER TABLE ONLY metadata.appcolumns
 
 ALTER TABLE ONLY metadata.appcolumns
     ADD CONSTRAINT appcolumns_datatypes_id_fk FOREIGN KEY (datatypeid) REFERENCES metadata.datatypes(id);
+
+
+--
+-- Name: appqueries appquery_applications_id_fk; Type: FK CONSTRAINT; Schema: metadata; Owner: appowner
+--
+
+ALTER TABLE ONLY metadata.appqueries
+    ADD CONSTRAINT appquery_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
 
 
 --
@@ -9932,7 +10166,7 @@ GRANT ALL ON SEQUENCE app.workflow_statetransitions_id_seq TO appuser;
 -- Name: TABLE actions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.actions TO appuser;
+GRANT ALL ON TABLE metadata.actions TO appuser;
 
 
 --
@@ -9946,7 +10180,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.actions_id_seq TO appuser;
 -- Name: TABLE apiactions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.apiactions TO appuser;
+GRANT ALL ON TABLE metadata.apiactions TO appuser;
 
 
 --
@@ -9960,7 +10194,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.apiactions_id_seq TO appuser;
 -- Name: TABLE appcolumns; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.appcolumns TO appuser;
+GRANT ALL ON TABLE metadata.appcolumns TO appuser;
 
 
 --
@@ -9974,7 +10208,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.appcolumns_id_seq TO appuser;
 -- Name: TABLE applications; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.applications TO appuser;
+GRANT ALL ON TABLE metadata.applications TO appuser;
 
 
 --
@@ -9985,10 +10219,17 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.applications_id_seq TO appuser;
 
 
 --
+-- Name: TABLE appqueries; Type: ACL; Schema: metadata; Owner: appowner
+--
+
+GRANT ALL ON TABLE metadata.appqueries TO appuser;
+
+
+--
 -- Name: TABLE apptables; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.apptables TO appuser;
+GRANT ALL ON TABLE metadata.apptables TO appuser;
 
 
 --
@@ -10002,7 +10243,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.apptables_id_seq TO appuser;
 -- Name: TABLE columntemplate; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.columntemplate TO appuser;
+GRANT ALL ON TABLE metadata.columntemplate TO appuser;
 
 
 --
@@ -10016,7 +10257,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.columntemplate_id_seq TO appuser;
 -- Name: TABLE controltypes; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.controltypes TO appuser;
+GRANT ALL ON TABLE metadata.controltypes TO appuser;
 
 
 --
@@ -10030,7 +10271,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.controltypes_id_seq TO appuser;
 -- Name: TABLE datatypes; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.datatypes TO appuser;
+GRANT ALL ON TABLE metadata.datatypes TO appuser;
 
 
 --
@@ -10044,7 +10285,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.datatypes_id_seq TO appuser;
 -- Name: TABLE events; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.events TO appuser;
+GRANT ALL ON TABLE metadata.events TO appuser;
 
 
 --
@@ -10058,7 +10299,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.events_id_seq TO appuser;
 -- Name: TABLE fieldcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.fieldcategories TO appuser;
+GRANT ALL ON TABLE metadata.fieldcategories TO appuser;
 
 
 --
@@ -10072,7 +10313,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.fieldcategories_id_seq TO appuser;
 -- Name: TABLE formeventactions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formeventactions TO appuser;
+GRANT ALL ON TABLE metadata.formeventactions TO appuser;
 
 
 --
@@ -10086,7 +10327,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.formeventactions_id_seq TO appuser;
 -- Name: TABLE formresources; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.formresources TO appuser;
+GRANT ALL ON TABLE metadata.formresources TO appuser;
 
 
 --
@@ -10100,7 +10341,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.formresources_id_seq TO appuser;
 -- Name: TABLE images; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.images TO appuser;
+GRANT ALL ON TABLE metadata.images TO appuser;
 
 
 --
@@ -10121,7 +10362,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.issues_id_seq TO appuser;
 -- Name: TABLE menuicons; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuicons TO appuser;
+GRANT ALL ON TABLE metadata.menuicons TO appuser;
 
 
 --
@@ -10135,7 +10376,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuicons_id_seq TO appuser;
 -- Name: TABLE menuitems; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menuitems TO appuser;
+GRANT ALL ON TABLE metadata.menuitems TO appuser;
 
 
 --
@@ -10149,7 +10390,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menuitems_id_seq TO appuser;
 -- Name: TABLE menupaths; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.menupaths TO appuser;
+GRANT ALL ON TABLE metadata.menupaths TO appuser;
 
 
 --
@@ -10163,7 +10404,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.menupaths_id_seq TO appuser;
 -- Name: TABLE pageforms; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.pageforms TO appuser;
+GRANT ALL ON TABLE metadata.pageforms TO appuser;
 
 
 --
@@ -10177,7 +10418,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.pageforms_id_seq TO appuser;
 -- Name: TABLE pages; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.pages TO appuser;
+GRANT ALL ON TABLE metadata.pages TO appuser;
 
 
 --
@@ -10191,7 +10432,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.pages_id_seq TO appuser;
 -- Name: TABLE systemcategories; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.systemcategories TO appuser;
+GRANT ALL ON TABLE metadata.systemcategories TO appuser;
 
 
 --
@@ -10205,7 +10446,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.systemcategories_id_seq TO appuser;
 -- Name: TABLE systemtables; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.systemtables TO appuser;
+GRANT ALL ON TABLE metadata.systemtables TO appuser;
 
 
 --
@@ -10219,7 +10460,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.systemtables_id_seq TO appuser;
 -- Name: TABLE systemtabletypes; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.systemtabletypes TO appuser;
+GRANT ALL ON TABLE metadata.systemtabletypes TO appuser;
 
 
 --
@@ -10233,7 +10474,7 @@ GRANT SELECT,USAGE ON SEQUENCE metadata.systemtabletypes_id_seq TO appuser;
 -- Name: TABLE urlactions; Type: ACL; Schema: metadata; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE metadata.urlactions TO appuser;
+GRANT ALL ON TABLE metadata.urlactions TO appuser;
 
 
 --
