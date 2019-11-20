@@ -36,6 +36,16 @@ ALTER SCHEMA metadata OWNER TO appowner;
 ###### check schemas
 \dn  
 
+``` javascript
+   List of schemas
+   Name   |  Owner   
+----------+----------
+ app      | appowner
+ metadata | appowner
+ public   | postgres
+(3 rows)
+```
+
 #### Check instance version info
 cd workspace/app-factory/appfactory-migrations  
 ./flyway.sh info  
