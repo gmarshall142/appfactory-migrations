@@ -3844,6 +3844,43 @@ ALTER SEQUENCE app.bunos_id_seq OWNED BY app.bunos.id;
 
 
 --
+-- Name: dashboardreports; Type: TABLE; Schema: app; Owner: appowner
+--
+
+CREATE TABLE app.dashboardreports (
+    id integer NOT NULL,
+    userid integer NOT NULL,
+    adhocqueryid integer NOT NULL,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE app.dashboardreports OWNER TO appowner;
+
+--
+-- Name: dashboardreport_id_seq; Type: SEQUENCE; Schema: app; Owner: appowner
+--
+
+CREATE SEQUENCE app.dashboardreport_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE app.dashboardreport_id_seq OWNER TO appowner;
+
+--
+-- Name: dashboardreport_id_seq; Type: SEQUENCE OWNED BY; Schema: app; Owner: appowner
+--
+
+ALTER SEQUENCE app.dashboardreport_id_seq OWNED BY app.dashboardreports.id;
+
+
+--
 -- Name: groups; Type: TABLE; Schema: app; Owner: appowner
 --
 
@@ -5570,6 +5607,13 @@ ALTER TABLE ONLY app.bunos ALTER COLUMN id SET DEFAULT nextval('app.bunos_id_seq
 
 
 --
+-- Name: dashboardreports id; Type: DEFAULT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.dashboardreports ALTER COLUMN id SET DEFAULT nextval('app.dashboardreport_id_seq'::regclass);
+
+
+--
 -- Name: groups id; Type: DEFAULT; Schema: app; Owner: appowner
 --
 
@@ -6299,6 +6343,14 @@ COPY app.bunos (id, identifier, description, createdat, updatedat) FROM stdin;
 4467	166395	\N	2019-01-18 20:43:26.514058	2019-01-18 20:43:26.512
 4468	N/A	\N	2019-01-18 20:43:27.114301	2019-01-18 20:43:27.112
 4469	I-level 	\N	2019-01-18 20:43:27.132797	2019-01-18 20:43:27.13
+\.
+
+
+--
+-- Data for Name: dashboardreports; Type: TABLE DATA; Schema: app; Owner: appowner
+--
+
+COPY app.dashboardreports (id, userid, adhocqueryid, createdat, updatedat) FROM stdin;
 \.
 
 
@@ -7958,21 +8010,21 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1402, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1405, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 156, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 158, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 195, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 196, true);
 
 
 --
@@ -7980,6 +8032,13 @@ SELECT pg_catalog.setval('app.attachments_id_seq', 195, true);
 --
 
 SELECT pg_catalog.setval('app.bunos_id_seq', 4469, true);
+
+
+--
+-- Name: dashboardreport_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
+--
+
+SELECT pg_catalog.setval('app.dashboardreport_id_seq', 1, true);
 
 
 --
@@ -8000,7 +8059,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 401, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 402, true);
 
 
 --
@@ -8077,7 +8136,7 @@ SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 189, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 190, true);
 
 
 --
@@ -8140,7 +8199,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 551, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 552, true);
 
 
 --
@@ -8203,7 +8262,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 270, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 272, true);
 
 
 --
@@ -8351,6 +8410,14 @@ ALTER TABLE ONLY app.attachments
 
 ALTER TABLE ONLY app.bunos
     ADD CONSTRAINT bunos_pk PRIMARY KEY (id);
+
+
+--
+-- Name: dashboardreports dashboardreport_pk; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.dashboardreports
+    ADD CONSTRAINT dashboardreport_pk PRIMARY KEY (id);
 
 
 --
@@ -8762,6 +8829,13 @@ CREATE UNIQUE INDEX bunos_label_uindex ON app.bunos USING btree (identifier);
 
 
 --
+-- Name: dashboardreport_id_uindex; Type: INDEX; Schema: app; Owner: appowner
+--
+
+CREATE UNIQUE INDEX dashboardreport_id_uindex ON app.dashboardreports USING btree (id);
+
+
+--
 -- Name: groups_id_uindex; Type: INDEX; Schema: app; Owner: appowner
 --
 
@@ -9110,6 +9184,22 @@ ALTER TABLE ONLY app.appdata
 
 ALTER TABLE ONLY app.appdata
     ADD CONSTRAINT appdata_apptables_id_fk FOREIGN KEY (apptableid) REFERENCES metadata.apptables(id);
+
+
+--
+-- Name: dashboardreports dashboardreport_users_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.dashboardreports
+    ADD CONSTRAINT dashboardreport_users_id_fk FOREIGN KEY (userid) REFERENCES app.users(id);
+
+
+--
+-- Name: dashboardreports dashboardreports_adhoc_queries_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.dashboardreports
+    ADD CONSTRAINT dashboardreports_adhoc_queries_id_fk FOREIGN KEY (adhocqueryid) REFERENCES app.adhoc_queries(id);
 
 
 --
@@ -10048,6 +10138,20 @@ GRANT ALL ON SEQUENCE app.bunos_id_seq TO appuser;
 
 
 --
+-- Name: TABLE dashboardreports; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.dashboardreports TO appuser;
+
+
+--
+-- Name: SEQUENCE dashboardreport_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE app.dashboardreport_id_seq TO appuser;
+
+
+--
 -- Name: TABLE groups; Type: ACL; Schema: app; Owner: appowner
 --
 
@@ -10220,6 +10324,13 @@ GRANT ALL ON SEQUENCE app.status_id_seq TO appuser;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.support TO appuser;
+
+
+--
+-- Name: SEQUENCE support_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE app.support_id_seq TO appuser;
 
 
 --
