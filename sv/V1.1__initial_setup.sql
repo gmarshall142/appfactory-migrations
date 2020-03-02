@@ -1,21 +1,4 @@
 --
--- PostgreSQL database dump
---
-
--- Dumped from database version 10.4
--- Dumped by pg_dump version 10.4
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
 -- Name: attachmentaddlink(text, integer, integer); Type: FUNCTION; Schema: app; Owner: appowner
 --
 
@@ -3626,7 +3609,9 @@ CREATE TABLE app.adhoc_queries (
     createdat timestamp without time zone,
     updatedat timestamp without time zone DEFAULT now(),
     reporttemplateid integer,
-    ownerid integer
+    ownerid integer,
+    editaction boolean DEFAULT false,
+    deleteaction boolean DEFAULT false
 );
 
 
@@ -4129,9 +4114,7 @@ CREATE TABLE app.reporttemplates (
     updatedat timestamp without time zone DEFAULT now(),
     primarytableid integer,
     jsondata jsonb,
-    ownerid integer,
-    editaction boolean DEFAULT false,
-    deleteaction boolean DEFAULT false
+    ownerid integer
 );
 
 
@@ -5095,7 +5078,7 @@ CREATE TABLE metadata.formeventactions (
     actionid integer NOT NULL,
     actiondata jsonb,
     pageformid integer,
-    reporttemplateid integer
+    adhocqueryid integer
 );
 
 
@@ -5898,7 +5881,7 @@ COPY app.activity (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: adhoc_queries; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat, reporttemplateid, ownerid) FROM stdin;
+COPY app.adhoc_queries (id, name, appid, jsondata, createdat, updatedat, reporttemplateid, ownerid, editaction, deleteaction) FROM stdin;
 \.
 
 
@@ -5923,6 +5906,8 @@ COPY app.appdata (id, jsondata, createdat, updatedat, apptableid, appid) FROM st
 --
 
 COPY app.attachments (id, path, uniquename, name, size, createdat, updatedat) FROM stdin;
+206	/uploads	f8c17770-27f9-11ea-be30-7b02c00427c8_temp.sql	temp.sql	7115	2019-12-26 16:08:36.070544	2019-12-26 16:08:36.070544
+207	/uploads	fed232f0-37dd-11ea-a226-a76a5ae632b1_temp2.sql	temp2.sql	7969	2020-01-15 21:28:39.103447	2020-01-15 21:28:39.103447
 \.
 
 
@@ -6418,7 +6403,7 @@ COPY app.priority (id, appid, label, description, createdat, updatedat, jsondata
 -- Data for Name: reporttemplates; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata, ownerid, editaction, deleteaction) FROM stdin;
+COPY app.reporttemplates (id, appid, name, createdat, updatedat, primarytableid, jsondata, ownerid) FROM stdin;
 \.
 
 
@@ -6483,6 +6468,8 @@ COPY app.support (id, title, value, hours, userid, createdat, updatedat, display
 --
 
 COPY app.tableattachments (createdat, updatedat, id, attachmentid, apptableid, recordid) FROM stdin;
+2020-01-15 21:28:40.437419	2020-01-15 21:28:40.437419	174	206	121	1414
+2020-01-15 21:28:40.441067	2020-01-15 21:28:40.441067	175	207	121	1414
 \.
 
 
@@ -6491,6 +6478,8 @@ COPY app.tableattachments (createdat, updatedat, id, attachmentid, apptableid, r
 --
 
 COPY app.userattachments (id, userid, attachmentid, createdat, updatedat) FROM stdin;
+200	3575	206	2019-12-26 16:08:36.070544	2019-12-26 16:08:36.070544
+201	3575	207	2020-01-15 21:28:39.103447	2020-01-15 21:28:39.103447
 \.
 
 
@@ -7780,7 +7769,7 @@ COPY metadata.fieldcategories (id, name, label) FROM stdin;
 -- Data for Name: formeventactions; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.formeventactions (id, eventid, actionid, actiondata, pageformid, reporttemplateid) FROM stdin;
+COPY metadata.formeventactions (id, eventid, actionid, actiondata, pageformid, adhocqueryid) FROM stdin;
 \.
 
 
@@ -7996,7 +7985,7 @@ SELECT pg_catalog.setval('app.activities_id_seq', 88, true);
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 59, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 66, true);
 
 
 --
@@ -8010,21 +7999,21 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1405, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1418, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 158, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 177, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 196, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 208, true);
 
 
 --
@@ -8059,7 +8048,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 402, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 405, true);
 
 
 --
@@ -8101,7 +8090,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, false);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 95, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 98, true);
 
 
 --
@@ -8115,7 +8104,7 @@ SELECT pg_catalog.setval('app.rolepermissions_id_seq', 1, false);
 -- Name: roles_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roles_id_seq', 41, true);
+SELECT pg_catalog.setval('app.roles_id_seq', 42, true);
 
 
 --
@@ -8136,7 +8125,7 @@ SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 190, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 202, true);
 
 
 --
@@ -8150,7 +8139,7 @@ SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 42, true);
+SELECT pg_catalog.setval('app.users_id_seq', 44, true);
 
 
 --
@@ -8199,7 +8188,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 552, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 554, true);
 
 
 --
@@ -8262,7 +8251,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 272, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 277, true);
 
 
 --
@@ -9555,6 +9544,14 @@ ALTER TABLE ONLY metadata.formeventactions
 
 
 --
+-- Name: formeventactions formeventactions_adhoc_queries_id_fk; Type: FK CONSTRAINT; Schema: metadata; Owner: appowner
+--
+
+ALTER TABLE ONLY metadata.formeventactions
+    ADD CONSTRAINT formeventactions_adhoc_queries_id_fk FOREIGN KEY (adhocqueryid) REFERENCES app.adhoc_queries(id);
+
+
+--
 -- Name: formeventactions formeventactions_events_id_fk; Type: FK CONSTRAINT; Schema: metadata; Owner: appowner
 --
 
@@ -9568,14 +9565,6 @@ ALTER TABLE ONLY metadata.formeventactions
 
 ALTER TABLE ONLY metadata.formeventactions
     ADD CONSTRAINT formeventactions_pageforms_id_fk FOREIGN KEY (pageformid) REFERENCES metadata.pageforms(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: formeventactions formeventactions_reporttemplates_id_fk; Type: FK CONSTRAINT; Schema: metadata; Owner: appowner
---
-
-ALTER TABLE ONLY metadata.formeventactions
-    ADD CONSTRAINT formeventactions_reporttemplates_id_fk FOREIGN KEY (reporttemplateid) REFERENCES app.reporttemplates(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --

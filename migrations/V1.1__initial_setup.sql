@@ -1,4 +1,21 @@
 --
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 10.4
+-- Dumped by pg_dump version 10.4
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
 -- Name: attachmentaddlink(text, integer, integer); Type: FUNCTION; Schema: app; Owner: appowner
 --
 
@@ -5906,8 +5923,6 @@ COPY app.appdata (id, jsondata, createdat, updatedat, apptableid, appid) FROM st
 --
 
 COPY app.attachments (id, path, uniquename, name, size, createdat, updatedat) FROM stdin;
-206	/uploads	f8c17770-27f9-11ea-be30-7b02c00427c8_temp.sql	temp.sql	7115	2019-12-26 16:08:36.070544	2019-12-26 16:08:36.070544
-207	/uploads	fed232f0-37dd-11ea-a226-a76a5ae632b1_temp2.sql	temp2.sql	7969	2020-01-15 21:28:39.103447	2020-01-15 21:28:39.103447
 \.
 
 
@@ -6468,8 +6483,6 @@ COPY app.support (id, title, value, hours, userid, createdat, updatedat, display
 --
 
 COPY app.tableattachments (createdat, updatedat, id, attachmentid, apptableid, recordid) FROM stdin;
-2020-01-15 21:28:40.437419	2020-01-15 21:28:40.437419	174	206	121	1414
-2020-01-15 21:28:40.441067	2020-01-15 21:28:40.441067	175	207	121	1414
 \.
 
 
@@ -6478,8 +6491,6 @@ COPY app.tableattachments (createdat, updatedat, id, attachmentid, apptableid, r
 --
 
 COPY app.userattachments (id, userid, attachmentid, createdat, updatedat) FROM stdin;
-200	3575	206	2019-12-26 16:08:36.070544	2019-12-26 16:08:36.070544
-201	3575	207	2020-01-15 21:28:39.103447	2020-01-15 21:28:39.103447
 \.
 
 
@@ -7985,7 +7996,7 @@ SELECT pg_catalog.setval('app.activities_id_seq', 88, true);
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 66, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 69, true);
 
 
 --
@@ -7999,21 +8010,21 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1078, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1418, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1808, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 177, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 181, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 208, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 209, true);
 
 
 --
@@ -8048,7 +8059,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 405, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 500, true);
 
 
 --
@@ -8076,7 +8087,7 @@ SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 4, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 19, true);
 
 
 --
@@ -8125,7 +8136,7 @@ SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 202, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 203, true);
 
 
 --
@@ -8188,7 +8199,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 554, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 556, true);
 
 
 --
@@ -8251,7 +8262,7 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 277, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 279, true);
 
 
 --
