@@ -746,6 +746,45 @@ $$;
 ALTER FUNCTION app.getusersinroles(roleids integer[]) OWNER TO appowner;
 
 --
+-- Name: groupusersbulkupdate(integer, integer[], integer[]); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.groupusersbulkupdate(idgroup integer, addids integer[], removeids integer[]) RETURNS json
+    LANGUAGE plpgsql
+    AS $$
+
+  DECLARE
+    result JSON;
+    userid integer;
+
+  BEGIN
+    FOREACH userid IN ARRAY addids
+    LOOP
+
+      RAISE NOTICE 'insert userid: %  groupid: %' , userid, idgroup;
+      EXECUTE 'INSERT INTO app.usergroups (id, userid, groupid, createdat, updatedat) VALUES' ||
+              '(DEFAULT, ' || userid || ', ' || idgroup || ', ''' || now() || ''', ''' || now() || ''');';
+
+    END LOOP;
+
+    FOREACH userid IN ARRAY removeids
+    LOOP
+
+      RAISE NOTICE 'remove userid: %  groupid: %' , userid, idgroup;
+      EXECUTE 'DELETE FROM app.usergroups WHERE userid = ' || userid || ' AND groupid = ' || idgroup || ';';
+
+    END LOOP;
+
+--     RETURN array_length(groupids, 1);
+    EXECUTE 'SELECT row_to_json(t) FROM ( SELECT COUNT(*) FROM app.usergroups WHERE groupid = ' || idgroup || ') t;' INTO result;
+	  RETURN result;
+  END;
+$$;
+
+
+ALTER FUNCTION app.groupusersbulkupdate(idgroup integer, addids integer[], removeids integer[]) OWNER TO appowner;
+
+--
 -- Name: issuetypesselectvalues(numeric); Type: FUNCTION; Schema: app; Owner: appowner
 --
 
@@ -8010,7 +8049,7 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 1079, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 2048, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 2067, true);
 
 
 --
@@ -8059,7 +8098,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 533, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 535, true);
 
 
 --
@@ -8143,7 +8182,7 @@ SELECT pg_catalog.setval('app.userattachments_id_seq', 214, true);
 -- Name: usergroups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
+SELECT pg_catalog.setval('app.usergroups_id_seq', 53, true);
 
 
 --

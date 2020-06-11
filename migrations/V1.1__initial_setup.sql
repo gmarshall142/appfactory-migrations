@@ -2230,7 +2230,7 @@ CREATE FUNCTION metadata.formrecordupdate(idform integer, idrec integer, fieldid
     RAISE NOTICE 'tableCold: %', tableCol;
     RAISE NOTICE 'setStr: %', setStr;
 
-    execStr := 'UPDATE app.' || tableName || ' SET ' || setStr || ' WHERE id = ' || idrec ||
+    execStr := 'UPDATE app.' || tableName || ' SET ' || setStr || ', updatedat = now() WHERE id = ' || idrec ||
                ' RETURNING app.' || tableName || '.' || tableCol || ';';
 
     RAISE NOTICE 'execStr';
@@ -8028,63 +8028,63 @@ COPY metadata.urlactions (id, url, apiactionid, actiondata, appid, pre, post, me
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 89, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 1, false);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, false);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 1079, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 1, false);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 2067, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 12, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 201, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 16, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 220, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 9, true);
 
 
 --
 -- Name: bunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.bunos_id_seq', 4469, true);
+SELECT pg_catalog.setval('app.bunos_id_seq', 1, false);
 
 
 --
 -- Name: dashboardreport_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.dashboardreport_id_seq', 1, true);
+SELECT pg_catalog.setval('app.dashboardreport_id_seq', 1, false);
 
 
 --
 -- Name: groups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.groups_id_seq', 19, true);
+SELECT pg_catalog.setval('app.groups_id_seq', 1, false);
 
 
 --
@@ -8098,35 +8098,35 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, false);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 535, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 3, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 39, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 1, false);
 
 
 --
 -- Name: mastertypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.mastertypes_id_seq', 832, true);
+SELECT pg_catalog.setval('app.mastertypes_id_seq', 1, false);
 
 
 --
 -- Name: priority_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
+SELECT pg_catalog.setval('app.priority_id_seq', 1, false);
 
 
 --
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 19, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, false);
 
 
 --
@@ -8140,7 +8140,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, false);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 98, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 1, false);
 
 
 --
@@ -8154,35 +8154,35 @@ SELECT pg_catalog.setval('app.rolepermissions_id_seq', 1, false);
 -- Name: roles_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roles_id_seq', 44, true);
+SELECT pg_catalog.setval('app.roles_id_seq', 1, false);
 
 
 --
 -- Name: status_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.status_id_seq', 45, true);
+SELECT pg_catalog.setval('app.status_id_seq', 1, false);
 
 
 --
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 16, true);
+SELECT pg_catalog.setval('app.support_id_seq', 1, false);
 
 
 --
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 214, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 9, true);
 
 
 --
 -- Name: usergroups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.usergroups_id_seq', 53, true);
+SELECT pg_catalog.setval('app.usergroups_id_seq', 1, false);
 
 
 --
@@ -8196,28 +8196,28 @@ SELECT pg_catalog.setval('app.users_id_seq', 46, true);
 -- Name: workflow_actionresponse_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 30, true);
+SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 1, false);
 
 
 --
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 1, false);
 
 
 --
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 1, false);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 218, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 1, false);
 
 
 --
@@ -8308,7 +8308,7 @@ SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 288, true);
 -- Name: formresources_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formresources_id_seq', 53, true);
+SELECT pg_catalog.setval('metadata.formresources_id_seq', 54, true);
 
 
 --
@@ -8336,7 +8336,7 @@ SELECT pg_catalog.setval('metadata.menuicons_id_seq', 28, true);
 -- Name: menuitems_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.menuitems_id_seq', 204, true);
+SELECT pg_catalog.setval('metadata.menuitems_id_seq', 205, true);
 
 
 --
