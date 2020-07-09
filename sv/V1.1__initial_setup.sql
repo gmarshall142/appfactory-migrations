@@ -16,38 +16,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: app; Type: SCHEMA; Schema: -; Owner: appowner
---
-
-CREATE SCHEMA app;
-
-
-ALTER SCHEMA app OWNER TO appowner;
-
---
--- Name: metadata; Type: SCHEMA; Schema: -; Owner: appowner
---
-
-CREATE SCHEMA metadata;
-
-
-ALTER SCHEMA metadata OWNER TO appowner;
-
---
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
-
---
 -- Name: attachmentaddlink(text, integer, integer); Type: FUNCTION; Schema: app; Owner: appowner
 --
 
@@ -3648,6 +3616,50 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
+-- Name: access_requests; Type: TABLE; Schema: app; Owner: appowner
+--
+
+CREATE TABLE app.access_requests (
+    id integer NOT NULL,
+    requesterid integer NOT NULL,
+    actiondate timestamp without time zone,
+    reason character varying(2000),
+    appid integer NOT NULL,
+    roleid integer NOT NULL,
+    adminnote character varying(1000),
+    actiontaken character varying(20),
+    active boolean DEFAULT true,
+    adminroles integer[],
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE app.access_requests OWNER TO appowner;
+
+--
+-- Name: access_requests_id_seq; Type: SEQUENCE; Schema: app; Owner: appowner
+--
+
+CREATE SEQUENCE app.access_requests_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE app.access_requests_id_seq OWNER TO appowner;
+
+--
+-- Name: access_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: app; Owner: appowner
+--
+
+ALTER SEQUENCE app.access_requests_id_seq OWNED BY app.access_requests.id;
+
+
+--
 -- Name: activity; Type: TABLE; Schema: app; Owner: appowner
 --
 
@@ -4354,7 +4366,8 @@ CREATE TABLE app.roles (
     appid integer NOT NULL,
     createdat timestamp without time zone,
     updatedat timestamp without time zone DEFAULT now(),
-    jsondata jsonb
+    jsondata jsonb,
+    accessapprover boolean DEFAULT false
 );
 
 
@@ -4380,6 +4393,50 @@ ALTER TABLE app.roles_id_seq OWNER TO appowner;
 --
 
 ALTER SEQUENCE app.roles_id_seq OWNED BY app.roles.id;
+
+
+--
+-- Name: saar_process; Type: TABLE; Schema: app; Owner: appowner
+--
+
+CREATE TABLE app.saar_process (
+    id integer NOT NULL,
+    userid integer NOT NULL,
+    saar_completed timestamp without time zone,
+    ia_training timestamp without time zone,
+    email_prdc timestamp without time zone,
+    email_v22web timestamp without time zone,
+    complete timestamp without time zone,
+    rejectdate timestamp without time zone,
+    rejectedby integer,
+    completedby integer,
+    createdat timestamp without time zone,
+    updatedat timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE app.saar_process OWNER TO appowner;
+
+--
+-- Name: saar_process_id_seq; Type: SEQUENCE; Schema: app; Owner: appowner
+--
+
+CREATE SEQUENCE app.saar_process_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE app.saar_process_id_seq OWNER TO appowner;
+
+--
+-- Name: saar_process_id_seq; Type: SEQUENCE OWNED BY; Schema: app; Owner: appowner
+--
+
+ALTER SEQUENCE app.saar_process_id_seq OWNED BY app.saar_process.id;
 
 
 --
@@ -4543,7 +4600,7 @@ ALTER SEQUENCE app.system_affiliation_id_seq OWNED BY app.system_affiliation.id;
 
 CREATE TABLE app.system_aircrafttype (
     id integer NOT NULL,
-    affiliation character varying(50) NOT NULL,
+    aircrafttype character varying(50) NOT NULL,
     description character varying(255),
     active boolean DEFAULT true NOT NULL
 );
@@ -4797,7 +4854,7 @@ ALTER SEQUENCE app.usergroups_id_seq OWNED BY app.usergroups.id;
 
 CREATE TABLE app.users (
     id integer NOT NULL,
-    active integer,
+    active boolean DEFAULT true,
     email character varying(100),
     firstname character varying(100),
     mi character varying(1),
@@ -4813,13 +4870,13 @@ CREATE TABLE app.users (
     activityid integer,
     affiliationid integer,
     siteid integer,
-    saarn numeric,
+    saarn integer,
     initialdate timestamp without time zone DEFAULT now(),
     updatedate timestamp without time zone,
     lastlogindate timestamp without time zone,
     branchid integer,
     approvaldate timestamp without time zone,
-    disabled integer DEFAULT 1,
+    disabled boolean DEFAULT false,
     aircrafttypeid integer
 );
 
@@ -5413,26 +5470,6 @@ ALTER SEQUENCE metadata.fieldcategories_id_seq OWNED BY metadata.fieldcategories
 
 
 --
--- Name: flyway_schema_history; Type: TABLE; Schema: metadata; Owner: appowner
---
-
-CREATE TABLE metadata.flyway_schema_history (
-    installed_rank integer NOT NULL,
-    version character varying(50),
-    description character varying(200) NOT NULL,
-    type character varying(20) NOT NULL,
-    script character varying(1000) NOT NULL,
-    checksum integer,
-    installed_by character varying(100) NOT NULL,
-    installed_on timestamp without time zone DEFAULT now() NOT NULL,
-    execution_time integer NOT NULL,
-    success boolean NOT NULL
-);
-
-
-ALTER TABLE metadata.flyway_schema_history OWNER TO appowner;
-
---
 -- Name: formeventactions; Type: TABLE; Schema: metadata; Owner: appowner
 --
 
@@ -5912,6 +5949,13 @@ CREATE SEQUENCE public.adhoc_queries_id_seq
 ALTER TABLE public.adhoc_queries_id_seq OWNER TO appowner;
 
 --
+-- Name: access_requests id; Type: DEFAULT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.access_requests ALTER COLUMN id SET DEFAULT nextval('app.access_requests_id_seq'::regclass);
+
+
+--
 -- Name: activity id; Type: DEFAULT; Schema: app; Owner: appowner
 --
 
@@ -6035,6 +6079,13 @@ ALTER TABLE ONLY app.rolerestrictions ALTER COLUMN id SET DEFAULT nextval('app.r
 --
 
 ALTER TABLE ONLY app.roles ALTER COLUMN id SET DEFAULT nextval('app.roles_id_seq'::regclass);
+
+
+--
+-- Name: saar_process id; Type: DEFAULT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.saar_process ALTER COLUMN id SET DEFAULT nextval('app.saar_process_id_seq'::regclass);
 
 
 --
@@ -6280,6 +6331,14 @@ ALTER TABLE ONLY metadata.systemtabletypes ALTER COLUMN id SET DEFAULT nextval('
 --
 
 ALTER TABLE ONLY metadata.urlactions ALTER COLUMN id SET DEFAULT nextval('metadata.urlactions_id_seq'::regclass);
+
+
+--
+-- Data for Name: access_requests; Type: TABLE DATA; Schema: app; Owner: appowner
+--
+
+COPY app.access_requests (id, requesterid, actiondate, reason, appid, roleid, adminnote, actiontaken, active, adminroles, createdat, updatedat) FROM stdin;
+\.
 
 
 --
@@ -6847,8 +6906,16 @@ COPY app.rolerestrictions (id, resourcetypeid, appid, roleid, visible, editable,
 -- Data for Name: roles; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.roles (id, name, description, appid, createdat, updatedat, jsondata) FROM stdin;
-36	System Administrators	System admins for maintenance of applications	0	2019-05-14 16:45:27.003	2019-05-28 12:34:30.802	\N
+COPY app.roles (id, name, description, appid, createdat, updatedat, jsondata, accessapprover) FROM stdin;
+36	System Administrators	System admins for maintenance of applications	0	2019-05-14 16:45:27.003	2019-05-28 12:34:30.802	\N	f
+\.
+
+
+--
+-- Data for Name: saar_process; Type: TABLE DATA; Schema: app; Owner: appowner
+--
+
+COPY app.saar_process (id, userid, saar_completed, ia_training, email_prdc, email_v22web, complete, rejectdate, rejectedby, completedby, createdat, updatedat) FROM stdin;
 \.
 
 
@@ -6973,7 +7040,7 @@ COPY app.system_affiliation (id, type, description, active) FROM stdin;
 -- Data for Name: system_aircrafttype; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.system_aircrafttype (id, affiliation, description, active) FROM stdin;
+COPY app.system_aircrafttype (id, aircrafttype, description, active) FROM stdin;
 1	MV	V22 Osprey for the U.S. Marine Corps	t
 2	CV	V22 Osprey for the Air Force Special Operations Command (AFSOC)	t
 3	MV (JA)	V22 Opsrey for the Japanese FMS	t
@@ -7123,1028 +7190,1027 @@ COPY app.usergroups (id, userid, groupid, createdat, updatedat) FROM stdin;
 --
 
 COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone, dsn, fax, npke_subject, npke_edipi, npke_user, rankid, activityid, affiliationid, siteid, saarn, initialdate, updatedate, lastlogindate, branchid, approvaldate, disabled, aircrafttypeid) FROM stdin;
-3176	1	joe.vang@usmc.mil	Joe		Vang	5	9104496065			CN=VANG.JOE.1455246748,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455246748		4	25	3	2	0	\N	\N	\N	3	\N	1	1
-2366	0	shawn.draper@us.af.mil	Shawn	O	Draper	\N				CN=DRAPER.SHAWN.O.1083630368,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DRAPER.SHAWN.O	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2424	0	carlos.a.franco@navy.mil	Carlos	A	Franco	\N				CN=FRANCO.CARLOS.ALBERTO.1235172905,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FRANCO.CARLOS.ALBERTO	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3358	1	grant.roth@navy.mil	Grant		Roth	3	2524646683			CN=ROTH.GRANT.T.1523583057,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523583057		20	15	1	18	0	\N	\N	\N	4	\N	0	1
-2049	0	victoria.bader.1@us.af.mil	Victoria		Bader	5	5058467622	2467622		CN=BADER.VICTORIA.MARIE.1140927410,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1140927410		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-900	1	gary.m.kline.ctr@navy.mil	Gary		Kline	4	9107501623			CN=KLINE.GARY.M.1093063445,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	KLINE.GARY.M	20	15	2	2	0	\N	\N	\N	3	\N	0	1
-910	1	mguy@bh.com	Michael		Guy	5	5058537160	2637160		CN=GUY.MICHAEL.L.1155567534,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	GUY.MICHAEL.L	20	20	2	5	0	\N	\N	\N	1	\N	0	2
-2021	1	patrick.armentrout@navy.mil	Patrick		Armentrout	1	9104495494			CN=ARMENTROUT.PATRICK.A.1229745480,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	ARMENTROUT.PATRICK.A	20	15	1	2	0	\N	\N	\N	3	\N	0	1
-2022	1	john.dantic@usmc.mil	John		Dantic	1	8585776225	2222		CN=DANTIC.JOHN.M.1133281564,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	DANTIC.JOHN.M	21	10	1	6	0	\N	\N	\N	3	\N	0	\N
-1	1	v22web@navy.mil	Sys		Admin	\N					\N		20	2	1	2	\N	\N	\N	\N	4	\N	1	\N
-2028	1	john.e.plets.civ@mail.mil	John		Plets	3	8004736597			CN=PLETS.JOHN.E.1268158940,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268158940	PLETS.JOHN.E	21	10	1	4	0	\N	\N	\N	4	\N	0	\N
-2050	1	andrew.gartee@usmc.mil	Andrew		Gartee	5	9104496267	7526267		CN=GARTEE.ANDREW.JAMES.JR.1411005271,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3117	0	joshua.r.white1@navy.mil	Joshua		White	5	6195530062		6195534229	CN=WHITE.JOSHUA.R.1369124265,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		20	38	2	6	0	\N	\N	\N	4	\N	0	1
-926	1	jimmy.r.jalil@boeing.com	Jimmy		Jalil	5	8508812645	6412645		CN=JALIL.JIMMY.R.1024394910,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024394910	JALIL.JIMMY.R	20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2038	0	jonathan.miller@usmc.mil	Jonathan		Miller	5	9104497265	7527265		CN=MILLER.JONATHAN.JOB.1265528020,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265528020		6	25	3	2	0	\N	\N	\N	3	\N	0	1
-2051	1	justin.caudle@us.af.mil	Justin		Caudle	5	8508841313			CN=CAUDLE.JUSTIN.EDWARD.1364972233,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364972233		5	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2001	1	jimmy.r.jalil@boeing.com	Jimmy		Jalil	5	8508812645	6412645		CN=Jimmy Jalil,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2004	1	jonathan.reyes3@usmc.mil	Jonathan		Reyes	5	8585771318	5771318		CN=REYES.JONATHAN.AGUYLES.1455990382,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		4	23	3	4	0	\N	\N	\N	3	\N	0	2
-2005	1	kelly.campagna@usmc.mil	Kelly		Campagna	5	8585777694	1231231234		CN=CAMPAGNA.KELLY.ANNE.1362108671,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		6	23	3	6	0	\N	\N	\N	3	\N	0	\N
-2007	1	brian.sulser@usmc.mil	Brian		Sulser	5	8585779107			CN=SULSER.BRIAN.J.1058523662,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		7	45	3	4	0	\N	\N	\N	3	\N	0	1
-2008	1	mark.whittle.2@us.af.mil	Mark		Whittle	3	8508813105	641310511		CN=WHITTLE.MARK.ANTHONY.1060319371,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	WHITTLE.MARK.ANTHONY	21	15	1	11	0	\N	\N	\N	4	\N	0	\N
-2025	1	victor.reyes.1@us.af.mil	Victor		Reyes	5	3142386175	2386175		CN=REYES.VICTOR.M.1243723325,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243723325		7	4	3	13	0	\N	\N	\N	1	\N	0	\N
-2037	0	hadley.hoopes@usmc.mil	Hadley		Hoopes	5	9104497087			CN=HOOPES.HADLEY.BRYAN.1469087812,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469087812		4	52	3	2	0	\N	\N	\N	3	\N	0	1
-3106	0	dejuan.rudolph@usmc.mil	Dejuan		Rudolph	5	8585774132			CN=RUDOLPH.DEJUAN.LEHASHAUN.1258803201,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258803201		6	56	3	4	0	\N	\N	\N	3	\N	0	1
-100	1	scott.a.cottrell@navy.mil	Scott		Cottrell	1	2524646151	4516151	1231231231	CN=COTTRELL.SCOTT.A.1229762679,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	COTTRELL.SCOTT.A	20	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2009	1	matthew.van_benthem.ctr@us.af.mil	Matthew		Van Benthem	3	8508813023	6413023		CN=VAN BENTHEM.MATTHEW.SHERIDAN.1395515655,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	15	2	11	0	\N	\N	\N	1	\N	0	2
-2020	1	jacob.mayes@us.af.mil	Jacob		Mayes	5	5757840919	7840919		CN=MAYES.JACOB.MICHAEL.1292500820,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-2024	1	victor.camacho.ctr@usmc.mil	Victorian		Camacho	3	8585779534	2679534		CN=CAMACHO.VICTORIAN.1176176020,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176176020		20	35	2	4	0	\N	\N	\N	3	\N	0	\N
-2027	1	alan.rivers@usmc.mil	Alan		Rivers	4	9104496065			CN=RIVERS.ALAN.PAUL.1397570360,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1397570360		5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2063	1	zachary.passini@usmc.mil	Zachary		Passini	5	3156367658	6367658		CN=PASSINI.ZACHARY.JOSEPH.1299045214,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299045214		16	53	3	7	0	\N	\N	\N	3	\N	0	1
-3107	1	scarlett.orlando@me.usmc.mil	Orlando		Scarlett	5	8585774132			CN=SCARLETT.ORLANDO.1236752808,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236752808		7	56	3	4	0	\N	\N	\N	3	\N	0	\N
-3108	1	maurice.m.defino@boeing.com	Maurice		Defino	5	8582426983			CN=Maurice DeFino,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	31	2	8	0	\N	\N	\N	3	\N	0	1
-2003	1	gabriel.austin@us.af.mil	Gabriel		Austin	5	5757910854	6817040		CN=AUSTIN.GABRIEL.GUNTLE.1248021868,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248021868		7	3	3	12	0	\N	\N	\N	1	\N	0	\N
-280	1	wabril@bh.com	William		Abril	5	9104495523			CN=ABRIL.WILLIAM.F.1227124420,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1227124420	ABRIL.WILLIAM.F	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2614	0	mark.jones21@us.af.mil	Mark	J	Jones	\N				CN=JONES.MARK.J.1097016581,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	JONES.MARK.J	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2002	1	fructuoso.santos@usmc.mil	Fructuoso		Santosjr	4	8585779638			CN=SANTOSJR.FRUCTUOSO.MARIANO.III.1376419556,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		5	23	3	4	0	\N	\N	\N	3	\N	0	\N
-2036	1	paul.l.smith1@usmc.mil	Paul		Smith	5	9104496053			CN=SMITH.PAUL.LESLIE.1052653807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1052653807		5	49	3	2	0	\N	\N	\N	3	\N	0	\N
-2055	1	zayed.antonio@us.af.mil	Antonio		Zayed	5	5757841501	6811501		CN=ANTONIO.ZAYED.ISAAC.1293747357,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293747357		5	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2554	1	jonathan.hobby@usmc.mil	Jonathan		Hobby	5	7607631460			CN=HOBBY.JONATHAN.MICHAEL.1270642671,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451	HOBBY.JONATHAN.MICHAEL	6	28	3	8	0	\N	\N	\N	3	\N	0	1
-2556	1	john.hoffman.12@us.af.mil	John		Hoffman	5	3142383690	2384646		CN=HOFFMAN.JOHN.AUTHUR.III.1293707940,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293707940	HOFFMAN.JOHN.AUTHUR.III	6	4	3	13	0	\N	\N	\N	1	\N	0	\N
-2558	1	connor.hollern@usmc.mil	Connor		Hollern	5	9104497252			CN=HOLLERN.CONNOR.LESLE.1465548068,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465548068	HOLLERN.CONNOR.LESLE	3	25	3	2	0	\N	\N	\N	3	\N	0	1
-2560	1	gregory.hollinger.ctr@us.af.mil	Gregory		Hollinger	5	5058466519	2466519		CN=HOLLINGER.GREGORY.L.1077683328,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1077683328	HOLLINGER.GREGORY.L	20	20	2	5	0	\N	\N	\N	1	\N	0	\N
-2562	1	choppe@bh.com	Clinton		Hoppe	5	9104515525			CN=HOPPE.CLINTON.C.1066021374,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1066021374	HOPPE.CLINTON.C	20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-2564	1	george.horvath.1@us.af.mil	George		Horvath	5	5058535089	8535089		CN=HORVATH.GEORGE.AARON.1265675308,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265675308	HORVATH.GEORGE.AARON	6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2566	1	mhouck@bh.com	Micah		Houck	5	3142384654			CN=HOUCK.MICAH.MCCLURE.1257377969,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257377969	HOUCK.MICAH.MCCLURE	20	21	2	13	0	\N	\N	\N	1	\N	0	2
-2568	1	jeffrey.a.houston@navy.mil	Jeffrey		Houston	2	2524648797			CN=HOUSTON.JEFFREY.A.1229801739,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229801739	HOUSTON.JEFFREY.A	21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2570	1	jeffrey.hovis.1.ctr@us.af.mil	Jeffrey		Hovis	5	5058537171			CN=HOVIS.JEFFREY.S.1167706777,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167706777	HOVIS.JEFFREY.S	20	6	2	5	0	\N	\N	\N	1	\N	0	2
-2572	1	shawn.howard@usmc.mil	Shawn		Howard	1	9104494331			CN=HOWARD.SHAWN.A.1186869750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186869750	HOWARD.SHAWN.A	7	61	3	2	0	\N	\N	\N	3	\N	0	1
-2574	1	dennis.hudon.2@us.af.mil	Dennis		Hudon	4	8508812641	6412641		CN=HUDON.DENNIS.J.1186701638,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186701638	HUDON.DENNIS.J	21	2	1	11	0	\N	\N	\N	1	\N	0	2
-2576	1	damon.hughes.1.ctr@us.af.mil	Damon		Hughes	5	5759045227	6405227		CN=HUGHES.DAMON.H.1075799299,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1075799299	HUGHES.DAMON.H	20	13	2	12	0	\N	\N	\N	1	\N	0	\N
-2578	1	kevin.o.hughes.ctr@navy.mil	Kevin		Hughes	3	3017570051			CN=HUGHES.KEVIN.O.1283782243,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283782243	HUGHES.KEVIN.O	21	19	2	9	0	\N	\N	\N	3	\N	0	1
-2580	1	anthony.huntington@usmc.mil	Anthony		Huntington	1	9104495352	7524352		CN=HUNTINGTON.ANTHONY.E.1160520546,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1160520546	HUNTINGTON.ANTHONY.E	9	61	3	2	0	\N	\N	\N	3	\N	0	1
-2582	1	rashad.hurd@usmc.mil	Rashad		Hurd	5	8585778155	2678155		CN=HURD.RASHAD.LEON.1263763480,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1263763480	HURD.RASHAD.LEON	6	43	3	4	0	\N	\N	\N	3	\N	0	1
-2584	1	juan.itzol.ctr@navy.mil	Juan		Itzol	5	3019954630			CN=ITZOL.JUAN.C.1028834035,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1028834035	itzoljc	20	39	2	9	0	\N	\N	\N	4	\N	0	1
-2586	1	bryan.jackson.11@us.af.mil	Bryan		Jackson	5	5058533490	2633490		CN=JACKSON.BRYAN.K.1054061419,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1054061419	JACKSON.BRYAN.K	20	6	1	5	0	\N	\N	\N	1	\N	0	2
-2588	1	matthew.c.jackson1@navy.mil	Matthew		Jackson	3	9104495862	7525862	9104495222	CN=JACKSON.MATTHEW.CHRISTOPHER.1252707030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252707030	JACKSON.MATTHEW.CHRISTOPHER	20	15	1	2	0	\N	\N	\N	3	\N	0	\N
-2590	1	michael.jackson.61.ctr@us.af.mil	Michael		Jackson	3	8508814306	6414306		CN=JACKSON.MICHAEL.R.1298084046,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	JACKSON.MICHAEL.R	20	15	2	11	0	\N	\N	\N	1	\N	0	2
-2592	1	jesse.jacobsen@usmc.mil	Jesse		Jacobsen	5	9104497123			CN=JACOBSEN.JESSE.OWEN.JR.1269440461,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269440461	JACOBSEN.JESSE.OWEN.JR	6	49	3	2	0	\N	\N	\N	3	\N	0	1
-2594	1	trevor.james@us.af.mil	Trevor		James	1	8508842592	5792959		CN=JAMES.TREVOR.L.1186181634,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	JAMES.TREVOR.L	8	8	3	11	0	\N	\N	\N	1	\N	0	2
-2596	1	kyle.jarchow@us.af.mil	Kyle		Jarchow	5	0756855976			CN=JARCHOW.KYLE.JAMES.1291652863,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291652863	JARCHOW.KYLE.JAMES	6	4	3	13	0	\N	\N	\N	1	\N	0	2
-2598	1	doug.jefferson@navy.mil	Douglas		Jefferson	3	2524648525			CN=JEFFERSON.DOUGLAS.M.1229776394,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229776394	jeffersondm	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2600	1	adam.johnson.5@us.af.mil	Adam		Johnson	5	5058535755			CN=JOHNSON.ADAM.L.1061541752,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061541752	JOHNSON.ADAM.L	7	6	3	5	0	\N	\N	\N	1	\N	0	2
-2602	1	jeffery.c.johnson@usmc.mil	Jeffery		Johnson	5	9104496970			CN=JOHNSON.JEFFERY.CALVIN.JR.1277946200,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277946200	JOHNSON.JEFFERY.CALVIN.JR	7	25	3	2	0	\N	\N	\N	3	\N	0	1
-2604	1	jeremiah.johnson@usmc.mil	Jeremiah		Johnson	5	9104497252			CN=JOHNSON.JEREMIAH.DEVON.1470537309,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470537309	JOHNSON.JEREMIAH.DEVON	3	25	3	2	0	\N	\N	\N	3	\N	0	1
-2606	1	michael.d.johnson27@boeing.com	Michael		Johnson	5	5058460263	2460263		CN=JOHNSON.MICHAEL.D.1155681957,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1155681957	Johnson, Michael, D	20	20	2	5	0	\N	\N	\N	1	\N	0	2
-2608	1	joseph.joiner.2.ctr@us.af.mil	Joseph		Joiner	5	5058535440	2635440		CN=JOINER.JOSEPH.RYAN.1294320373,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1294320373	JOINER.JOSEPH.RYAN	20	20	2	5	0	\N	\N	\N	1	\N	0	\N
-2610	1	jason.jones.46@us.af.mil	Jason		Jones	5	3142384613	2384613		CN=JONES.JASON.ALLEN.1363612578,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1363612578	JONES.JASON.ALLEN	6	4	3	13	0	\N	\N	\N	1	\N	0	2
-2612	1	ljjones@bh.com	Lawrence		Jones	5	8175425207			CN=JONES.LAWRENCE.JOSEPH.JR.1260039292,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260039292	JONES.LAWRENCE.JOSEPH.JR	20	31	2	7	0	\N	\N	\N	3	\N	0	\N
-2616	1	melisa.jones@navy.mil	Melisa		Jones	5	2524648530	4518530		CN=JONES.MELISA.R.1164255243,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1164255243	JONES.MELISA.R	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2686	0	kevin.macken@usmc.mil	Kevin	C	Macken	\N				CN=MACKEN.KEVIN.CHRISTOPHER.1300123011,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MACKEN.KEVIN.CHRISTOPHER	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2688	1	scott.madden1@navy.mil	Brian		Madden	4	3017574403			CN=MADDEN.BRIAN.SCOTT.1115623482,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	MADDEN.BRIAN.SCOTT	20	38	1	9	0	\N	\N	\N	3	\N	0	1
-2690	0	sebastian.maik@usmc.mil	Sebastian	M	Maik	\N				CN=MAIK.SEBASTIAN.MAREK.1046092763,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MAIK.SEBASTIAN.MAREK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2692	1	christopher.mandich@us.af.mil	Christopher		Mandich	5	5058535089	2535089		CN=MANDICH.CHRISTOPHER.WILLIAM.1296655453,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1296655453	MANDICH.CHRISTOPHER.WILLIAM	5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2694	1	angela.mankowski@navy.mil	Angela		Mankowski	4	3017575577	13121212		CN=MANKOWSKI.ANGELA.A.1047244540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	MANKOWSKI.ANGELA.A	21	38	1	9	0	\N	\N	\N	4	\N	0	\N
-2696	1	enrique.mari@usmc.mil	Enrique		Mari Jr	5	3156366249			CN=MARI.ENRIQUE.JR.1235000314,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235000314	MARI.ENRIQUE.JR	7	50	3	7	0	\N	\N	\N	3	\N	0	1
-2698	1	edward.e.marks@boeing.com	Edward		Marks	4	8503776443			CN=MARKS.EDWARD.E.1121140264,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	MARKS.EDWARD.E	20	16	2	11	0	\N	\N	\N	1	\N	0	\N
-2700	1	amartinez05@bh.com	Abraham		Martinez	5	8585776833	1236547899		CN=MARTINEZ.ABRAHAM.DAVID.1282774891,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	MARTINEZ.ABRAHAM.DAVID	20	31	2	4	0	\N	\N	\N	3	\N	0	\N
-2702	1	ronnie.matthews@usmc.mil	Ronnie		Matthews	5	8082573588			CN=MATTHEWS.RONNIE.ALAN.1157933457,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1157933457	MATTHEWS.RONNIE.ALAN	7	55	3	81	0	\N	\N	\N	3	\N	0	\N
-2704	0	brian.mays@usmc.mil	Brian	D	Mays	\N				CN=MAYS.BRIAN.DEE.1285995775, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	maysbd	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2706	1	mitchell.mccue@us.af.mil	Mitchell		Mccue	5	8508841313	5791313		CN=MCCUE.MITCHELL.LEE.1270810051,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270810051	MCCUE.MITCHELL.LEE	6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2708	1	todd.mcgee1@navy.mil	Todd		Mcgee	4	3019952893	9952893		CN=MCGEE.TODD.A.1147417639,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1147417639	MCGEE.TODD.A	20	38	1	9	0	\N	\N	\N	1	\N	0	1
-2710	1	daniel.mcguigan@usmc.mil	Daniel		Mcguigan	5	3156362024			CN=MCGUIGAN.DANIEL.PATRICK.1035440409,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1035440409	MCGUIGAN.DANIEL.PATRICK	5	50	3	7	0	\N	\N	\N	3	\N	0	1
-2712	1	kristi.mckinney1@navy.mil	Kristi		Mckinney	4	2524646479			CN=MCKINNEY.KRISTI.D.1229811408,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229811408	MCKINNEY.KRISTI.D	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2714	1	richard.medlin@whmo.mil	Richard		Medlin	5	5714944729			CN=MEDLIN.RICHARD.KIETH.1260249211,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260249211	MEDLIN.RICHARD.KIETH	6	17	3	80	0	\N	\N	\N	3	\N	0	\N
-2716	1	jeffrey.mickler@navy.mil	Jeffrey		Mickler	3	2524646158			CN=MICKLER.JEFFREY.L.1502791083,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	MICKLER.JEFFREY.L	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2718	1	bryce.mihelich@me.usmc.mil	Bryce		Mihelich	5	0809458233	6367658		CN=MIHELICH.BRYCE.ROBERT.1388575480,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1388575480	MIHELICH.BRYCE.ROBERT	5	47	3	4	0	\N	\N	\N	3	\N	0	\N
-2720	1	troy.mikko@usmc.mil	Troy		Mikko	5	9104495661			CN=MIKKO.TROY.K.1096306020,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1096306020	MIKKO.TROY.K	20	61	2	2	0	\N	\N	\N	3	\N	0	1
-2722	1	christopher.w.miller@boeing.com	Christopher		Miller	1	9109376842			CN=MILLER.CHRISTOPHER.W.1254393149,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254393149	MILLER.CHRISTOPHER.W	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2724	1	jensen.miller@usmc.mil	Jensen		Miller	5	9104497227	7527227		CN=MILLER.JENSEN.JAMES.1260825034,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260825034	MILLER.JENSEN.JAMES	7	25	3	2	0	\N	\N	\N	3	\N	0	1
-2726	1	kade.miller@usmc.mil	Kade		Miller	5	9104497994			CN=MILLER.KADE.NORMAN.1300817790,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300817790	MILLER.KADE.NORMAN	5	61	3	2	0	\N	\N	\N	3	\N	0	1
-2728	1	stephen.w.miller3@boeing.com	Stephen		Miller	5	9104495220	1236547878		CN=Stephen Miller,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494	MILLER.STEPHEN.WESLEY	20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-2730	1	brodrick.mills@usmc.mil	Brodrick		Mills	5	0906366124			CN=MILLS.BRODRICK.DEAN.1465554920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465554920	MILLS.BRODRICK.DEAN	4	27	3	7	0	\N	\N	\N	3	\N	0	\N
-2732	1	patrick.moholt@navy.mil	Patrick		Moholt	3	9104494080			CN=MOHOLT.PATRICK.J.1379274532,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379274532	MOHOLT.PATRICK.J	21	10	1	2	0	\N	\N	\N	4	\N	0	1
-2734	1	david.montoya.1@us.af.mil	David		Montoya	5	5058469841	2469841		CN=MONTOYA.DAVID.A.1132480580,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132480580	MONTOYA.DAVID.A	6	3	3	5	0	\N	\N	\N	1	\N	0	\N
-2736	1	adalberto.morales@usmc.mil	Adalberto		Morales	5	0806490712			CN=MORALES.ADALBERTO.1380634070,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380634070	MORALES.ADALBERTO	5	50	3	7	0	\N	\N	\N	3	\N	0	1
-2738	0	kenneth.morris.5@us.af.mil	Kenneth	C	Morris	\N				CN=MORRIS.KENNETH.CHARLES.II.1235298860,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MORRIS.KENNETH.CHARLES.II	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2740	1	jonathan.morton.2@us.af.mil	Jonathan		Morton	5	5058533550			CN=MORTON.JONATHAN.GEORGE.1288947526,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288947526	MORTON.JONATHAN.GEORGE	5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2742	1	marshall.mosher@us.af.mil	Marshall		Mosher	5	8508847659	5797659		CN=MOSHER.MARSHALL.HARPER.1249189649,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1249189649	MOSHER.MARSHALL.HARPER	8	8	3	11	0	\N	\N	\N	1	\N	0	2
-2744	1	david.motley@navy.mil	David		Motley	3	2524646276			CN=MOTLEY.DAVID.R.1258799905,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258799905	MOTLEY.DAVID.R	20	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2746	0	carlos.muletromero@whmo.mil	Carlos	n	Muletromero	\N				CN=MULETROMERO.CARLOS.1255617741, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	muletromero.carlos	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2748	1	christopher.munas@usmc.mil	Christopher		Munas	5	9103201654	3156362		CN=MUNAS.CHRISTOPHER.D.1190193779,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	MUNAS.CHRISTOPHER.D	20	34	2	7	0	\N	\N	\N	3	\N	0	\N
-2750	0	john.c.munroe@navy.mil	John	C	Munroe	\N				CN=MUNROE.JOHN.C.1011089000,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MUNROE.JOHN.C	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2622	1	thomas.e.jones4@navy.mil	Thomas		Jones	4	3017572007			CN=JONES.THOMAS.E.1049238700,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1049238700	JONES.THOMAS.E	21	38	1	9	0	\N	\N	\N	4	\N	0	\N
-2752	1	joseph.a.murray@usmc.mil	Joseph		Murray	5	9104494556			CN=MURRAY.JOSEPH.ALLEN.1261578502,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261578502	MURRAY.JOSEPH.ALLEN	7	44	3	2	0	\N	\N	\N	3	\N	0	1
-2754	1	joseph.muscarella@us.af.mil	Joseph		Muscarella	5	5058465089			CN=MUSCARELLA.JOSEPH.B.III.1287966470,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287966470	MUSCARELLA.JOSEPH.B.III	6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2756	1	christopher.d.napier@boeing.com	Christopher		Napier	5	8585776833			CN=NAPIER.CHRISTOPHER.D.1142167286,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	NAPIER.CHRISTOPHER.D	20	31	2	4	0	\N	\N	\N	3	\N	0	1
-2758	1	ashley.napolitano@us.af.mil	Ashley		Napolitano	5	8508841309	5791309		CN=NAPOLITANO.ASHLEY.HUGHES.1272657838,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272657838	NAPOLITANO.ASHLEY.HUGHES	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2760	1	ldnelson@bh.com	Larry		Nelson	5	8508812651	6412651		CN=NELSON.LARRY.DUANE.1136393274,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136393274	NELSON.LARRY.DUANE	20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2762	1	joseph.newhart.1@us.af.mil	Joseph		Newhart	3	5759045249	6405249		CN=NEWHART.JOSEPH.P.1079551364,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1079551364	NEWHART.JOSEPH.P	21	3	1	12	0	\N	\N	\N	1	\N	0	\N
-2764	0	walter.l.norwood@usmc.mil	Walter	L	Norwood	\N				CN=NORWOOD.WALTER.L.1055085818,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	NORWOOD.WALTER.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2766	1	daniel.nosek@usmc.mil	Daniel		Nosek	5	9104495291			CN=NOSEK.DANIEL.RAY.1276229750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276229750	NOSEK.DANIEL.RAY	6	58	3	2	0	\N	\N	\N	3	\N	0	\N
-2768	1	david.j.oconnor1@navy.mil	David		Oconnor	5	2524645495	4515495		CN=OCONNOR.DAVID.J.1007344488,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007344488	OCONNOR.DAVID.J	21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2984	1	zachary.stewart@us.af.mil	Zachary		Stewart	5	5757840529	6810529		CN=STEWART.ZACHARY.DAVID.1077443513,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1077443513	STEWART.ZACHARY.DAVID	7	3	3	12	0	\N	\N	\N	1	\N	0	2
-2986	1	christopher.stoffels@us.af.mil	Christopher		Stoffels	5	3142383192	2383178		CN=STOFFELS.CHRISTOPHER.S.1186961265,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186961265	STOFFELS.CHRISTOPHER.S	7	4	3	13	0	\N	\N	\N	1	\N	0	\N
-2988	1	steven.stone.11@us.af.mil	Steven		Stone	5	3142383159			CN=STONE.STEVEN.P.1078459863,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1078459863	STONE.STEVEN.P	21	4	1	13	0	\N	\N	\N	1	\N	0	2
-2990	1	mark.strohmeyer@navy.mil	Mark		Strohmeyer	3	2524645434			CN=STROHMEYER.MARK.1272478313,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272478313	STROHMEYER.MARK	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2992	1	michael.sullivan.36@us.af.mil	Michael		Sullivan	3	4783272775	4972775		CN=SULLIVAN.MICHAEL.J.1045875551,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1045875551	SULLIVAN.MICHAEL.J	21	7	1	11	0	\N	\N	\N	1	\N	0	\N
-2994	1	david.tavares.ctr@usmc.mil	David		Tavares	4	7607253800			CN=TAVARES.DAVID.ALAN.1168653308,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1168653308	TAVARES.DAVID.ALAN	20	28	2	8	0	\N	\N	\N	3	\N	0	1
-2996	1	anthony.t.taylor1.ctr@navy.mil	Anthony		Taylor	1	3019954656	1231231234		CN=TAYLOR.ANTHONY.TYRONE.SR.1018749722,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	TAYLOR.ANTHONY.TYRONE.SR	20	39	2	9	0	\N	\N	\N	3	\N	0	\N
-2998	1	timothy.tenny@us.af.mil	Timothy		Tenny	5	3142384308			CN=TENNY.TIMOTHY.BROOKS.1298731661,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298731661	TENNY.TIMOTHY.BROOKS	5	4	3	13	0	\N	\N	\N	1	\N	0	\N
-3000	1	daniel.tesh@usmc.mil	Daniel		Tesh	5	9104494683			CN=TESH.DANIEL.LAMAR.1261806459,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261806459	TESH.DANIEL.LAMAR	6	44	3	2	0	\N	\N	\N	3	\N	0	1
-3002	1	anthony.thomas.5@us.af.mil	Anthony		Thomas	5	3122383154			CN=THOMAS.ANTHONY.P.1170990052,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1170990052	THOMAS.ANTHONY.P	20	4	1	13	0	\N	\N	\N	1	\N	0	2
-3004	1	brandon.s.thomas@usmc.mil	Brandon		Thomas	5	9104497368			CN=THOMAS.BRANDON.SHANE.1275859083,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275859083	THOMAS.BRANDON.SHANE	6	54	3	2	0	\N	\N	\N	3	\N	0	1
-3008	1	brian.thompson.28@us.af.mil	Brian		Thompson	5	7554003406	2383192		CN=THOMPSON.BRIAN.DAVID.1266544347,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266544347	THOMPSON.BRIAN.DAVID	7	4	3	13	0	\N	\N	\N	1	\N	0	2
-3010	0	lauren.maldonado@navy.mil	Lauren	J	Maldonado	\N				CN=THORNTON.LAUREN.J.1299007908,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MALDONADO.LAUREN.J	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3012	1	jon.k.thorsten@usmc.mil	Jon		Thorsten	5	8585771280			CN=THORSTEN.JON.KENT.1265316901,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265316901	THORSTEN.JON.KENT	6	60	3	4	0	\N	\N	\N	3	\N	0	1
-3014	0	jason.tipaldos@usmc.mil	Jason	R	Tipaldos	\N				CN=TIPALDOS.JASON.RICHARD.1258496031,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	TIPALDOS.JASON.RICHARD	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3016	0	andrew.torres@usmc.mil	Andrew		Torres	\N				CN=TORRES.ANDREW.1367369244, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	torresa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3018	1	chad.trask@usmc.mil	Chad		Trask	5	9104496669			CN=TRASK.CHAD.DAVID.1368840633,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368840633	TRASK.CHAD.DAVID	5	61	3	2	0	\N	\N	\N	3	\N	0	1
-3020	1	joseph.trigg.1@us.af.mil	Joseph		Trigg	5	5757840529			CN=TRIGG.JOSEPH.RYAN.1246365683,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246365683	TRIGG.JOSEPH.RYAN	7	3	3	12	0	\N	\N	\N	1	\N	0	2
-3022	0	guillermo.tristan@usmc.mil	Guillermo	A	Tristan	\N				CN=TRISTAN.GUILLERMO.ALEJANDRO.JR.1400583451,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	TRISTAN.GUILLERMO.ALEJANDRO.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3024	1	robert.trunck@usmc.mil	Robert		Trunck	5	3156367658			CN=TRUNCK.ROBERT.WILLIAM.1368840625,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368840625	TRUNCK.ROBERT.WILLIAM	5	53	3	7	0	\N	\N	\N	3	\N	0	\N
-3026	1	holly.tucker@navy.mil	Holly		Tucker	3	2524646240			CN=TUCKER.HOLLY.F.1395976130,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395976130	TUCKER.HOLLY.F	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-3028	1	pdturner@bh.com	Paul		Turner	5	8508812651			CN=TURNER.PAUL.D.1048848431,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	TURNER.PAUL.D	20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2618	1	riley.jones@us.af.mil	Riley		Jones	5	3142383192	2383192		CN=JONES.RILEY.W.1237498166,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1237498166	JONES.RILEY.W	7	4	3	13	0	\N	\N	\N	1	\N	0	2
-2620	1	terry.jones.25.ctr@us.af.mil	Terry		Jones	3	8508815872	6415872		CN=JONES.TERRY.N.1277015508,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277015508	JONES.TERRY.N	20	15	2	11	0	\N	\N	\N	1	\N	0	2
-2846	0	james.k.riddle@navy.mil	James	K	Riddle	\N				CN=RIDDLE.JAMES.KEVIN.1046572277,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RIDDLE.JAMES.KEVIN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2624	1	zachary.l.jones@usmc.mil	Zachary		Jones	5	9104497252			CN=JONES.ZACHARY.LAVAR.1107228868,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1107228868	JONES.ZACHARY.LAVAR	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2626	1	rckellner@bh.com	Robert		Kellner	5	5058535439	2635439		CN=KELLNER.ROBERT.C.III.1240817264,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240817264	KELLNER.ROBERT.C.III	20	20	2	5	0	\N	\N	\N	1	\N	0	\N
-2628	1	kristopher.kendall.2@us.af.mil	Kristopher		Kendall	5	2106525221			CN=KENDALL.KRISTOPHER.M.1064448567,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064448567	KENDALL.KRISTOPHER.M	7	8	3	11	0	\N	\N	\N	1	\N	0	\N
-2630	1	martin.w.kendrex@boeing.com	Martin		Kendrex	5	5759045225	640522544		CN=KENDREX.MARTIN.W.1179535099,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	KENDREX.MARTIN.W	20	13	2	12	0	\N	\N	\N	1	\N	0	\N
-2632	1	jeffrey.kennedy@usmc.mil	Jeffrey		Kennedy	5	9104495971			CN=KENNEDY.JEFFREY.THOMAS.1265017645,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265017645	KENNEDY.JEFFREY.THOMAS	16	51	3	2	0	\N	\N	\N	3	\N	0	1
-2634	1	emily.kerlin@usmc.mil	Emily		Kerlin	3	8585779543			CN=KERLIN.EMILY.B.1271214487,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271214487	KERLIN.EMILY.B	21	10	1	4	0	\N	\N	\N	3	\N	0	1
-2636	1	beau.kitchens@usmc.mil	Beau		Kitchens	5	9104496419			CN=KITCHENS.BEAU.DAREN.1384071909,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384071909	KITCHENS.BEAU.DAREN	5	49	3	2	0	\N	\N	\N	3	\N	0	1
-2640	0	brian.koskey@usmc.mil	Brian	M	Koskey	\N				CN=KOSKEY.BRIAN.MITCHELL.1258239411,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	KOSKEY.BRIAN.MITCHELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2642	1	sanders.kreycik@usmc.mil	Sanders		Kreycik	5	7607636391	3616391		CN=KREYCIK.SANDERS.R.1159528207,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159528207	KREYCIK.SANDERS.R	8	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2644	1	bryan.kruger@usmc.mil	Bryan		Kruger	5	9282696880			CN=KRUGER.BRYAN.CHRISTOPHER.1275242868,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275242868	KRUGER.BRYAN.CHRISTOPHER	6	62	3	6	0	\N	\N	\N	3	\N	0	1
-2646	1	slane2@bh.com	Stanley		Lane	5	9104496560	4496560		CN=LANE.STANLEY.B.1031373308,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1031373308	LANE.STANLEY.B	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2648	1	clarence.langi@us.af.mil	Clarence		Langi	5	8508846954			CN=LANGI.CLARENCE.ELIJAH.1277824805,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277824805	LANGI.CLARENCE.ELIJAH	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2650	1	ronald.lasky@us.af.mil	Ronald		Lasky	5	8508813439	6413439		CN=LASKY.RONALD.J.JR.1072466175,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1072466175	LASKY.RONALD.J.JR	21	2	1	11	0	\N	\N	\N	1	\N	0	2
-2654	1	brandon.laughrey@whmo.mil	Brandon		Laughrey	4	5714944725	5714944		CN=LAUGHREY.BRANDON.PAUL.1011220050,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1011220050	LAUGHREY.BRANDON.PAUL	7	17	3	80	0	\N	\N	\N	3	\N	0	\N
-2656	1	lawrence.lee.5@us.af.mil	Lawrence		Lee	5	5757842939	6812939		CN=LEE.LAWRENCE.III.1246497245,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246497245	LEE.LAWRENCE.III	6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2658	1	matthew.r.lee@usmc.mil	Matthew		Lee	5	7605255487			CN=LEE.MATTHEW.ROYCE.1235298615,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235298615	LEE.MATTHEW.ROYCE	6	57	3	8	0	\N	\N	\N	3	\N	0	1
-2660	1	carlisle.leitch@navy.mil	Carlisle		Leitch	3	2524646177	4516177		CN=LEITCH.CARLISLE.H.1460337344,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460337344	LEITCH.CARLISLE.H	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2662	1	erwin.lewis@navy.mil	Erwin		Lewis	3	9104494080			CN=LEWIS.ERWIN.B.1467818771,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467818771	LEWIS.ERWIN.B	20	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2664	1	robert.liebig@lhd2.navy.mil	Robert		Liebig	4	8585776624			CN=LIEBIG.ROBERT.WILLIAM.JR.1400294980,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400294980	LIEBIG.ROBERT.WILLIAM.JR	5	23	3	4	0	\N	\N	\N	3	\N	0	\N
-2666	1	joe.lingle@usmc.mil	Joe		Lingle	5	8585779146			CN=LINGLE.JOE.DAVID.JR.1368793791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368793791	LINGLE.JOE.DAVID.JR	5	23	3	4	0	\N	\N	\N	3	\N	0	\N
-2668	1	orlando.lloyd@usmc.mil	Orlando		Lloyd	5	8585778035			CN=LLOYD.ORLANDO.LEWIS.1281824933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281824933	LLOYD.ORLANDO.LEWIS	6	47	3	4	0	\N	\N	\N	3	\N	0	\N
-2670	0	john.loizzi@usmc.mil	John	L	Loizzi	\N				CN=LOIZZI.JOHN.L.1186735001,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LOIZZI.JOHN.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2672	1	danilo.a.lopez@usmc.mil	Danilo		Lopez	3	9104497087			CN=LOPEZ.DANILO.ALBERTO.1274271759,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1274271759	LOPEZ.DANILO.ALBERTO	6	52	3	77	0	\N	\N	\N	3	\N	0	1
-2674	0	guillermo.lopez.5.ctr@us.af.mil	Guillermo	M	Lopez	\N				CN=LOPEZ.GUILLERMO.M.1008253060,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LOPEZ.GUILLERMO.M	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2676	1	hector.f.lopezavila@boeing.com	Hector		Lopezavila	5	5759045233	6405233		CN=LOPEZAVILA.HECTOR.FRANCISCO.1267961375,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267961375	LOPEZAVILA.HECTOR.FRANCISCO	20	13	2	12	0	\N	\N	\N	1	\N	0	\N
-2678	0	felipe.lucas@usmc.mil	Felipe	U	Lucas	\N				CN=LUCAS.FELIPE.UDEL.1173777686,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LUCAS.FELIPE.UDEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2680	1	gary.lynch@usmc.mil	Gary		Lynch	5	9105464191			CN=LYNCH.GARY.DON.1268942650,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268942650	LYNCH.GARY.DON	6	149	3	79	0	\N	\N	\N	3	\N	0	1
-2682	1	jeffrey.mabe@navy.mil	Jeffrey		Mabe	3	2524648636	4518636	2524646400	CN=MABE.JEFFREY.D.1254742291,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254742291	MABE.JEFFREY.D	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2684	1	kenneth.mabe@usmc.mil	Kenneth		Mabe	5	7607630529			CN=MABE.KENNETH.MICHAEL.1054086225,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1054086225	MABE.KENNETH.MICHAEL	8	46	3	8	0	\N	\N	\N	3	\N	0	1
-2950	0	karen.solberg@us.af.mil	Karen	M	Solberg	\N				CN=SOLBERG.KAREN.MICHELLE.1259149777,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RUEBELMAN.KAREN.MICHELLE	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2952	1	aaron.m.soto3.civ@mail.mil	Aaron		Soto	1	1231231234	1231231234		CN=SOTO.AARON.M.1403940808,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	SOTO.AARON.M	16	17	1	8	0	\N	\N	\N	1	\N	0	\N
-2954	1	lauren.sovine@usmc.mil	Lauren		Sovine	5	9104497245			CN=SOVINE.LAUREN.ALISON.1463451750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463451750	SOVINE.LAUREN.ALISON	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2956	0	jeremy.sparkman@us.af.mil	Jeremy	A	Sparkman	\N				CN=SPARKMAN.JEREMY.A.1242354717,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	Sparkman,J,A	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2958	1	christopher.d.sparr@navy.mil	Christopher		Sparr	3	2524646273			CN=SPARR.CHRISTOPHER.D.1374268992,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374268992	SPARR.CHRISTOPHER.D	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2960	1	jeremy.spaulding@navy.mil	Jeremy		Spaulding	4	2402374392			CN=SPAULDING.JEREMY.CARR.1171156781,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	SPAULDING.JEREMY.CARR	20	38	2	9	0	\N	\N	\N	4	\N	0	1
-2962	1	eric.speck@navy.mil	Eric		Speck	3	3013420839			CN=SPECK.ERIC.STANLEY.1200872750,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1200872750	SPECK.ERIC.STANLEY	21	38	1	9	0	\N	\N	\N	4	\N	0	1
-2964	1	derek.spencer.2@us.af.mil	Derek		Spencer	5	5759046031	6416031		CN=SPENCER.DEREK.ALAN.1256747738,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256747738	SPENCER.DEREK.ALAN	6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2966	1	john.spitzer.1@us.af.mil	John		Spitzer	5	8508812682			CN=SPITZER.JOHN.ERIC.1253880500,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253880500	SPITZER.JOHN.ERIC	7	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2968	1	dominic.stabler@navy.mil	Dominic		Stabler	1	3019954656			CN=STABLER.DOMINIC.OWEN.SR.1199104558,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1199104558	STABLER.DOMINIC.OWEN.SR	20	39	2	9	0	\N	\N	\N	4	\N	0	1
-2970	1	darrell.l.stanley@boeing.com	Darrell		Stanley	5	2525148292	6363984		CN=STANLEY.DARRELL.L.1189474802,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1189474802	stanleydl	20	31	2	7	0	\N	\N	\N	3	\N	0	1
-2972	1	sean.starkey@us.af.mil	Sean		Starkey	5	5757842635	6812635		CN=STARKEY.SEAN.T.1126501672,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1126501672	STARKEY.SEAN.T	7	3	3	12	0	\N	\N	\N	1	\N	0	2
-2974	1	jesse.steel@navy.mil	Jesse		Steel	3	2524646968	4516968		CN=STEEL.JESSE.R.1298805363,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298805363	STEEL.JESSE.R	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2976	1	terrance.steele@whmo.mil	Terrance		Steele	5	5714944801			CN=STEELE.TERRANCE.L.1063818611,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1063818611	STEELE.TERRANCE.L	20	32	2	80	0	\N	\N	\N	3	\N	0	1
-2978	1	william.b.sterett@boeing.com	William		Sterett	5	8503016966	1234564566		CN=STERETT.WILLIAM.B.1090432296,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	STERETT.WILLIAM.B	20	21	2	13	0	\N	\N	\N	1	\N	0	\N
-2980	0	robert.stevens.5@us.af.mil	Robert	J	Stevens	\N				CN=STEVENS.ROBERT.JOSEPH.1071517604,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	STEVENS.ROBERT.JOSEPH	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2982	1	russell.d.stewart@navy.mil	Russell		Stewart	5	7578368759			CN=STEWART.RUSSELL.D.1072635759,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1072635759	STEWART.RUSSELL.D	21	38	1	79	0	\N	\N	\N	3	\N	0	\N
-2011	1	richard.edwards.21@us.af.mil	Richard		Edwards	5	5058467456	2467465		CN=EDWARDS.RICHARD.LUCAS.1402322906,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2014	1	alejandro.cordero@usmc.mil	Alejandro		Corderogonzalez	4	7574450134	4450134	7574450134	CN=CORDEROGONZALEZ.ALEJANDRO.1248988920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248988920		6	149	3	79	0	\N	\N	\N	3	\N	0	1
-2015	0	scott.dickover@us.af.mil	Scott		Dickover	5	5757847040	6817040		CN=DICKOVER.SCOTT.E.1088207285,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	3	3	12	0	\N	\N	\N	1	\N	0	2
-2019	1	jeffrey.morand.ctr@navy.mil	Jeffrey		Morand	5	2524648716			CN=MORAND.JEFFREY.M.1209016857,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	2	18	0	\N	\N	\N	3	\N	0	1
-2023	0	fittzpatrick.noel@usmc.mil	Fittzpatrick		Noel	5	9104494556			CN=NOEL.FITTZPATRICK.ARTHUR.1390606377,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		5	44	3	2	0	\N	\N	\N	3	\N	0	1
-2039	1	cameron.a.hubbard@usmc.mil	Cameron		Hubbard	4	7607631479			CN=HUBBARD.CAMERON.ALLEN.1395423386,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		16	57	3	8	0	\N	\N	\N	3	\N	0	1
-2040	0	mark.echard@usmc.mil	Mark		Echard	1	9104496053			CN=ECHARD.MARK.CHRISTOPHER.1281744670,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		5	49	3	2	0	\N	\N	\N	3	\N	0	1
-2041	1	casey.hall@usmc.mil	Casey		Hall	1	9104496053			CN=HALL.CASEY.MITCHELL.1377208583,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1377208583		5	49	3	2	0	\N	\N	\N	3	\N	0	1
-2043	1	kevin.ruby@usmc.mil	Kevin		Ruby	5	7607253262			CN=RUBY.KEVIN.HARRISON.1454918807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454918807		4	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2044	0	carlton.bannerman@us.af.mil	Carlton		Bannerman	5	5058465409			CN=BANNERMAN.CARLTON.V M.1058042575,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058042575		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2045	0	brian.clark.34@us.af.mil	Brian		Clark	5	5058465409	8465409		CN=CLARK.BRIAN.PETER.1391444370,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1391444370		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2048	1	sharon.d.smith3.ctr@navy.mil	Sharon		Smith	4	2524648526	4518526		CN=SMITH.SHARON.D.1029140401,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029140401		20	10	2	18	0	\N	\N	\N	4	\N	0	\N
-2053	1	joshua.haywood@us.af.mil	Joshua		Haywood	5	5757840919			CN=HAYWOOD.JOSHUA.DANIEL.1254319690,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254319690		6	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2054	1	jared.bennett.4@us.af.mil	Jared		Bennett	5	5757840917	6810917		CN=BENNETT.JARED.ANTHONY.1403994843,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1403994843		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-2060	1	michael.e.aguilar1@usmc.mil	Michael		Aguilar	5	9282696863	2696863		CN=AGUILAR.MICHAEL.E.1132431597,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132431597		7	62	3	2	0	\N	\N	\N	3	\N	0	1
-2067	0	jacob.j.cooley@usmc.mil	Jacob		Cooley	5	7605057830			CN=COOLEY.JACOB.JONATHAN.1456760275,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456760275		4	28	3	8	0	\N	\N	\N	3	\N	0	1
-2069	1	ricky.r.boysel@usmc.mil	Ricky		Boysel	5	7607253994	3653994		CN=BOYSEL.RICKY.RAY.JR.1241313227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241313227		7	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2176	1	edward.abma@usmc.mil	Edward		Abma	5	9104496693	1231231233		CN=ABMA.EDWARD.JACOB.1276272655,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABMA.EDWARD.JACOB	16	52	3	2	0	\N	\N	\N	3	\N	0	\N
-2178	0	sergio.acosta@usmc.mil	Sergio	A	Acosta	\N				CN=ACOSTA.SERGIO.A.1134394680,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	ACOSTA.SERGIO.A	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2180	1	lance.p.aja@boeing.com	Lance		Aja	5	8585776833			CN=AJA.LANCE.P.1007718302,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	AJA.LANCE.P	20	32	2	79	0	\N	\N	\N	3	\N	0	\N
-2182	1	victor.alanis.ctr@navy.mil	Victor		Alanis	5	3017570171			CN=ALANIS.VICTOR.HUGO.JR.1129918043,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1129918043	ALANIS.VICTOR.HUGO.JR	20	39	2	9	0	\N	\N	\N	4	\N	0	1
-2184	1	jamie.albonetti@usmc.mil	Jamie		Albonetti	5	3156367659			CN=ALBONETTI.JAMIE.LEIGH.1470083596,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470083596	ALBONETTI.JAMIE.LEIGH	15	53	3	7	0	\N	\N	\N	3	\N	0	1
-2186	1	seth.aldrich@boeing.com	Seth		Aldrich	5	8585776835			CN=ALDRICH.SETH.O.1008962126,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1008962126	ALDRICH.SETH.O	20	31	2	4	0	\N	\N	\N	3	\N	0	1
-2188	1	christopher.almeria@us.af.mil	Christopher		Almeria	5	5058467990	2467990		CN=ALMERIA.CHRISTOPHER.J.1167705444,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167705444	ALMERIA.CHRISTOPHER.J	8	6	3	5	0	\N	\N	\N	1	\N	0	2
-2190	1	richard.ammons@us.af.mil	Richard		Ammons	3	8508814474	6414474		CN=AMMONS.RICHARD.B.1246002807,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	AMMONS.RICHARD.B	21	15	1	11	0	\N	\N	\N	4	\N	0	2
-2256	1	lynn.bowman@navy.mil	Lynn		Bowman	3	2524648717			CN=BOWMAN.LYNN.J.1228632950,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	bowmanlj	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2192	1	lucas.f.anderson.civ@mail.mil	Lucas		Anderson	3	3152642781			CN=ANDERSON.LUCAS.F.1369336866,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1369336866	ANDERSON.LUCAS.F	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2194	1	matthew.a.arsenault@usmc.mil	Matthew		Arsenault	5	7574447818	4447818		CN=ARSENAULT.MATTHEW.A.1013726422,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1013726422	ARSENAULT.MATTHEW.A	6	149	3	79	0	\N	\N	\N	3	\N	0	1
-2198	1	robert.j.baker3.ctr@navy.mil	Robert		Baker	5	3019954630			CN=BAKER.ROBERT.JOHN.1298682164,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298682164	BAKER.ROBERT.JOHN	20	39	2	9	0	\N	\N	\N	4	\N	0	1
-2200	1	julius.e.banks@boeing.com	Julius		Banks	1	5714944800	6465465465		CN=Julius Banks,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494	BANKS.JULIUS.E	20	17	2	80	0	\N	\N	\N	3	\N	0	\N
-2202	1	ruber.banks@us.af.mil	Ruber		Banks	5	5757840892			CN=BANKS.RUBER.J.JR.1114922036,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114922036	banksrj	6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2204	1	tony.bare@us.af.mil	Tony		Bare	5	0000000000			CN=BARE.TONY.R.1057549919,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	BARE.TONY.R	21	8	1	4	0	\N	\N	\N	1	\N	0	2
-2206	1	hannah.baron@navy.mil	Hannah		Baron	3	8585778314			CN=BARON.HANNAH.P.1468176030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468176030	BARON.HANNAH.P	21	15	1	4	0	\N	\N	\N	4	\N	0	1
-2208	1	john.barron.4@us.af.mil	John		Barron	5	8508841313	5791310		CN=BARRON.JOHN.ANDREWS.1290419715,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290419715	BARRON.JOHN.ANDREWS	6	2	3	11	0	\N	\N	\N	1	\N	0	2
-2210	1	aldo.bassignani@navy.mil	Aldo		Bassignani	3	2524646640			CN=BASSIGNANI.ALDO.R.1258528154,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	BASSIGNANI.ALDO.R	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2212	1	timothy.batchler@usmc.mil	Timothy		Batchler	5	0116365665	315		CN=BATCHLER.TIMOTHY.P.1061411638,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061411638	BATCHLER.TIMOTHY.P	7	53	3	7	0	\N	\N	\N	3	\N	0	1
-2214	1	david.beaman@navy.mil	David		Beaman	3	2524646656	4516656		CN=BEAMAN.DAVID.C.1239535433,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239535433	BEAMAN.DAVID.C	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2216	1	anita.becerra@usmc.mil	Anita		Becerra	4	8585771318			CN=BECERRA.ANITA.KAREN.1455548922,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455548922	BECERRA.ANITA.KAREN	5	23	3	4	0	\N	\N	\N	3	\N	0	\N
-2218	1	robert.beeton.3@us.af.mil	Robert		Beeton	4	8508814301	6414301		CN=BEETON.ROBERT.ANDREW.1110660363,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	BEETON.ROBERT.ANDREW	20	15	2	11	0	\N	\N	\N	4	\N	0	\N
-2220	1	lee.bennett@usmc.mil	Lee		Bennett	5	3156367658	6367658		CN=BENNETT.LEE.FREDERICK.1163405365,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1163405365	BENNETT.LEE.FREDERICK	6	53	3	7	0	\N	\N	\N	3	\N	0	\N
-2222	1	steven.bergland@us.af.mil	Steven		Bergland	5	5757840917			CN=BERGLAND.STEVEN.JAMES GUNN.1294775486,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1294775486	BERGLAND.STEVEN.JAMES GUNN	5	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2224	1	mathew.bertalot@navy.mil	Mathew		Bertalot	3	2524646214			CN=BERTALOT.MATHEW.J.1147043054,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	BERTALOT.MATHEW.J	21	15	1	18	0	\N	\N	\N	3	\N	0	1
-2226	1	ted.beszterczei@navy.mil	Ted		Beszterczei	3	2524646183	4516183555		CN=BESZTERCZEI.TED.G.JR.1362611322,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	beszterczeitg	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2228	1	timothy.bierce@usmc.mil	Timothy		Bierce	5	7607630576			CN=BIERCE.TIMOTHY.ALLYN.1299735113,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299735113	BierceTA	5	46	3	8	0	\N	\N	\N	3	\N	0	1
-2230	1	robert.bierly@navy.mil	Robert		Bierly	1	3017570161			CN=BIERLY.ROBERT.JOHN.1007531318,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007531318	BIERLY.ROBERT.JOHN	20	19	2	9	0	\N	\N	\N	3	\N	0	1
-2232	1	mbiles@bh.com	Michael		Biles	5	8174716782	2383172	8172789485	CN=BILES.MICHAEL.RAY.1161201509,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1161201509	BILES.MICHAEL.RAY	20	21	2	13	0	\N	\N	\N	1	\N	0	2
-2234	0	daniel.blocker@navy.mil	Daniel	K	Blocker	\N				CN=BLOCKER.DANIEL.KEITH.1126306845,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BLOCKER.DANIEL.KEITH	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2236	1	kyle.blond@usmc.mil	Kyle		Blond	5	3156363285			CN=BLOND.KYLE.EDWARD.1379789486,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379789486	BLOND.KYLE.EDWARD	15	27	3	7	0	\N	\N	\N	3	\N	0	1
-2238	1	joshua.a.boaz@usmc.mil	Joshua		Boaz	5	8585771677			CN=BOAZ.JOSHUA.A.1088020991,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1088020991	BOAZ.JOSHUA.A	11	60	3	4	0	\N	\N	\N	3	\N	0	1
-2240	1	ronald.bogan@us.af.mil	Ronald		Bogan	5	8508812088	6412088		CN=BOGAN.RONALD.L.1081990030,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	BOGAN.RONALD.L	7	8	3	4	0	\N	\N	\N	1	\N	0	2
-2242	0	thomas.h.bonner@navy.mil	Thomas	H	Bonner	\N				CN=BONNER.THOMAS.HOWARD.JR.1134101578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BONNER.THOMAS.HOWARD.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2244	1	leanne.booth@navy.mil	Leanne		Booth	3	2524649978			CN=BOOTH.LEANNE.M.1262186683,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230678274	BOOTH.LEANNE.M	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-1725	1	travis.makarowski@navy.mil	Travis		Makarowski	4	2524646396			CN=MAKAROWSKI.TRAVIS.W.1141323233,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	TRAVIS MAKAROWSKI	21	23	1	18	0	\N	\N	\N	4	\N	0	\N
-2246	1	travis.borkowski@usmc.mil	Travis		Borkowski	5	8585778089			CN=BORKOWSKI.TRAVIS.CHRISTOPHER.1242523730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242523730	BORKOWSKI.TRAVIS.CHRISTOPHER	7	48	3	4	0	\N	\N	\N	3	\N	0	\N
-2248	1	brad.bosman@usmc.mil	Brad		Bosman	5	9104494357	4494357		CN=BOSMAN.BRAD.WILLIAM.1411008432,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411008432	BOSMAN.BRAD.WILLIAM	5	25	3	2	0	\N	\N	\N	3	\N	0	\N
-37	\N	alexandra.poole@oem.com	Alexandra	E	Poole	\N	1115551212	\N	\N		\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:03:54.621326	\N	\N	\N	\N	1	\N
-2250	0	andrew.boston@usmc.mil	Andrew	M	Boston	\N				CN=BOSTON.ANDREW.MARK.1387733848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BOSTON.ANDREW.MARK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2252	1	kennth.bowden@usmc.mil	Kenneth		Bowden	5	9104497231			CN=BOWDEN.KENNETH.WEST.1365099894,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365099894	BOWDEN.KENNETH.WEST	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2254	1	joshua.bowen.1@us.af.mil	Joshua		Bowen	5	0163854461	2384613		CN=BOWEN.JOSHUA.NATHAN.1258473244,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258473244	BOWEN.JOSHUA.NATHAN	6	4	3	13	0	\N	\N	\N	1	\N	0	2
-3498	1	jason.kern@boeing.com	Kern		Jason	1	8584328223			CN=Jason.Kern.2829505,OU=people,O=boeing,C=us	2829505		20	42	2	4	0	\N	\N	\N	3	\N	1	\N
-2258	1	brian.m.boyer@rolls-royce.com	Brian		Boyer	1	8582205619	2671332455		CN=BOYER.BRIAN.MICHAEL.1400960476,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	BOYER.BRIAN.MICHAEL	20	34	2	4	0	\N	\N	\N	3	\N	0	\N
-2260	0	james.brady.4@us.af.mil	James	B	Brady	\N				CN=BRADY.JAMES.B.1082207151,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BRADY.JAMES.B	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2262	1	scott.braun.2@us.af.mil	Scott		Braun	5	8508815007	6415007		CN=BRAUN.SCOTT.MICHAEL.1256185837,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256185837	BRAUN.SCOTT.MICHAEL	6	2	3	11	0	\N	\N	\N	1	\N	0	2
-2264	1	eric.brodd@usmc.mil	Eric		Brodd	5	3156363938			CN=BRODD.ERIC.ANDREW.1176157166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176157166	BRODD.ERIC.ANDREW	12	27	3	7	0	\N	\N	\N	3	\N	0	\N
-2266	1	kara.brody@navy.mil	Kara		Brody	3	2524646209			CN=BRODY.KARA.M.1470493697,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470493697	BRODY.KARA.M	21	15	1	18	0	\N	\N	\N	3	\N	0	\N
-2268	1	douglas.brown0@usmc.mil	Douglas		Brown	3	8585774862			CN=BROWN.DOUGLAS.T.1228825553,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1228825553	BROWN.DOUGLAS.T	21	10	1	4	0	\N	\N	\N	3	\N	0	1
-2270	0	tyler.budgen@usmc.mil	Tyler	D	Budgen	\N				CN=BUDGEN.TYLER.DEAN.1399618360,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BUDGEN.TYLER.DEAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2272	0	matthew.burazin@usmc.mil	Matthew	J	Burazin	\N				CN=BURAZIN.MATTHEW.JOHN.1392126984,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BURAZIN.MATTHEW.JOHN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2274	1	joseph.burros@usmc.mil	Joseph		Burros	5	7607253562			CN=BURROS.JOSEPH.STEVEN.1454771644,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454771644	BURROS.JOSEPH.STEVEN	5	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2276	1	dbutler3@bellhelicopter.textron.com	Douglas		Butler	4	8063670448			CN=BUTLER.DOUGLAS.A.1153560524,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1153560524	butlerda	20	39	2	9	0	\N	\N	\N	3	\N	0	1
-2278	1	james.m.butler2@navy.mil	James		Butler	3	2524645666			CN=BUTLER.JAMES.M.1196731888,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1196731888	Butlerjm	20	15	1	18	0	\N	\N	\N	4	\N	0	1
-2282	0	ethan.calvin@usmc.mil	Ethan	F	Calvin	\N				CN=CALVIN.ETHAN.FRANNELL.1124658353,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	CALVIN.ETHAN.FRANNELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2284	1	joshua.campbell.17@us.af.mil	Joshua		Campbell	5	5058467456	8467456		CN=CAMPBELL.JOSHUA.RYAN.1390748198,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1390748198	CAMPBELL.JOSHUA.RYAN	5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2286	1	zachary.capps@navy.mil	Zachary		Capps	3	2527207946			CN=CAPPS.ZACHARY.W.1105031706,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1105031706	CAPPS.ZACHARY.W	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2288	0	michael.card@us.af.mil	Michael	A	Card	\N				CN=CARD.MICHAEL.ALAN.1102153150,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	CARD.MICHAEL.ALAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2290	1	patrick.j.carr@usmc.mil	Patrick		Carr	5	9104497685			CN=CARR.PATRICK.JAMES.1411011166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411011166	CARR.PATRICK.JAMES	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2292	1	kevin.champaigne1@usmc.mil	Kevin		Champaigne	5	9104496116	7526116		CN=CHAMPAIGNE.KEVIN.FRANCIS.1242238660,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242238660	CHAMPAIGNE.KEVIN.FRANCIS	16	25	3	2	0	\N	\N	\N	3	\N	0	\N
-2280	1	bryant.calcote@us.af.mil	Bryant		Calcote	3	8508812534	6412534		CN=CALCOTE.BRYANT.R.1268086443,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268086443	CALCOTE.BRYANT.R	21	15	1	11	0	\N	\N	\N	4	\N	0	2
-2294	1	jason.charpia@us.af.mil	Jason		Charpia	5	3142383192	2383192		CN=CHARPIA.JASON.W.1159871149,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159871149	CHARPIA.JASON.W	7	4	3	13	0	\N	\N	\N	1	\N	0	2
-2296	1	gary.christie@navy.mil	Gary		Christie	4	2524646232	4516232		CN=CHRISTIE.GARY.W.1055348878,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055348878	CHRISTIE.GARY.W	21	15	1	18	0	\N	\N	\N	3	\N	0	\N
-2298	1	jason.cirioni@us.af.mil	Jason		Cirioni	5	0163854614	2386143		CN=CIRIONI.JASON.C.1235313100,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235313100	CIRIONI.JASON.C	6	4	3	13	0	\N	\N	\N	1	\N	0	2
-2300	1	jacob.a.clark2@usmc.mil	Jacob		Clark	5	7607250576			CN=CLARK.JACOB.ALEXANDER.1290918312,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290918312	CLARK.JACOB.ALEXANDER	6	46	3	6	0	\N	\N	\N	3	\N	0	1
-3030	1	gregory.turney@navy.mil	Gregory		Turney	3	2524648725			CN=TURNEY.GREGORY.D.1229828670,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229828670	turneygd	21	15	1	18	0	\N	\N	\N	3	\N	0	1
-3032	1	christopher.k.underw@navy.mil	Christopher		Underwood	3	2524645313			CN=UNDERWOOD.CHRISTOPHER.K.1367940030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	UNDERWOOD.CHRISTOPHER.K	20	15	1	18	0	\N	\N	\N	3	\N	0	1
-3034	1	roy.uyematsu@us.af.mil	Roy		Uyematsu	3	5759045226	6405226		CN=UYEMATSU.ROY.S.1400711166,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	UYEMATSU.ROY.S	21	15	1	12	0	\N	\N	\N	4	\N	0	2
-3036	1	roy.vancamp.ctr@navy.mil	Roy		Vancamp	5	3017570078			CN=VANCAMP.ROY.EDWARD.1051054748,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051054748	VANCAMP.ROY.EDWARD	20	39	2	9	0	\N	\N	\N	4	\N	0	\N
-3038	1	gerald.vanderstar@usmc.mil	Gerald		Vanderstar	5	9104495865	7825867		CN=VANDERSTAR.GERALD.ELWIN.JR.1093870880,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093870880	VANDERSTAR.GERALD.ELWIN.JR	7	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3040	1	ramon.f.vasquez1@usmc.mil	Ramon		Vasquez	5	9104496839			CN=VASQUEZ.RAMON.F.1187351568,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187351568	VASQUEZ.RAMON.F	16	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3042	1	timothy.j.vaughn@usmc.mil	Timothy		Vaughn	5	9104496065			CN=VAUGHN.TIMOTHY.JOSHUA.1024275180,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024275180	VAUGHN.TIMOTHY.JOSHUA	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-3044	1	leigha.mabe@usmc.mil	Leigha		Veganunez	3	2544627512			CN=VEGANUNEZ.LEIGHA.MARIE.1462636039,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462636039	VEGANUNEZ.LEIGHA.MARIE	3	25	3	77	0	\N	\N	\N	3	\N	0	1
-3046	1	vvillasenor@bh.com	Victor		Villasenor	5	8172401371		8585776830	CN=VILLASENOROJEDA.VICTOR.IVAN.1273605823,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	VILLASENOROJEDA.VICTOR.IVAN	20	31	2	8	0	\N	\N	\N	3	\N	0	1
-3048	1	mvonbergen@bh.com	Michael		Vonbergen	5	8508812651	6412651		CN=VON BERGEN.MICHAEL.EDWARD.1257076551,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257076551	VON BERGEN.MICHAEL.EDWARD	20	16	2	11	0	\N	\N	\N	1	\N	0	2
-3050	1	christopher.voss@usmc.mil	Christopher		Voss	5	3156367661	6367661		CN=VOSS.CHRISTOPHER.JIN.1138177820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1138177820	VOSS.CHRISTOPHER.JIN	12	53	3	7	0	\N	\N	\N	3	\N	0	\N
-3052	1	cory.walker@usmc.mil	Cory		Walker	5	7703612330			CN=WALKER.CORY.DAVID.1410844580,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410844580	WALKER.CORY.DAVID	15	60	3	4	0	\N	\N	\N	3	\N	0	\N
-3054	1	kayo.walton@usmc.mil	Kayo		Walton	1	3156362763			CN=WALTON.KAYO.SCOTT.1397892928,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1397892928	WALTON.KAYO.SCOTT	5	27	3	7	0	\N	\N	\N	3	\N	0	1
-3056	1	william.ward@whmo.mil	William		Ward	5	5714944730			CN=WARD.WILLIAM.ROLAND.1288491352,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288491352	WARD.WILLIAM.ROLAND	6	17	3	80	0	\N	\N	\N	3	\N	0	\N
-3060	1	aaron.watson@navy.mil	Aaron		Watsonss	1	1234567890	654654622		abc	1065484494	aaron.watson	4	3	2	17	0	\N	\N	\N	2	\N	0	\N
-3062	1	tana.watters@navy.mil	Tana		Watters	5	2524646901	4516901		CN=WATTERS.TANA.S.1155533729,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1155533729	WATTERS.TANA.S	21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3064	1	brenton.webster@usmc.mil	Brenton		Webster	5	9104497087			CN=WEBSTER.BRENTON.LEE.1267734549,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267734549	WEBSTER.BRENTON.LEE	6	58	3	2	0	\N	\N	\N	3	\N	0	\N
-3066	1	james.welch2@usmc.mil	James		Welch	5	3156362000	6362000		CN=WELCH.JAMES.LEE.1242208397,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242208397	WELCH.JAMES.LEE	15	27	3	7	0	\N	\N	\N	3	\N	0	\N
-3068	1	john.wells2@whmo.mil	John		Wells	5	5714944729			CN=WELLS.JOHN.KEVINMCDONALD.1267841060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267841060	WELLS.JOHN.KEVINMCDONALD	6	17	3	9	0	\N	\N	\N	3	\N	0	1
-3070	1	aaron.wermy@us.af.mil	Aaron		Wermy	5	8508847515	1236548798		CN=WERMY.AARON.JOSEPH.1269270841,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	WERMY.AARON.JOSEPH	6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-3072	1	maurice.wertz@navy.mil	Maurice		Wertz	4	2524645038	4515038		CN=WERTZ.MAURICE.H.1061301336,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061301336	WERTZ.MAURICE.H	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-3074	0	thornton.west@usmc.mil	Thornton	D	West	\N				CN=WEST.THORNTON.DOUGLAS.1365254920, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	westtd	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3076	1	amy.wheary@navy.mil	Amy		Wheary	3	9104494080			CN=WHEARY.AMY.LYNN.1364811094,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364811094	WHEARY.AMY.LYNN	21	15	1	2	0	\N	\N	\N	3	\N	0	\N
-3078	1	kelly.r.white@navy.mil	Kelly		White	1	2524648388	6546546544	1231231234	CN=WHITE.KELLY.REEVES.1069624240,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	whitekr	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3080	1	erin.whitley@navy.mil	Erin		Whitley	3	3017572427			CN=WHITLEY.ERIN.D.1256859897,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256859897	WHITLEY.ERIN.D	21	38	1	9	0	\N	\N	\N	3	\N	0	1
-3082	1	jrwilliams@ltminc.net	Jimmy		Williams	4	2525157281			CN=WILLIAMS.JIMMY.R.1064495867,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064495867	WILLIAMS.JIMMY.R	20	15	2	18	0	\N	\N	\N	3	\N	0	\N
-3084	0	jon.r.williams@usmc.mil	Jon	R	Williams	\N				CN=WILLIAMS.JON.RUSSELL.1407029808,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	WILLIAMS.JON.RUSSELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3086	1	thomas.williams.41@us.af.mil	Thomas		Williams	5	5757840917	6810917		CN=WILLIAMS.THOMAS.CLAY.1288227779,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288227779	WILLIAMS.THOMAS.CLAY	5	3	3	12	0	\N	\N	\N	1	\N	0	2
-3088	1	matthew.willman@usmc.mil	Matthew		Willman	5	7607631468			CN=WILLMAN.MATTHEW.SCOTT.1258495280,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258495280	WILLMAN.MATTHEW.SCOTT	6	57	3	8	0	\N	\N	\N	3	\N	0	\N
-3090	0	jimmy.winn.1@us.af.mil	Jimmy	D	Winn	\N				CN=WINN.JIMMY.D.JR.1042870303,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	WINN.JIMMY.D.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3092	1	zachary.winter@usmc.mil	Zachary		Winter	5	9104497252			CN=WINTER.ZACHARY.CHARLES.1467472158,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467472158	WINTER.ZACHARY.CHARLES	4	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3094	1	maksim.wolkoff@usmc.mil	Maksim		Wolkoff	5	4405250046			CN=WOLKOFF.MAKSIM.SERGEY.1379358370,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379358370	WOLKOFF.MAKSIM.SERGEY	5	56	3	4	0	\N	\N	\N	3	\N	0	\N
-3096	1	trevor.won@navy.mil	Trevor		Won	3	2524646638			CN=WON.TREVOR.WAY KWONG.1515309299,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1515309299	WON.TREVOR.WAY KWONG	20	10	1	18	0	\N	\N	\N	4	\N	0	1
-3098	1	matthew.wuensch@us.af.mil	Matthew		Wuensch	5	8508846954			CN=WUENSCH.MATTHEW.LEE.1266724922,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266724922	WUENSCH.MATTHEW.LEE	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-3100	1	alan.c.young@usmc.mil	Alan		Young	5	7574447818			CN=YOUNG.ALAN.CY.1267735812,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267735812	YOUNG.ALAN.CY	6	149	3	79	0	\N	\N	\N	3	\N	0	1
-1536	1	steven.hagene@navy.mil	Steven		Hagene	5	2524646386		3232323232	CN=HAGENE.STEVEN.EARL.1287802451,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	STEVEN HAGENE	21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3102	1	richard.j.ytzen@boeing.com	Richard		Ytzen	5	8586927204			CN=Richard Ytzen,OU=BOEING,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233	YTZEN.RICHARD.J	20	31	2	8	0	\N	\N	\N	3	\N	0	1
-3104	1	kevin.zydowsky@usmc.mil	Kevin		Zydowsky	5	7607253262			CN=ZYDOWSKY.KEVIN.ROBERT.1460507223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460507223	ZYDOWSKY.KEVIN.ROBERT	4	28	3	8	0	\N	\N	\N	3	\N	0	\N
-3105	1	tyrone.trotter@us.af.mil	Tyrone		Trotter	1	5058537620	2637620		CN=TROTTER.TYRONE.D.1116385259,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116385259		8	6	3	5	0	\N	\N	\N	1	\N	0	\N
-3109	1	michael.graven@us.af.mil	Michael		Graven	5	5757840919			CN=GRAVEN.MICHAEL.JOHN.1103449177,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1103449177		6	3	3	12	0	\N	\N	\N	1	\N	0	\N
-3110	1	james.pels.2@us.af.mil	James		Pels	3	8508812690			CN=PELS.JAMES.FRANCIS.1262048698,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1262048698		21	2	1	11	0	\N	\N	\N	1	\N	0	\N
-3111	1	allen.h.lee@navy.mil	Allen		Lee	3	2524646200	4516200		CN=LEE.ALLEN.H.IV.1513381863,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513381863		20	10	1	18	0	\N	\N	\N	4	\N	0	1
-3112	1	christopher.celestin@navy.mil	Christopher		Celestino	3	2524646651			CN=CELESTINO.CHRISTOPHER.ROBERT.1268041008,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268041008		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3113	0	seth.rosbrugh@us.af.mil	Seth		Rosbrugh	5	5752182564	7840910		CN=ROSBRUGH.SETH.LOUIS.1292506887,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-3114	0	scott.m.hoffman.ctr@navy.mil	Scott		Hoffman	4	3018636512			CN=HOFFMAN.SCOTT.M.1046531236,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1046531236		20	38	2	9	0	\N	\N	\N	4	\N	0	2
-3115	1	joshua.johannsen@usmc.mil	Joshua		Johannsen	5	9104497228			CN=JOHANNSEN.JOSHUA.EDWARD.1454919749,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454919749		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-1770	1	shawn.shea@makin-island.usmc.mil	Shawn		Shea	1	8585279968			CN=SHEA.SHAWN.MICHAEL.1253214992,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253214992		20	31	2	4	0	\N	\N	\N	3	\N	0	\N
-2000	1	paul.charron@navy.mil	Paul		Charron	3	2524646113			CN=CHARRON.PAUL.W.1513905404,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513905404		21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2010	1	jared.kuhn.1@us.af.mil	Jared		Kuhn	5	8508847543	5797543		CN=KUHN.JARED.THOMAS.1383075552,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1383075552		5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2016	0	roy.zeisloft@us.af.mil	Roy		Zeisloft	5	5052467610	8467610		CN=ZEISLOFT.ROY.LEE.II.1270641012,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2017	1	kenneth.bobby@usmc.mil	Kenneth		Bobby	5	3183455282			CN=BOBBY.KENNETH.STEPHEN.JR.1025144402,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025144402		16	56	3	6	0	\N	\N	\N	3	\N	0	1
-2018	1	matthew.brownell@usmc.mil	Matthew		Brownell	1	9104497231			CN=BROWNELL.MATTHEW.SPENCER.1454761827,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454761827		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2029	1	thankins@bh.com	Tobias		Hankins	5	8588373106			CN=HANKINS.TOBIAS.MICHAEL.1083773886,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564		20	31	2	4	0	\N	\N	\N	3	\N	0	1
-2030	1	christopher.o.pierce@usmc.mil	Christopher		Pierce	5	9104496053			CN=PIERCE.CHRISTOPHE.OSBORNE.1238010523,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1238010523		6	49	3	2	0	\N	\N	\N	3	\N	0	1
-2031	0	jaron.franklin.1@us.af.mil	Jaron		Franklin	5	5058467456	2467456		CN=FRANKLIN.JARON.EDWARD.1100606867,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2032	0	jason.burtnick@navy.mil	Jason		Burtnick	3	2524646178			CN=BURTNICK.JASON.E.1041579494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2033	1	paul.edwards.6@us.af.mil	Paul		Edwards	5	8508841313	579131		CN=EDWARDS.PAUL.CHANNING.1118769852,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118769852		6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2034	1	joseph.hollingsworth@usmc.mil	Joseph		Hollingsworth	5	7607630578	3610578		CN=HOLLINGSWORTH.JOSEPH.HERBERT.1235103172,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235103172		7	46	3	8	0	\N	\N	\N	3	\N	0	\N
-2035	1	david.denis@us.af.mil	David		Denis	5	5058467456	2467456		CN=DENIS.DAVID.JOSEPH.1281048771,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281048771		6	6	3	5	0	\N	\N	\N	1	\N	0	\N
-2042	1	tyler.thielen@usmc.mil	Tyler		Thielen	5	6193287107			CN=THIELEN.TYLER.AUSTIN.1455431855,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455431855		5	23	3	4	0	\N	\N	\N	3	\N	0	1
-2046	1	john.l.reeder@boeing.com	John		Reeder	1	6105917639			CN=John Reeder,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	1	18	0	\N	\N	\N	3	\N	0	1
-2047	1	v327mxgqa@us.af.mil	Christopher		Taylor	5	5757840919			CN=TAYLOR.CHRISTOPHER.DEWAYNE.1290425588,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290425588		6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2052	1	amado.m.aviles.civ@mail.mil	Amado		Aviles	3	8004736597	3152643		CN=AVILES.AMADO.M.1277023977,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277023977		21	14	1	4	0	\N	\N	\N	4	\N	0	\N
-2056	1	v327mxgqa@us.af.mil	Lindsey		Stanley	5	5757840919	6810919		CN=STANLEY.LINDSEY.MICHELE.1275079851,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275079851		5	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2057	0	darryl.saliva@us.af.mil	Darryl		Saliva	5	5058467622			CN=SALIVA.DARRYL.UCOL.1369370266,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	5	0	\N	\N	\N	1	\N	0	2
-2058	1	michael.gruetzmacher@us.af.mil	Michael		Gruetzmacher	5	5757840919	6810919		CN=GRUETZMACHER.MICHAEL.GORDON.1401461511,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1401461511		5	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2059	1	v327mxgqa@us.af.mil	Seth		Bolles	5	5757840919	6810919		CN=BOLLES.SETH.GABRIEL.1367100040,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367100040		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-2061	1	v327mxgqa@us.af.mil	Daniel		Johnson	5	5757840919	6810919		CN=JOHNSON.DANIEL.JAMES.1137781839,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137781839		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-2062	0	james.gerlach@us.af.mil	James		Gerlach	5	5757840919			CN=GERLACH.JAMES.J.1101906589,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1101906589		6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2070	1	clayton.loper@us.af.mil	Clayton		Loper	5	5757840919	6810919		CN=LOPER.CLAYTON.ANDREW.1273809925,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273809925		6	3	3	12	0	\N	\N	\N	1	\N	0	2
-3116	1	jeffrey.r.binder.ctr@navy.mil	Jeffrey		Binder	5	3019954632			CN=BINDER.JEFFREY.RONALD.1029486081,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029486081		21	39	2	9	0	\N	\N	\N	4	\N	0	\N
-2770	1	rodney.olsen@navy.mil	Rodney		Olsen	3	2524646109	9426109		CN=OLSEN.RODNEY.J.1251907273,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	OLSEN.RODNEY.J	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2772	1	steven.orth@usmc.mil	Steven		Orth	5	8585778155			CN=ORTH.STEVEN.ANTONIO.1368373601,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368373601	ORTH.STEVEN.ANTONIO	5	43	3	4	0	\N	\N	\N	3	\N	0	1
-2774	0	donovan.ossman@usmc.mil	Donovan	M	Ossman	\N				CN=OSSMAN.DONOVAN.MICHEAL.1501333570,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	OSSMAN.DONOVAN.MICHEAL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2776	1	joseph.pacella@navy.mil	Joseph		Pacella	3	7323231668			CN=PACELLA.JOSEPH.M.1366314608,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1366314608	PACELLA.JOSEPH.M	21	15	1	3	0	\N	\N	\N	4	\N	0	1
-2778	1	mario.paez@navy.mil	Mario		Paez	3	2524648648			CN=PAEZ.MARIO.A.1297539589,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1297539589	PAEZ.MARIO.A	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2780	1	garrett.h.page@navy.mil	Garrett		Page	3	2524646199	4516199		CN=PAGE.GARRETT.H.1455290380,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455290380	PAGE.GARRETT.H	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2782	0	ian.page@usmc.mil	Ian	R	Page	\N				CN=PAGE.IAN.RUSSELL.1366778612,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PAGE.IAN.RUSSELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2784	1	casey.parkins@usmc.mil	Casey		Parkins	5	3156366249	3156366		CN=PARKINS.CASEY.LEE.1276588997,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276588997	PARKINS.CASEY.LEE	6	50	3	7	0	\N	\N	\N	3	\N	0	1
-2786	1	edwin.partridge@usmc.mil	Edwin		Partridge	5	9282696834			CN=PARTRIDGE.EDWIN.JAMES.1283144344,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283144344	PARTRIDGE.EDWIN.JAMES	6	62	3	4	0	\N	\N	\N	3	\N	0	1
-2788	1	michell.n.patrick@boeing.com	Michell		Patrick	5	8582455974			CN=PATRICK.MICHELL.N.JR.1155108602,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	PATRICK.MICHELL.N.JR	20	31	2	4	0	\N	\N	\N	3	\N	0	1
-2790	1	nicholas.paulson@whmo.mil	Nicholas		Paulson	5	5714944730			CN=PAULSON.NICHOLAS.BRADFORD.1260253260,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260253260	PAULSON.NICHOLAS.BRADFORD	7	17	3	9	0	\N	\N	\N	3	\N	0	1
-2792	1	adil.pence@boxer.usmc.mil	Adil		Pence	5	8585778087			CN=PENCE.ADIL.MEGUINJESSE.1279863905,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279863905	PENCE.ADIL.MEGUINJESSE	6	48	3	4	0	\N	\N	\N	3	\N	0	1
-2794	1	aimee.perkins@usmc.mil	Aimee		Perkins	3	8585778349			CN=PERKINS.AIMEE.LYNN.1279371166,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279371166	PERKINS.AIMEE.LYNN	21	15	1	4	0	\N	\N	\N	3	\N	0	1
-2796	1	torey.pesterre@usmc.mil	Torey		Pesterre	5	8585779388			CN=PESTERRE.TOREY.WILLIAM.1299547007,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299547007	PESTERRE.TOREY.WILLIAM	5	60	3	4	0	\N	\N	\N	3	\N	0	1
-2798	1	jonathan.peter@us.af.mil	Jonathan		Peter	5	8508841309	5791309		CN=PETER.JONATHAN.ROBERT.1391455178,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1391455178	PETER.JONATHAN.ROBERT	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2800	0	marion.phelps@usmc.mil	Marion	R	Phelps	\N				CN=PHELPS.MARION.RYAN.1141912018,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PHELPS.MARION.RYAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2802	1	roger.phillip@usmc.mil	Roger		Phillip	5	8585778105			CN=PHILLIP.ROGER.GILLIAN.1268617228,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268617228	PHILLIP.ROGER.GILLIAN	6	48	3	4	0	\N	\N	\N	3	\N	0	\N
-2804	1	chad.phillipp@makin-islandusmc.mil	Chad		Phillipp	5	8585779485	2679485		CN=PHILLIPP.CHAD.D.1137880373,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137880373	PHILLIPP.CHAD.D	7	45	3	4	0	\N	\N	\N	3	\N	0	\N
-2806	1	steven.pickering@usmc.mil	Steven		Pickering	1	9104497225			CN=PICKERING.STEVEN.DUANE.1367858776,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367858776	PICKERING.STEVEN.DUANE	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2808	1	irving.pierson@navy.mil	Irving		Pierson	1	3019954372			CN=PIERSON.IRVING.T.1034644868,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1034644868	PIERSON.IRVING.T	20	39	2	9	0	\N	\N	\N	3	\N	0	\N
-2810	1	robert.pike.11@us.af.mil	Robert		Pike	4	8508814312	6414312		CN=PIKE.ROBERT.L.1170175782,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	PIKE.ROBERT.L	20	15	1	11	0	\N	\N	\N	4	\N	0	2
-2812	1	cory.pinkelton@navy.mil	Cory		Pinkelton	3	2524648912			CN=PINKELTON.CORY.A.1454889696,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454889696	PINKELTON.CORY.A	21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2814	1	daniel.plank@usmc.mil	Daniel		Plank	5	8585778050			CN=PLANK.DANIEL.CHARLES.1264228995,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264228995	PLANK.DANIEL.CHARLES	6	56	3	4	0	\N	\N	\N	3	\N	0	\N
-2816	1	isaac.plummer@us.af.mil	Isaac		Plummer	1	5058535752			CN=PLUMMER.ISAAC.H.1110186769,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110186769	PLUMMER.ISAAC.H	7	6	3	5	0	\N	\N	\N	1	\N	0	\N
-2818	1	douglas.pope.1@us.af.mil	Douglas		Pope	5	5055635089			CN=POPE.DOUGLAS.SHANE.1257580152,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257580152	POPE.DOUGLAS.SHANE	6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2820	1	richard.pope@us.af.mil	Richard		Pope	5	8508841313	5791313		CN=POPE.RICHARD.PATRICK.1173558631,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1173558631	POPE.RICHARD.PATRICK	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2822	0	brandon.porter@navy.mil	Brandon	E	Porter	\N				CN=PORTER.BRANDON.E.1274371125,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PORTER.BRANDON.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2824	1	darren.pugh@usmc.mil	Darren		Pugh	5	9104496267			CN=PUGH.DARREN.TAYLOR.1471128593,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1471128593	PUGH.DARREN.TAYLOR	3	25	3	2	0	\N	\N	\N	3	\N	0	\N
-2826	1	erick.ramirez2@usmc.mil	Erick		Ramirez	4	8183708395			CN=RAMIREZ.ERICK.ALBERT.1465235728,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465235728	RAMIREZ.ERICK.ALBERT	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2828	1	christopher.ramos3@usmc.mil	Christopher		Ramos	5	3156366230			CN=RAMOS.CHRISTOPHER.1386546840,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1386546840	RAMOS.CHRISTOPHER	15	50	3	7	0	\N	\N	\N	3	\N	0	1
-2830	1	garrett.rayfield@us.af.mil	Garrett		Rayfield	3	0162381862			CN=RAYFIELD.GARRETT.WILLIAM.1404262374,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404262374	RAYFIELD.GARRETT.WILLIAM	5	4	3	13	0	\N	\N	\N	1	\N	0	2
-2832	1	jay.raymond@usmc.mil	Jay		Raymond	1	9104497225			CN=RAYMOND.JAY.LYNN.1409033730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1409033730	RAYMOND.JAY.LYNN	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2834	1	abdul.rehman@navy.mil	Abdul		Rehman	3	2524646152	12365455		CN=REHMAN.ABDUL.1387296073,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	REHMAN.ABDUL	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2836	1	daniel.reinbolz@us.af.mil	Daniel		Reinbolz	4	3142384613	2384613		CN=REINBOLZ.DANIEL.JOSEPH.1374792764,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374792764	REINBOLZ.DANIEL.JOSEPH	5	4	3	13	0	\N	\N	\N	1	\N	0	2
-2838	1	ryan.w.reinhart@navy.mil	Ryan		Reinhart	1	2527208289			CN=REINHART.RYAN.W.1079107022,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1079107022	REINHART.RYAN.W	20	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2840	1	kenneth.rhoades@usmc.mil	Kenneth		Rhoades	5	9104494684	7524684		CN=RHOADES.KENNETH.J.1024284928,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024284928	RHOADES.KENNETH.J	7	61	3	2	0	\N	\N	\N	3	\N	0	\N
-2842	0	matthew.richter@whmo.mil	Matthew	R	Richter	\N				CN=RICHTER.MATTHEW.R.1185849089,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RICHTER.MATTHEW.R	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2844	1	louann.rickley.ctr@usmc.mil	Louann		Rickley	5	7607253800	3653800		CN=RICKLEY.LOUANN.1038732605,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038732605	RICKLEY.LOUANN	20	28	2	8	0	\N	\N	\N	3	\N	0	\N
-3190	1	nichole.gill@navy.mil	Nichole		Gill	3	2524646246	4516246		CN=GILL.NICHOLE.A.1385637230,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2848	1	frederick.m.ridenour@boeing.com	Mike		Ridenour	5	9104494161			CN=RIDENOUR.FREDERICK.M.JR.1183962520,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1183962520	RIDENOUR.FREDERICK.M.JR	20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-2850	1	justin.rivenburgh@usmc.mil	Justin		Rivenburgh	3	8585779107			CN=RIVENBURGH.JUSTIN.MICHAEL.1248797335,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248797335	RIVENBURGH.JUSTIN.MICHAEL	6	45	3	4	0	\N	\N	\N	3	\N	0	1
-2852	1	michael.rivera.41.ctr@us.af.mil	Michael		Rivera	5	8508812529			CN=RIVERA.MICHAEL.A.1025058026,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025058026	RIVERA.MICHAEL.A	21	2	2	11	0	\N	\N	\N	1	\N	0	2
-2854	1	john.w.roberts1@usmc.mil	John		Roberts	4	8585779409			CN=ROBERTS.JOHN.WESLEY.1233747765,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233747765	ROBERTS.JOHN.WESLEY	6	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2856	0	shawn.roberts@usmc.mil	Shawn	A	Roberts	\N				CN=ROBERTS.SHAWN.A.1252406359, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	robertssa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2858	1	kevin.robertson.6@us.af.mil	Kevin		Robertson	4	1638543195	2383195		CN=ROBERTSON.KEVIN.N.JR.1241713888,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241713888	ROBERTSON.KEVIN.N.JR	7	4	3	13	0	\N	\N	\N	1	\N	0	2
-2860	1	noah.robertson@navy.mil	Noah		Robertson	3	2524646690			CN=ROBERTSON.NOAH.DON.1248051350,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248051350	ROBERTSON.NOAH.DON	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2862	0	edwin.e.rodriguez@usmc.mil	Edwin	E	Rodriguez	\N				CN=RODRIGUEZ.EDWIN.E.1182147350,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RODRIGUEZ.EDWIN.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2864	1	harry.rodriguez.2@us.af.mil	Harry		Rodriguez	5	5757840529	6810529		CN=RODRIGUEZ.HARRY.W.1236518481,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236518481	RODRIGUEZ.HARRY.W	7	3	3	12	0	\N	\N	\N	1	\N	0	2
-2866	1	larodriguez@bh.com	Luis		Rodriguez	5	9102657199			CN=RODRIGUEZ.LUIS.A.JR.1256874810,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256874810	RODRIGUEZ.LUIS.A.JR	20	17	2	80	0	\N	\N	\N	3	\N	0	1
-2868	0	richard.l.rodriguez2@usmc.mil	Richard	L	Rodriguez	\N				CN=RODRIGUEZ.RICHARD.L.1018270567,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RODRIGUEZ.RICHARD.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2870	1	lance.roe@us.af.mil	Lance		Roe	4	8508841310	5791310		CN=ROE.LANCE.W.1106116489,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1106116489	ROE.LANCE.W	7	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2872	1	edward.g.roeloffzen2@boeing.com	Edward		Roeloffzen	5	3142384654			CN=ROELOFFZEN.EDWARD.G.1084094958,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	ROELOFFZEN.EDWARD.G	20	21	2	13	0	\N	\N	\N	1	\N	0	2
-2874	1	alan.roos.1@us.af.mil	Alan		Roos	5	5058464841	2464841		CN=ROOS.ALAN.L.1178650668,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1178650668	ROOS.ALAN.L	21	6	1	5	0	\N	\N	\N	1	\N	0	2
-2876	1	pwrosenberger@bh.com	Paul		Rosenberger	5	3017570077			CN=ROSENBERGER.PAUL.WARREN.JR.1042638699,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042638699	ROSENBERGER.PAUL.WARREN.JR	20	39	2	9	0	\N	\N	\N	3	\N	0	1
-2878	1	eric.rowland@usmc.mil	Eric		Rowland	5	9104497247			CN=ROWLAND.ERIC.TODD.1298377981,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298377981	ROWLAND.ERIC.TODD	5	25	3	2	0	\N	\N	\N	3	\N	0	\N
-2880	1	stephen.rubel@usmc.mil	Stephen		Rubel	5	7574447818			CN=RUBEL.STEPHEN.LINCOLN.JR.1240844237,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240844237	RUBEL.STEPHEN.LINCOLN.JR	11	149	3	79	0	\N	\N	\N	3	\N	0	1
-2882	1	damien.ruggieri@usmc.mil	Damien		Ruggieri	5	9175179492			CN=RUGGIERI.DAMIEN.JOSEPH.1018541323,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018541323	RUGGIERI.DAMIEN.JOSEPH	6	51	3	2	0	\N	\N	\N	3	\N	0	\N
-2884	1	antonio.ruiz@usmc.mil	Antonio		Ruiz	2	9104497368			CN=RUIZ.ANTONIO.RAMOS.JR.1362432266,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362432266	RUIZ.ANTONIO.RAMOS.JR	5	54	3	2	0	\N	\N	\N	3	\N	0	1
-2886	1	adam.ruse@usmc.mil	Adam		Ruse	5	9104495661			CN=RUSE.ADAM.CHRISTOPHER.1250422365,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250422365	RUSE.ADAM.CHRISTOPHER	6	61	3	2	0	\N	\N	\N	3	\N	0	1
-2888	1	michael.rusinchak@us.af.mil	Michael		Rusinchak	4	8508846492	5796492		CN=RUSINCHAK.MICHAEL.J.1038598208,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038598208	RUSINCHAK.MICHAEL.J	7	2	3	11	0	\N	\N	\N	1	\N	0	2
-2890	1	matthew.russell1@usmc.mil	Matthew		Russell	5	9104497073			CN=RUSSELL.MATTHEW.ROY.1258748294,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258748294	RUSSELL.MATTHEW.ROY	16	52	3	2	0	\N	\N	\N	3	\N	0	1
-2892	1	westley.sage@us.af.mil	Westley		Sage	1	5757847040	6817040		CN=SAGE.WESTLEY.G.1140992590,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1140992590	SAGE.WESTLEY.G	7	3	3	12	0	\N	\N	\N	1	\N	0	2
-2894	1	jerome.salabye@usmc.mil	Jerome		Salabye	5	8585779409	8582789		CN=SALABYE.JEROME.1233500999,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233500999	SALABYE.JEROME	6	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2896	1	paul.salay@whmo.mil	Paul		Salay	5	1571494473			CN=SALAY.PAUL.M.1029001010,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029001010	SALAY.PAUL.M	7	17	3	80	0	\N	\N	\N	3	\N	0	1
-2898	1	ulises.sanchezmartin@usmc.mil	Ulises		Sanchez-Martinez	5	3156362024			CN=SANCHEZMARTINEZ.ULISES.1385011233,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1385011233	SANCHEZMARTINEZ.ULISES	5	50	3	7	0	\N	\N	\N	3	\N	0	\N
-2900	1	brian.sandoval@usmc.mil	Brian		Sandoval	5	8585779406			CN=SANDOVAL.BRIAN.S.1244394929,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244394929	SANDOVAL.BRIAN.S	7	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2902	0	sherri.santos.1@us.af.mil	Sherri	L	Santos	\N				CN=SANTOS.SHERRI.LYNN.1284784096,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SANTOS.SHERRI.LYNN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2904	1	herman.sargent@us.af.mil	Herman		Sargent	5	3122384595	2384595		CN=SARGENT.HERMAN.R.1125881307,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1125881307	SARGENT.HERMAN.R	8	4	3	13	0	\N	\N	\N	1	\N	0	2
-2906	1	andrew.schellenger@us.af.mil	Andrew		Schellenger	2	5757847040			CN=SCHELLENGER.ANDREW.DAVID.1293709706,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293709706	SCHELLENGER.ANDREW.DAVID	6	3	3	12	0	\N	\N	\N	1	\N	0	2
-2908	1	matthew.s.scherhaufe.ctr@navy.mil	Matthew		Scherhaufer	5	3019954632			CN=SCHERHAUFER.MATTHEW.SCOTT.1364481469,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364481469	SCHERHAUFER.MATTHEW.SCOTT	20	39	2	9	0	\N	\N	\N	4	\N	0	1
-2910	1	james.d.schmidt@usmc.mil	James		Schmidt	5	3156366229			CN=SCHMIDT.JAMES.DANIEL.1367062939,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367062939	SCHMIDT.JAMES.DANIEL	6	50	3	18	0	\N	\N	\N	3	\N	0	1
-2912	1	david.schnorenberg@navy.mil	David		Schnorenberg	3	9104495219			CN=SCHNORENBERG.DAVID.GERARD.1099651969,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	SCHNORENBERG.DAVID.GERARD	21	15	1	2	0	\N	\N	\N	3	\N	0	1
-2914	1	paul.schroeder.2@us.af.mil	Paul		Schroeder	1	5058465409			CN=SCHROEDER.PAUL.CHRISTIAN.1244433860,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244433860	SCHROEDER.PAUL.CHRISTIAN	6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2916	1	justin.r.schulz@usmc.mil	Justin		Schulz	5	9104497226			CN=SCHULZ.JUSTIN.RYAN.1380480138,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380480138	schulzjr	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2918	1	cory.schwendemann@usmc.mil	Cory		Schwendemann	5	7607253562			CN=SCHWENDEMANN.CORY.EDWARD.1404520489,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404520489	SCHWENDEMANN.CORY.EDWARD	5	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2920	1	john.sciortino@navy.mil	John		Sciortino	3	2524645847			CN=SCIORTINO.JOHN.J.1256851187,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256851187	SCIORTINO.JOHN.J	21	15	1	18	0	\N	\N	\N	3	\N	0	1
-2922	1	kyle.b.scott@usmc.mil	Kyle		Scott	4	3156361189			CN=SCOTT.KYLE.BRADY.1362718976,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362718976	SCOTT.KYLE.BRADY	5	27	3	7	0	\N	\N	\N	3	\N	0	1
-2924	1	cameron.settle@us.af.mil	Cameron		Settle	1	5757847040	7847040		CN=SETTLE.CAMERON.CURTIS.1267965753,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267965753	SETTLE.CAMERON.CURTIS	6	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2926	0	joshua.settles.4@us.af.mil	Joshua	M	Settles	\N				CN=SETTLES.JOSHUA.MICHAEL.1262984180,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SETTLES.JOSHUA.MICHAEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2928	1	bridget.shideler@navy.mil	Bridget		Shideler	3	5714944760			CN=SHIDELER.BRIDGET.R.1136235962,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136235962	SHIDELER.BRIDGET.R	21	15	1	80	0	\N	\N	\N	3	\N	0	\N
-2930	1	donald.shiffer@us.af.mil	Donald		Shiffer	5	9408820939	2635089		CN=SHIFFER.DONALD.DALTON.1284944000,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1284944000	SHIFFER.DONALD.DALTON	5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2932	1	matthew.shiver@usmc.mil	Matthew		Shiver	5	3156362024			CN=SHIVER.MATTHEW.JAVIER.1279228525,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279228525	SHIVER.MATTHEW.JAVIER	6	50	3	7	0	\N	\N	\N	3	\N	0	1
-2934	1	paul.shutts@me.usmc.mil	Paul		Shutts	5	3183455277	3455277		CN=SHUTTS.PAUL.MATTHEW.1266865321,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266865321	SHUTTS.PAUL.MATTHEW	6	47	3	4	0	\N	\N	\N	3	\N	0	\N
-2936	0	bryant.silverio@usmc.mil	Bryant		Silverio	\N				CN=SILVERIO.BRYANT.1398343227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SILVERIO.BRYANT	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2938	1	jeffrey.simonton@usmc.mil	Jeffrey		Simonton	5	8585778090			CN=SIMONTON.JEFFREY.CHARLES.1260328260,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260328260	SIMONTON.JEFFREY.CHARLES	15	48	3	6	0	\N	\N	\N	3	\N	0	\N
-2940	1	chaka.d.smith@boeing.com	Chaka		Smith	5	9104495144			CN=SMITH.CHAKA.D A.1239277914,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239277914	SMITH.CHAKA.D A	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2942	1	ryan.smith1@usmc.mil	Ryan		Smith	5	8585778155			CN=SMITH.RYAN.C.1236371103,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236371103	SMITH.RYAN.C	7	43	3	4	0	\N	\N	\N	3	\N	0	1
-2944	1	trevor.m.smith2@usmc.mil	Trevor		Smith	5	8585776184			CN=SMITH.TREVOR.M.1234067059,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234067059	SMITH.TREVOR.M	16	23	3	4	0	\N	\N	\N	3	\N	0	\N
-2946	1	william.d.smith@usmc.mil	William		Smith	5	9104495643	7525643		CN=SMITH.WILLIAM.DANE.1129961879,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1129961879	SMITH.WILLIAM.DANE	6	44	3	2	0	\N	\N	\N	3	\N	0	1
-2948	0	ryan.snipes@usmc.mil	Ryan	c	Snipes	\N				CN=SNIPES.RYAN.CULLAN.1281206938,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	snipesrc	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2432	1	jonathan.friscia@navy.mil	Jonathan		Friscia	4	3019954313			CN=FRISCIA.JONATHAN.R.1112747849,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	FRISCIA.JONATHAN.R	7	38	3	9	0	\N	\N	\N	1	\N	0	2
-2434	1	evan.frock@us.af.mil	Evan		Frock	3	8508841313			CN=FROCK.EVAN.MICHAEL.1379386845,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379386845	FROCK.EVAN.MICHAEL	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2436	1	vincent.frosig@us.af.mil	Vincent		Frosig	5	5759046037	6406037		CN=FROSIG.VINCENT.EUGENE.1260822361,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260822361	FROSIG.VINCENT.EUGENE	6	3	3	12	0	\N	\N	\N	1	\N	0	\N
-2438	1	robert.gallipeau.ctr@navy.mil	Robert		Gallipeau	5	3019954633			CN=GALLIPEAU.ROBERT.FRANCIS.III.1025068528,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GALLIPEAU.ROBERT.FRANCIS.III	20	19	2	9	0	\N	\N	\N	3	\N	0	1
-2440	1	timothy.d.gamble.ctr@usmc.mil	Timothy		Gamble	5	8048788468	6367658		CN=GAMBLE.TIMOTHY.D.1075539688,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	GAMBLE.TIMOTHY.D	21	27	2	7	0	\N	\N	\N	3	\N	0	1
-2442	1	john.gann@navy.mil	John		Gann	3	2524645729			CN=GANN.JOHN.C.1395131296,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395131296	GANN.JOHN.C	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2444	1	carlos.r.garcia@usmc.mil	Carlos		Garcia	5	3156362583	6362583		CN=GARCIA.CARLOS.R.1243291280,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243291280	GARCIA.CARLOS.R	7	27	3	7	0	\N	\N	\N	3	\N	0	\N
-2446	0	ericjay.garcia@afg.usmc.mil	Ericjay	K	Garcia	\N				CN=GARCIA.ERICJAY.KONA.1150722116, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	garcia,e,k	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2448	1	marcos.garcia@usmc.mil	Marcos		Garcia	5	8064921809	6361171		CN=GARCIA.MARCOS.ANTONIO.1288493266,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288493266	GARCIA.MARCOS.ANTONIO	6	27	3	7	0	\N	\N	\N	3	\N	0	\N
-2450	0	michale.gardner@us.af.mil	Michale	T	Gardner	\N				CN=GARDNER.MICHALE.TIMOTHY.1271462170, OU=USAF, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	gardnermt	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2452	1	samuel.garrison@usmc.mil	Samuel		Garrison	5	8585779406			CN=GARRISON.SAMUEL.PAUL.1379018870,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379018870	GARRISON.SAMUEL.PAUL	5	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2454	1	eric.giannettino@usmc.mil	Eric		Giannettino	5	8585779127	2679127		CN=GIANNETTINO.ERIC.J.1027326818,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1027326818	GIANNETTINO.ERIC.J	11	45	3	4	0	\N	\N	\N	3	\N	0	1
-2456	1	jeremy.gilbertson@wasp.usmc.mil	Jeremy		Gilbertson	5	9104497087			CN=GILBERTSON.JEREMY.ALLEN.1276637785,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276637785	GILBERTSON.JEREMY.ALLEN	6	52	3	2	0	\N	\N	\N	3	\N	0	\N
-2458	1	neal.j.gilbreth@boeing.com	Neal		Gilbreth	5	6199950784			CN=GILBRETH.NEAL.JOHN.1115841455,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	GILBRETH.NEAL.JOHN	20	31	2	4	0	\N	\N	\N	3	\N	0	1
-2460	1	kglavin@bh.com	Kenneth		Glavin	5	5759045250	6405250		CN=GLAVIN.KENNETH.WAYNE.1166920953,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1166920953	GLAVIN.KENNETH.WAYNE	20	13	2	12	0	\N	\N	\N	1	\N	0	2
-2462	1	luis.f.godoy@usmc.mil	Luis		Godoy	5	9105464283	3156362		CN=GODOY.LUIS.FELIPE.1256873040,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256873040	godoylf1	7	27	3	7	0	\N	\N	\N	3	\N	0	1
-2464	1	stephen.c.golden@navy.mil	Stephen		Golden	3	2524646256			CN=GOLDEN.STEPHEN.C.1454782522,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	GOLDEN.STEPHEN.C	20	15	1	18	0	\N	\N	\N	4	\N	0	1
-2466	1	simon.gommesen@usmc.mil	Simon		Gommesen	5	9104497247			CN=GOMMESEN.SIMON.ENOCH.1412277798,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1412277798	GOMMESEN.SIMON.ENOCH	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2468	0	kristopher.gonzalez@usmc.mil	Kristopher	A	Gonzalez	\N				CN=GONZALEZ.KRISTOPHER.ALLEN.1018540084, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	gonzalez,k,a	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2470	1	randy.gonzalez@usmc.mil	Randy		Gonzalez	5	9104497252			CN=GONZALEZ.RANDY.1408065239,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1408065239	gonzalezr	5	25	3	2	0	\N	\N	\N	3	\N	0	1
-2472	1	luis.a.gracia@navy.mil	Luis		Gracia	3	9104495215			CN=GRACIA.LUIS.ANGEL.1133447772,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	GRACIA.LUIS.ANGEL	21	15	1	2	0	\N	\N	\N	3	\N	0	1
-2474	1	james.p.graham@navy.mil	James		Graham	5	9104495425			CN=GRAHAM.JAMES.P.1229441341,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229441341	GRAHAM.JAMES.P	21	10	1	2	0	\N	\N	\N	3	\N	0	1
-2476	1	kevin.graninger@usmc.mil	Kevin		Graninger	5	7607630972	3610972		CN=GRANINGER.KEVIN.MICHAEL.1268415196,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268415196	GRANINGER.KEVIN.MICHAEL	11	46	3	8	0	\N	\N	\N	3	\N	0	\N
-2478	1	cody.n.grant@usmc.mil	Cody		Grant	5	9104497367			CN=GRANT.CODY.NICHOLAS.1388577742,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1388577742	GRANT.CODY.NICHOLAS	5	54	3	2	0	\N	\N	\N	3	\N	0	1
-2480	1	aaron.gray.3@us.af.mil	Aaronq		Gray	3	1231231234			CN=GRAY.AARON.MICHAEL.1288225946,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GRAY.AARON.MICHAEL	18	17	1	77	0	\N	\N	\N	2	\N	0	\N
-2482	1	john.h.grogan.ctr@navy.mil	John		Grogan	3	2524645750			CN=GROGAN.JOHN.HENRY.III.1116589300,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116589300	GROGAN.JOHN.HENRY.III	20	15	2	18	0	\N	\N	\N	4	\N	0	\N
-2484	1	charles.grove.2@us.af.mil	Charles		Grove	5	8508841309			CN=GROVE.CHARLES.DILLON.1292504892,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292504892	GROVE.CHARLES.DILLON	6	2	3	11	0	\N	\N	\N	1	\N	0	2
-1769	1	william.brickhouse@navy.mil	William		Brickhouse	5	2524645572	456547821		CN=BRICKHOUSE.WILLIAM.D.1461688841,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2486	1	barrie.m.grubbs@boeing.com	Barrie		Grubbs	5	9104495849	8526547896		CN=GRUBBS.BARRIE.M.1201153405,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	GRUBBS.BARRIE.M	20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-2488	1	enrique.guadalajara1.ctr@navy.mil	Enrique		Guadalajara	5	3019954631			CN=GUADALAJARA.ENRIQUE.NMN.1180700664,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1180700664	GUADALAJARA.ENRIQUE.NMN	20	39	2	9	0	\N	\N	\N	4	\N	0	\N
-2490	1	wesley.guarino@usmc.mil	Wesley		Guarino	5	9104494541	7524541		CN=GUARINO.WESLEY.M.1186599949,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186599949	GUARINO.WESLEY.M	12	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3121	0	richard.harrington2@navy.mil	Richard		Harrington	4	3013429846			CN=HARRINGTON.RICHARD.A.1080286097,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		20	38	1	9	0	\N	\N	\N	4	\N	0	1
-3122	1	patrick.k.wyman@navy.mil	Patrick		Wyman	4	3017571986			CN=WYMAN.PATRICK.K.1033480705,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1033480705		20	38	1	9	0	\N	\N	\N	4	\N	0	1
-3126	1	bryan.p.hill@navy.mil	Bryan		Hill	3	2524646267			CN=HILL.BRYAN.P.1108530800,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1108530800		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-3128	1	linda.macneil@navy.mil	Linda		Macneil	4	3017570150			CN=MACNEIL.LINDA.M.1027727936,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1027727936		21	38	1	9	0	\N	\N	\N	1	\N	1	2
-3129	1	james.withers@navy.mil	James		Withers	1	2524648711	4518711		CN=WITHERS.JAMES.N.1229818054,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229818054		21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3140	1	james.w.paishon.ctr@navy.mil	James		Paishon	5	3019957694			CN=PAISHON.JAMES.WESLEY.1283619130,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283619130		20	19	2	9	0	\N	\N	\N	4	\N	0	\N
-3147	1	matthew.norton.2@us.af.mil	Matthew		Norton	1	5058535457			CN=NORTON.MATTHEW.JAMES.1374239810,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374239810		6	6	3	5	0	\N	\N	\N	1	\N	1	2
-3156	1	christopher.stamps@usmc.mil	Christopher		Stamps	5	7607630576			CN=STAMPS.CHRISTOPHER.ALLAN.1279222420,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279222420		6	46	3	8	0	\N	\N	\N	3	\N	1	1
-3159	1	robert.laliberte@usmc.mil	Robert		Laliberte	5	7607630576			CN=LALIBERTE.ROBERT.EARLE.1006756162,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1006756162		5	46	3	8	0	\N	\N	\N	3	\N	0	1
-3164	1	david.jones.78@us.af.mil	David		Jones	5	5757847040	6817040		CN=JONES.DAVID.W.JR.1244632978,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244632978		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3166	1	amonte.latimer@usmc.mil	Amonte		Latimer	5	7607631468			CN=LATIMER.AMONTE.EDWARDKERRY.1291032610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291032610		5	57	3	8	0	\N	\N	\N	3	\N	0	1
-3167	0	jonathan.joya@usmc.mil	Jonathan		Joya	5	7607253262			CN=JOYA.JONATHAN.ELIAS.1505871380,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1505871380		3	28	3	8	0	\N	\N	\N	3	\N	0	1
-3170	1	cristobal.ceron@navy.mil	Cristobal		Ceron	4	3017575951			CN=CERON.CRISTOBAL.N.1513025412,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513025412		21	38	1	9	0	\N	\N	\N	4	\N	1	1
-3172	1	robert.puett@navy.mil	Robert		Puett	3	2524649430			CN=PUETT.ROBERT.E.II.1299008343,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299008343		20	10	1	17	0	\N	\N	\N	4	\N	0	1
-3177	1	aaron.watson@navy.mil	Aaron		Watsons	1	1234567890	1233654722		abc	1065484494		4	3	2	17	0	\N	\N	\N	2	\N	0	\N
-3181	1	jeffrey.fender@usmc.mil	Jeffrey		Fender	5	8585779406			CN=FENDER.JEFFREY.SCOTT.1281421774,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281421774		5	60	3	4	0	\N	\N	\N	3	\N	1	1
-3183	1	jamie.r.jenkins@usmc.mil	Jamie		Jenkins	5	7607630529			CN=JENKINS.JAMIE.R.1055598556,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055598556		7	46	3	8	0	\N	\N	\N	3	\N	0	\N
-3184	1	samuel.n.stiles@boeing.com	Samuel		Stiles	3	6107425194			CN=Samuel Stiles,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	0	\N
-3187	1	christopher.s.mccart@usmc.mil	Christopher		Mccarthy	5	8585779406			CN=MCCARTHY.CHRISTOPHER.SEAN.1376674670,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1376674670		5	60	3	4	0	\N	\N	\N	3	\N	0	1
-3188	1	blake.shulsky@us.af.mil	Blake		Shulsky	1	8508847314	5797314		CN=SHULSKY.BLAKE.CAMERON.1266027598,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266027598		6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-3200	1	jason.a.woodard@usmc.mil	Jason		Woodard	2	7024452533	5771318		CN=WOODARD.JASON.ANTHONY.1455243277,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455243277		4	23	3	4	0	\N	\N	\N	3	\N	1	1
-3208	1	demark.l.stewart1@navy.mil	Demark		Stewart	4	2524648719			CN=STEWART.DEMARK.L.1057676490,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1057676490		21	10	1	18	0	\N	\N	\N	4	\N	1	1
-3211	1	jhoppe@bh.com	Justin		Hoppe	5	8177576690			CN=HOPPE.JUSTIN.PRESLEYWILLIAM.1279718875,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279718875		20	13	2	12	0	\N	\N	\N	1	\N	0	2
-3218	1	michael.howeth@navy.mil	Michael		Howeth	4	3017573165	7573165		CN=HOWETH.MICHAEL.D.SR.1042443715,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042443715		21	38	1	9	0	\N	\N	\N	4	\N	0	\N
-3223	1	hunter.johnson2@usmc.mil	Hunter		Johnson	5	3156363586			CN=JOHNSON.HUNTER.BURTON.1464534594,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1464534594		3	27	3	7	0	\N	\N	\N	3	\N	1	1
-3232	1	matthew.ohler@wasp.usmc.mil	Matthew		Ohler	3	9104497087			CN=OHLER.MATTHEW.SCOTT.1381714892,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381714892		5	52	3	2	0	\N	\N	\N	3	\N	0	1
-3233	1	pernell.hepbourn@usmc.mil	Pernell		Hepbourn	4	9104497087	7527087		CN=HEPBOURN.PERNELL.ANSON.JR.1257569965,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257569965		6	52	3	2	0	\N	\N	\N	3	\N	0	\N
-3234	1	wesley.pevahouse@usmc.mil	Wesley		Pevahouse	5	8585778155			CN=PEVAHOUSE.WESLEY.MILES.1381367319,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381367319		5	43	3	4	0	\N	\N	\N	3	\N	0	\N
-3237	1	ismael.andradedelgado@usmc.mil	Ismael		Andradedelgado	4	7607253262			CN=ANDRADEDELGADO.ISMAEL.1468634690,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468634690		4	28	3	8	0	\N	\N	\N	3	\N	1	1
-3239	1	brandon.l.washington@usmc.mil	Brandon		Washington	3	8585779487			CN=WASHINGTON.BRANDON.LEE.1420540864,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1420540864		5	43	3	4	0	\N	\N	\N	3	\N	1	1
-3240	1	matthew.v.le@usmc.mil	Mathew		Le	4	8585771318			CN=LE.MATHEW.VU.1464538115,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1464538115		3	23	3	4	0	\N	\N	\N	3	\N	1	1
-3242	1	jonathan.wiley@navy.mil	Jonathan		Wiley	3	2524646637			CN=WILEY.JONATHAN.A.1513102247,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513102247		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3245	1	jacob.b.lewis@usmc.mil	Jacob		Lewis	5	7607636391	3616391		CN=LEWIS.JACOB.BARTHOLOMEW.1118680290,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118680290		13	28	3	8	0	\N	\N	\N	3	\N	1	1
-3246	1	sheryl.l.hutchison@navy.mil	Sheryl		Hutchison	5	3019954282			CN=HUTCHISON.SHERYL.L.1162249238,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1162249238		20	38	1	9	0	\N	\N	\N	1	\N	1	2
-3247	1	thomas.howard@sofsa.mil	Thomas		Howard	5	8595665104			CN=HOWARD.THOMAS.H.1062806482,OU=USA,OU=PKI,OU=DoD,O=U.S. Government,C=US	1062806482		10	42	1	11	0	\N	\N	\N	1	\N	1	2
-3248	1	jason.fleming.5@us.af.mil	Jason		Fleming	1	3142387341			CN=FLEMING.JASON.ERIC.1273632480,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273632480		6	4	3	13	0	\N	\N	\N	1	\N	1	2
-3124	1	jared.byrd1@navy.mil	Jared		Byrd	4	3013428068			CN=BYRD.JARED.M.1113222170,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		21	38	1	9	0	\N	\N	\N	4	\N	0	1
-3125	1	steven.j.kretschmer2@boeing.com	Steven		Kretschmer	5	5759045234	6405234		CN=KRETSCHMER.STEVEN.J.1099978739,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1099978739		20	13	2	12	0	\N	\N	\N	1	\N	0	2
-3130	1	john.wasko.2@us.af.mil	John		Wasko	3	8508814304	6414304		CN=WASKO.JOHN.F.1266901352,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266901352		20	15	1	11	0	\N	\N	\N	4	\N	0	2
-3137	1	craig.kornely.2@us.af.mil	Craig		Kornely	4	8508812684	6412684		CN=KORNELY.CRAIG.R.1100976257,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1100976257		21	138	1	11	0	\N	\N	\N	1	\N	0	2
-3141	1	joaquin.hernandez.2@us.af.mil	Joaquin		Hernandez	5	8508813669	6413669		CN=HERNANDEZ.JOAQUIN.1233757434,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	33	2	11	0	\N	\N	\N	1	\N	1	2
-3142	1	joshua.duncan.1@us.af.mil	Joshua		Duncan	5	5757847040	6817040		CN=DUNCAN.JOSHUA.D.1144730824,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1144730824		7	3	3	12	0	\N	\N	\N	1	\N	1	2
-3143	1	alvaro.velador@usmc.mil	Alvaro		Velador	5	7607253389			CN=VELADOR.ALVARO.1461573181,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461573181		4	28	3	8	0	\N	\N	\N	3	\N	1	1
-3144	1	manuel.santiago@usmc.mil	Manuel		Santiago	3	8585776832			CN=SANTIAGO.MANUEL.S.1380711075,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380711075		20	15	1	4	0	\N	\N	\N	3	\N	0	\N
-3148	1	alex.j.ramirez@usmc.mil	Alex		Ramirez	5	8585771318			CN=RAMIREZ.ALEX.JAMES.1455992989,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455992989		5	23	3	4	0	\N	\N	\N	3	\N	1	1
-3158	1	gregory.clayson@navy.mil	Gregory		Clayson	3	2524646123			CN=CLAYSON.GREGORY.ALLEN.1017366757,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1017366757		21	15	1	18	0	\N	\N	\N	3	\N	0	1
-3173	1	garth.cook@usmc.mil	Garth		Cook	4	9104497252			CN=COOK.GARTH.JANES.1461779936,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461779936		3	25	3	2	0	\N	\N	\N	3	\N	1	1
-3175	1	robert.denecke@whmo.mil	Robert		Denecke	1	5714944803			CN=DENECKE.ROBERT.W.1277365304,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277365304		20	17	2	80	0	\N	\N	\N	3	\N	1	1
-3178	1	richard.collmann@whmo.mil	Richard		Collmann	5	5714944848			CN=COLLMANN.RICHARD.L.1201264886,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1201264886		20	17	2	80	0	\N	\N	\N	3	\N	0	1
-3180	1	rlbrewer@bh.com	Randy		Brewer	5	9104497690			CN=BREWER.RANDY.L.1056030189,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1056030189		20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-3185	1	theodore.c.jones@boeing.com	Theodore		Jones	3	6105912709			CN=Theodore.C.Jones.212937,OU=people,O=boeing,C=us	1287802451		20	9	2	6	0	\N	\N	\N	3	\N	0	\N
-3195	1	luis.a.mendoza1@usmc.mil	Luis		Mendoza	5	8082571424			CN=MENDOZA.LUIS.ANTHONY.1396422626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396422626		5	24	3	81	0	\N	\N	\N	3	\N	0	1
-3199	1	john.h.rodrigues@navy.mil	John		Rodrigues	4	6195453097			CN=RODRIGUES.JOHN.H.1231746362,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1231746362		21	14	1	6	0	\N	\N	\N	4	\N	1	1
-3210	1	brian.mays@usmc.mil	Brian		Mays	5	9104495661			CN=MAYS.BRIAN.DEE.1285995775,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1285995775		6	49	3	2	0	\N	\N	\N	3	\N	0	\N
-3227	1	thoffer@bh.com	Thomas		Hoffer	4	8173726048			CN=Thomas Hoffer,OU=Bell Helicopter\\, Textron\\, INC,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	1	1
-3228	1	tamiller@bh.com	Todd		Miller	4	8175906047		8172806048	CN=Todd Allen Miller,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	2	2	0	\N	\N	\N	3	\N	0	1
-3231	1	evan.hansen@usmc.mil	Evan		Hansen	5	8585774289			CN=HANSEN.EVAN.ALLEN.1501091940,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501091940		3	23	3	6	0	\N	\N	\N	3	\N	1	1
-3241	0	morgan.walker@boxer.usmc.mil	Morgan		Walker	5	8585778091	2678091		CN=WALKER.MORGAN.JONATHAN.1187212843,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187212843		17	48	3	4	0	\N	\N	\N	3	\N	0	1
-3249	1	mike.goncalves@usmc.mil	Mike		Goncalves	5	7607253262			CN=GONCALVES.MIKE.1460497953,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460497953		4	28	3	8	0	\N	\N	\N	3	\N	1	1
-3250	1	william.e.grantham@navy.mil	William		Grantham	2	2524647401	4517401	2524647337	CN=GRANTHAM.WILLIAM.ERWIN.1161530200,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1161530200		21	15	1	17	0	\N	\N	\N	4	\N	0	1
-3251	1	vincent.taitingfong@navy.mil	Vincent		Taitingfong	4	2524648701	1231231236		CN=TAITINGFONG.VINCENT.C.1185485095,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		20	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3252	1	victor.cruz@usmc.mil	Victor		Cruz	5	3156367656			CN=CRUZ.VICTOR.THOMAS.1276005703,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276005703		6	53	3	7	0	\N	\N	\N	3	\N	0	1
-3253	1	joseph.gaccione@us.af.mil	Joseph		Gaccione	5	9105518686	7847040		CN=GACCIONE.JOSEPH.SAVERIO.1260552585,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260552585		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3254	1	brett.mckee@rolls-royce.com	Brett		Mckee	3	8585318608	2679537		CN=MCKEE.JONATHAN.BRETT.1266933254,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266933254		20	34	2	4	0	\N	\N	\N	3	\N	0	\N
-3255	0	samuel.w.tsu@boeing.com	Samuel		Tsu	3	6105917712			CN=Samuel Tsu,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		21	9	1	9	0	\N	\N	\N	3	\N	0	1
-3256	1	brandon.newby@whmo.mil	Brandon		Newby	5	5714944730			CN=NEWBY.BRANDON.LAMONT.1250846610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250846610		7	17	3	80	0	\N	\N	\N	3	\N	0	1
-3257	1	cory.w.demuth@rolls-royce.com	Cory		Demuth	5	8582648778	2679537		CN=DEMUTH.CORY.WAYNE.1241409461,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241409461		20	34	2	4	0	\N	\N	\N	3	\N	0	\N
-3258	1	brent.culp@usmc.mil	Brent		Culp	5	9104494326			CN=CULP.BRENT.D.1146969166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1146969166		8	61	3	2	0	\N	\N	\N	3	\N	0	1
-3259	1	jimmy.a.reimert@boeing.com	Jimmy		Reimert	5	6105912452			CN=Jimmy Reimert,OU=Boeing,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	18	0	\N	\N	\N	3	\N	0	1
-3260	0	daniel.vanhoven@usmc.mil	Daniel		Vanhoven	4	9104496267			CN=VANHOVEN.DANIEL.ROBERT.1409030137,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1409030137		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-3131	1	brittany.king@navy.mil	Brittany		King	4	3013421145			CN=KING.BRITTANY.RAYMOND.1395097560,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395097560		21	38	1	9	0	\N	\N	\N	1	\N	1	1
-3132	1	bryan.bunch@navy.mil	Bryan		Bunch	3	2527208014			CN=BUNCH.BRYAN.H.1368434830,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368434830		21	15	1	18	0	\N	\N	\N	3	\N	0	\N
-3133	0	matthew.e.stevenson@navy.mil	Matthew		Stevenson	4	3017571922	7571922		CN=STEVENSON.MATTHEW.E.1167948916,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167948916		21	38	1	9	0	\N	\N	\N	4	\N	0	1
-3134	1	troy.romenesko@us.af.mil	Troy		Romenesko	5	5058535089	8535089		CN=ROMENESKO.TROY.ROBERT.1285291204,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1285291204		5	6	3	5	0	\N	\N	\N	1	\N	0	2
-3138	1	jason.l.badell@boeing.com	Jason		Badell	5	8582301973			CN=BADELL.JASON.L.1015925643,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1015925643		20	9	2	4	0	\N	\N	\N	3	\N	1	\N
-3139	1	rufus.brenneman@us.af.mil	Rufus		Brenneman	5	3142383191			CN=BRENNEMAN.RUFUS.STRONG.II.1400458533,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400458533		5	4	3	13	0	\N	\N	\N	1	\N	1	2
-3146	1	andrew.patterson@usmc.mil	Andrew		Patterson	5	2526261618			CN=PATTERSON.ANDREW.THOMAS.1275422505,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275422505		6	55	3	4	0	\N	\N	\N	3	\N	1	1
-3151	1	stephen.trochesset@us.af.mil	Stephen		Trochesset	5	5757847040	6817040		CN=TROCHESSET.STEPHEN.A.JR.1114790113,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114790113		8	3	3	12	0	\N	\N	\N	1	\N	1	2
-3152	1	neason@bh.com	Nicholas		Eason	5	8176593111			CN=EASON.NICHOLAS.ANDREW.1299543230,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	31	2	4	0	\N	\N	\N	3	\N	0	1
-3153	1	adam.shores@usmc.mil	Adam		Shores	2	8585771318			CN=SHORES.ADAM.JOSEPH.1454767574,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454767574		4	23	3	4	0	\N	\N	\N	3	\N	1	1
-3154	1	anthony.c.collins2@navy.mil	Anthony		Collins	4	3017575582			CN=COLLINS.ANTHONY.C.1240040200,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240040200		6	38	3	9	0	\N	\N	\N	3	\N	1	1
-3161	1	stalling.duenas@us.af.mil	Stalling		Duenas	5	3142384613			CN=DUENAS.STALLING.NMN.1365261420,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365261420		5	4	3	13	0	\N	\N	\N	1	\N	1	2
-3162	1	christopher.denver@usmc.mil	Christophe		Denver	5	3156363740	3156363		CN=DENVER.CHRISTOPHE.A.1270185904,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270185904		17	53	3	7	0	\N	\N	\N	3	\N	0	1
-3168	1	wonfung.lee@usmc.mil	Won Fung		Lee	3	8585779535			CN=LEE.WON.FUNG.1234320587,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234320587		21	15	1	4	0	\N	\N	\N	4	\N	0	\N
-3174	1	peter.dimartino@me.usmc.mil	Peter		Dimartino	1	8585778035	2678035		CN=DIMARTINO.PETER.J.III.1159556359,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159556359		7	47	3	4	0	\N	\N	\N	3	\N	0	\N
-3182	1	fletcher.james.ctr@navy.mil	Fletcher		James	3	9104494075			CN=JAMES.FLETCHER.LEE.1149843210,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	2	2	0	\N	\N	\N	3	\N	0	1
-3189	1	jared.drew@usmc.mil	Jared		Drew	5	9104496059			CN=DREW.JARED.LEE.1243938925,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243938925		6	49	3	2	0	\N	\N	\N	3	\N	0	1
-3191	1	max.neighbors@usmc.mil	Max		Neighbors	4	9104495643			CN=NEIGHBORS.MAX.GREGORY.1286202396,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286202396		6	44	3	2	0	\N	\N	\N	3	\N	0	1
-3193	1	jared.barrow@usmc.mil	Jared		Barrow	3	8585774298			CN=BARROW.JARED.JOSEPH.1461992451,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461992451		4	23	3	4	0	\N	\N	\N	3	\N	1	1
-3196	1	edward.m.bolish@boeing.com	Edward		Bolish	3	6105914613	4566544566		CN=Edward.M.Bolish.14213,OU=people,O=boeing,C=us	1065484494		21	9	1	17	0	\N	\N	\N	3	\N	0	\N
-3197	1	xerdan.canlas@lha6.navy.mil	Xerdan		Canlas	5	6195563897			CN=CANLAS.XERDAN.L.1265181585,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265181585		5	158	3	6	0	\N	\N	\N	4	\N	1	1
-3198	1	brandi.parker@us.af.mil	Brandi		Parker	5	8508841309			CN=PARKER.BRANDI.LEIGH.1178994138,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1178994138		6	2	3	11	0	\N	\N	\N	1	\N	0	2
-3201	0	shival.ramroop@usmc.mil	Shival		Ramroop	5	8585778143			CN=RAMROOP.SHIVAL.NICHOLAS.1255481408,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255481408		6	43	3	4	0	\N	\N	\N	3	\N	0	1
-3202	1	gabriel.s.marrow@boeing.com	Gabriel		Marrow	3	2523674895	5714944		CN=MARROW.GABRIEL.S.III.1056554935,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1056554935		20	17	2	80	0	\N	\N	\N	3	\N	0	\N
-3204	1	scot.kinnersley@usmc.mil	Scot		Kinnersley	3	8585779107			CN=KINNERSLEY.SCOT.THOMAS.1236940060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236940060		6	45	3	4	0	\N	\N	\N	3	\N	0	1
-3205	1	daniel.s.nickle@boeing.com	Daniel		Nickle	3	2524645696	4515696		CN=NICKLE.DANIEL.S.1145264797,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1145264797		20	15	2	18	0	\N	\N	\N	4	\N	1	1
-3206	1	maryjane.shofkom@navy.mil	Mary Jane		Shofkom	4	2524648744			CN=SHOFKOM.MARY JANE.1514583192,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514583192		20	15	1	18	0	\N	\N	\N	4	\N	0	1
-3207	1	brandon.s.dixon@navy.mil	Brandon		Dixon	4	2524649909	4549909		CN=DIXON.BRANDON.S.1270669324,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270669324		21	15	1	18	0	\N	\N	\N	4	\N	1	1
-3212	1	jeffrey.frost@usmc.mil	Jeffery		Frost	5	9104497228			CN=FROST.JEFFERY.BRIAN.1456145333,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456145333		3	25	3	2	0	\N	\N	\N	3	\N	0	1
-3213	1	benjamin.a.pugh@navy.mil	Benjamin		Pugh	3	9104495657			CN=PUGH.BENJAMIN.A.1516766359,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1516766359		21	10	1	17	0	\N	\N	\N	4	\N	0	\N
-3214	1	dillon.waite@navy.mil	Dillon		Waite	3	2524646248	8522587893		CN=WAITE.DILLON.M.1521216499,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3215	1	patrick.nager@navy.mil	Patrick		Nager	3	2527208016			CN=NAGER.PATRICK.MICHAEL.1511421035,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1511421035		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2492	1	edwin.gunderson@us.af.mil	Edwin		Gunderson	5	3142384596	2384596		CN=GUNDERSON.EDWIN.JAMES.1276476897,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276476897	GUNDERSON.EDWIN.JAMES	6	4	3	13	0	\N	\N	\N	1	\N	0	\N
-2494	1	sarah.gurganus@navy.mil	Sarah		Gurganus	3	2524646667			CN=GURGANUS.SARAH.C.1501755431,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GURGANUS.SARAH.C	20	10	1	18	0	\N	\N	\N	4	\N	0	1
-2496	0	william.gurkin@navy.mil	William	H	Gurkin	\N				CN=GURKIN.WILLIAM.NMN.1501190817,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	GURKIN.WILLIAM.NMN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2498	1	clifford.guthrie@navy.mil	Clifford		Guthrie	3	2524646631			CN=GUTHRIE.CLIFFORD.M.1257351382,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	GUTHRIE.CLIFFORD.M	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2500	1	johnathan.hallford@us.af.mil	Johnathan		Hallford	5	8508841313	5791313		CN=HALLFORD.JOHNATHAN.TYLER.1297925977,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1297925977	HALLFORD.JOHNATHAN.TYLER	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2502	1	david.halvorson.5.ctr@us.af.mil	David		Halvorson	5	8508812529			CN=HALVORSON.DAVID.L.1137297619,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137297619	HALVORSON.DAVID.L	21	2	2	11	0	\N	\N	\N	1	\N	0	2
-2504	1	carey.hamil@usmc.mil	Carey		Hamil	5	9104497090			CN=HAMIL.CAREY.ALLEN.1064525820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064525820	HAMIL.CAREY.ALLEN	7	52	3	2	0	\N	\N	\N	3	\N	0	\N
-2506	1	mhamilton@bh.com	Michael		Hamilton	5	9104497690			CN=HAMILTON.MICHAEL.A.1126207499,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	HAMILTON.MICHAEL.A	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2508	1	john.hamrick.3.ctr@us.af.mil	John		Hamrick	1	8502408496	6413669		CN=HAMRICK.JOHN.E.1156409339,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1156409339	HAMRICK.JOHN.E	20	33	2	11	0	\N	\N	\N	1	\N	0	\N
-2510	1	kevin.hancock.1@us.af.mil	Kevin		Hancock	3	5058535089			CN=HANCOCK.KEVIN.GENE.1272815182,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272815182	HANCOCK.KEVIN.GENE	5	6	3	5	0	\N	\N	\N	1	\N	0	2
-2512	1	thomas.haney@navy.mil	Thomas		Haney	1	2527206932			CN=HANEY.THOMAS.A.1180877602,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1180877602	HANEY.THOMAS.A	21	15	1	17	0	\N	\N	\N	4	\N	0	1
-2514	1	david.m.hanson1@usmc.mil	David		Hanson	4	9104497252			CN=HANSON.DAVID.MARK.1411137828,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411137828	HANSON.DAVID.MARK	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2516	1	lynell.hargrove@usmc.mil	Lynell		Hargrove	5	8585779400			CN=HARGROVE.LYNELL.KEVIN.1282223437,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282223437	HARGROVE.LYNELL.KEVIN	5	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2518	0	michael.d.harmon@navy.mil	Michael	D	Harmon	\N				CN=HARMON.MICHAEL.DAVID.1010869087,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	HARMON.MICHAEL.DAVID	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2520	1	alonzo.harrelson@usmc.mil	Alonzo		Harrelson	5	7607250779			CN=HARRELSON.ALONZO.EUGENE.1037188715,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1037188715	HARRELSON.ALONZO.EUGENE	5	28	3	8	0	\N	\N	\N	3	\N	0	1
-2522	1	eric.w.harris.ctr@navy.mil	Eric		Harris	1	3017571960			CN=HARRIS.ERIC.WILLIAM.1148220499,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1148220499	HARRIS.ERIC.WILLIAM	20	39	2	9	0	\N	\N	\N	3	\N	0	1
-2524	1	robin.harton@navy.mil	Robin		Harton	3	2524646182			CN=HARTON.ROBIN.K.1053084628,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	HARTON.ROBIN.K	21	15	1	18	0	\N	\N	\N	3	\N	0	1
-2526	1	michael.haskell@us.af.mil	Michael		Haskell	5	8508847659			CN=HASKELL.MICHAEL.H.1173288278,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	HASKELL.MICHAEL.H	7	8	3	4	0	\N	\N	\N	1	\N	0	2
-2528	1	christopher.hawk@us.af.mil	Christopher		Hawk	5	8508841309			CN=HAWK.CHRISTOPHER.PAUL.1362430620,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362430620	HAWK.CHRISTOPHER.PAUL	5	2	3	11	0	\N	\N	\N	1	\N	0	2
-2530	1	jhaycraft@bh.com	Jason		Haycraft	5	8176023089	6362864		CN=HAYCRAFT.JASON.LEWIS.1258088650,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	Haycraft Jason L	20	31	2	7	0	\N	\N	\N	3	\N	0	1
-2532	1	jered.healy@usmc.mil	Jered		Healy	5	6117367661	6367661		CN=HEALY.JERED.DOUGLAS.1117589559,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1117589559	HEALY.JERED.DOUGLAS	6	53	3	7	0	\N	\N	\N	3	\N	0	1
-3243	1	james.g.butchko.ctr@navy.mil	James		Butchko	4	3013420257			CN=BUTCHKO.JAMES.G.JR.1017859974,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1017859974		20	38	2	9	0	\N	\N	\N	4	\N	0	\N
-2536	1	edward.s.henderson@navy.mil	Edward		Henderson	4	3017578404	7578404		CN=HENDERSON.EDWARD.SCOTT.1019677822,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	HENDERSON.EDWARD.SCOTT	21	38	1	9	0	\N	\N	\N	4	\N	0	1
-2538	1	gordon.henjum@usmc.mil	Gordon		Henjum	5	7605833979			CN=HENJUM.GORDON.IVAN.1293412622,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293412622	HENJUM.GORDON.IVAN	6	24	3	81	0	\N	\N	\N	3	\N	0	\N
-2540	1	michael.hensley.4@us.af.mil	Michael		Hensley	5	5058466764	2466764		CN=HENSLEY.MICHAEL.J.1234645060,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234645060	HENSLEY.MICHAEL.J	7	6	3	5	0	\N	\N	\N	1	\N	0	\N
-2542	1	brandon.herbert.1@us.af.mil	Brandon		Herbert	5	3142384613			CN=HERBERT.BRANDON.ANDRE.1267101317,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267101317	HERBERT.BRANDON.ANDRE	5	4	3	13	0	\N	\N	\N	1	\N	0	\N
-2544	0	rodrigo.hernandezpol@usmc.mil	Rodrigo	A	Hernandezpolindara	\N				CN=HERNANDEZPOLINDARA.RODRIGO.ALONSO.1292949924,OU	1	HernandezPolindara,R	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2548	1	james.a.higgins@usmc.mil	James		Higgins	5	8585779406			CN=HIGGINS.JAMES.A.1250900810,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250900810	HIGGINS.JAMES.A	7	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2552	1	tai.ho@navy.mil	Tai		Ho	3	2524646114			CN=HO.TAI.D.1256891804,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256891804	HO.TAI.D	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3118	1	alex.thomason@usmc.mil	Alex		Thomason	5	7607630576			CN=THOMASON.ALEX.STEFAN.1284949095,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		6	46	3	8	0	\N	\N	\N	3	\N	0	1
-3119	1	timothy.d.gamble@boeing.com	Timothy		Gamble	5	8048788468		314-545-8183	CN=Timothy Gamble,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	31	2	7	0	\N	\N	\N	3	\N	0	1
-3120	1	william.b.ellington@usmc.mil	William		Ellington	5	0809708285	3156239		CN=ELLINGTON.WILLIAM.B.1058777249,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058777249		7	50	3	7	0	\N	\N	\N	3	\N	1	1
-2302	1	john.clayman@us.af.mil	John		Clayman	1	5058532956			CN=CLAYMAN.JOHN.WILLIAM.III.1255368679,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255368679	CLAYMAN.JOHN.WILLIAM.III	6	6	3	5	0	\N	\N	\N	1	\N	0	2
-2306	1	eddie.clemmons@navy.mil	Eddie		Clemmons	3	2524645846			CN=CLEMMONS.EDDIE.J.1386686030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1386686030	Clemmonsej	20	10	1	18	0	\N	\N	\N	3	\N	0	1
-2308	0	james.cliffe@usmc.mil	James	E	Cliffe	\N				CN=CLIFFE.JAMES.EDWARD.III.1387063010,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	cliffeje	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2310	1	caspar.cogar@usmc.mil	Caspar		Cogar	5	3092028556			CN=COGAR.CASPAR.JACEY.1456296854,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456296854	COGAR.CASPAR.JACEY	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2312	1	michael.coker@wasp.usmc.mil	Michael		Coker	5	9104495849			CN=COKER.MICHAEL.R.1059711900,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1059711900	COKER.MICHAEL.R	20	32	2	2	0	\N	\N	\N	3	\N	0	1
-2314	1	raymond.r.cole@usmc.mil	Raymond		Cole	5	9104495126			CN=COLE.RAYMOND.ROYCE.1276757764,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276757764	COLE.RAYMOND.ROYCE	6	58	3	2	0	\N	\N	\N	3	\N	0	1
-2316	1	todd.cook@navy.mil	Todd		Cook	3	2524646165			CN=COOK.TODD.J.1230207174,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230207174	COOK.TODD.J	20	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2318	1	james.coons@usmc.mil	James		Coons	5	9104495160			CN=COONS.JAMES.LEVI.IV.1119361946,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1119361946	COONS.JAMES.LEVI.IV	7	51	3	2	0	\N	\N	\N	3	\N	0	1
-2320	1	mihai.g.cosarca@boeing.com	Mihai		Cosarca	5	5058460252	2460252		CN=COSARCA.MIHAI.GABRIEL.1274133364,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1274133364	COSARCA.MIHAI.GABRIEL	20	20	2	5	0	\N	\N	\N	1	\N	0	2
-2322	1	roger.counts@navy.mil	Roger		Counts	3	2524647814	4517814		CN=COUNTS.ROGER.D.JR.1229693626,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229693626	COUNTS.ROGER.D.JR	21	15	1	18	0	\N	\N	\N	4	\N	0	1
-2324	1	barry.courie@navy.mil	Barry		Courie	3	9104495213			CN=COURIE.BARRY.R.1229760790,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229818054	COURIE.BARRY.R	21	15	1	2	0	\N	\N	\N	3	\N	0	1
-2326	1	michael.cowan@usmc.mil	Michael		Cowan	5	9104496953			CN=COWAN.MICHAEL.ANDREW.1296825090,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1296825090	COWAN.MICHAEL.ANDREW	6	51	3	2	0	\N	\N	\N	3	\N	0	1
-2328	1	edmond.cox@usmc.mil	Edmond		Cox	5	7574447818			CN=COX.EDMOND.PAUL.II.1299738112,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299738112	COX.EDMOND.PAUL.II	6	149	3	79	0	\N	\N	\N	3	\N	0	\N
-2330	0	eric.crespo@usmc.mil	Eric	N	Crespo	\N				CN=CRESPO.ERIC.NICHOLAS.1295281630, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	CRESPOEN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2332	1	paul.croom@navy.mil	Paul		Croom	3	2524645665	4515665		CN=CROOM.PAUL.H.1229985783,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229985783	CROOM.PAUL.H	21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-2334	1	forest.cunningham@whmo.mil	Forest		Cunningham	5	5714944729			CN=CUNNINGHAM.FOREST.J.1253120947,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253120947	CUNNINGHAM.FOREST.J	7	17	3	80	0	\N	\N	\N	3	\N	0	\N
-2336	1	jason.darrow@whmo.mil	Jason		Darrow	5	5714944736			CN=DARROW.JASON.W.1065583026,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	DARROW.JASON.W	8	17	3	80	0	\N	\N	\N	3	\N	0	\N
-2338	1	james.d.davenport@usmc.mil	James		Davenport	5	3156361174			CN=DAVENPORT.JAMES.D.1059336858,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1059336858	DAVENPORT.JAMES.D	8	27	3	7	0	\N	\N	\N	3	\N	0	1
-2340	0	william.dean@usmc.mil	William	H	Dean	\N				CN=DEAN.WILLIAM.H.1167478995,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DEAN.WILLIAM.H	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2342	1	adam.decker.2.ctr@us.af.mil	Adam		Decker	3	8508812503	6412503		CN=DECKER.ADAM.L.1077015740,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	DECKER.ADAM.L	20	15	2	11	0	\N	\N	\N	1	\N	0	2
-2344	1	keith.decker.ctr@navy.mil	Keith		Decker	5	3017572020			CN=DECKER.KEITH.A.1045531291,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1045531291	DECKER.KEITH.A	20	39	2	9	0	\N	\N	\N	3	\N	0	\N
-2348	1	randal.degrave@us.af.mil	Randal		Degrave	5	3142384613	3142384		CN=DEGRAVE.RANDAL.NEAL.JR.1381755220,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381755220	DEGRAVE.RANDAL.NEAL.JR	5	4	3	13	0	\N	\N	\N	1	\N	0	2
-2350	1	walter.dehaan@usmc.mil	Walter		Dehaan	5	9104497367	7527367		CN=DEHAAN.WALTER.ALLEN.1254285583,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254285583	DEHAAN.WALTER.ALLEN	7	54	3	2	0	\N	\N	\N	3	\N	0	1
-2352	1	michael.demars@usmc.mil	Michael		Demars	1	9104497376	7228011		CN=DEMARS.MICHAEL.JOSEPH.1283462230,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283462230	DEMARS.MICHAEL.JOSEPH	11	54	3	2	0	\N	\N	\N	3	\N	0	\N
-2354	1	rose.denbleyker@usmc.mil	Rose		Denbleyker	3	8585778349			CN=DENBLEYKER.ROSE.VICTORIA.1395330345,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395330345	DENBLEYKER.ROSE.VICTORIA	21	15	1	4	0	\N	\N	\N	3	\N	0	1
-2356	0	ryan.dibble@whmo.mil	Ryan	C	Dibble	\N				CN=DIBBLE.RYAN.CHRISTOPHER.1266320694,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DIBBLE.RYAN.CHRISTOPHER	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2358	1	walker.dillenbeck@usmc.mil	Walker		Dillenbeck	5	8585779400			CN=DILLENBECK.WALKER.JARRED.1454460622,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454460622	DILLENBECK.WALKER.JARRED	5	60	3	4	0	\N	\N	\N	3	\N	0	\N
-2360	0	james.dodson@navy.mil	James	L	Dodson	\N				CN=DODSON.JAMES.LEONARD.1122247453, OU=USN, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	Dodson,James L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2362	0	phillip.downey.1@us.af.mil	Phillip	E	Downey Ii	\N				CN=DOWNEY.PHILLIP.ERIC.II.1072326500,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DOWNEY.PHILLIP.ERIC.II	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2364	1	shawn.drake.3@us.af.mil	Shawn		Drake	4	2106529543	487954333		CN=DRAKE.SHAWN.G.1082896933,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	DRAKE.SHAWN.G	7	8	3	5	0	\N	\N	\N	1	\N	0	\N
-2368	0	mitchell.duffy@usmc.mil	Mitchell	R	Duffy	\N				CN=DUFFY.MITCHELL.RYAN.1392591385,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DUFFY.MITCHELL.RYAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2370	1	daniel.duggan.1@us.af.mil	Daniel		Duggan	3	8508847104	5797104		CN=DUGGAN.DANIEL.A.1247703280,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1247703280	DUGGAN.DANIEL.A	6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2372	1	michael.dumestre@us.af.mil	Michael		Dumestre	5	3142384613	2384613		CN=DUMESTRE.MICHAEL.EDMOND.1121636600,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1121636600	DUMESTRE.MICHAEL.EDMOND	5	4	3	13	0	\N	\N	\N	1	\N	0	2
-2374	1	joshua.durnell@usmc.mil	Joshua		Durnell	3	7607631468			CN=DURNELL.JOSHUA.STEVEN.1256242105,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256242105	DURNELL.JOSHUA.STEVEN	7	57	3	8	0	\N	\N	\N	3	\N	0	\N
-2376	1	andrew.p.dyke@navy.mil	Andrew		Dyke	3	9105452464			CN=DYKE.ANDREW.P.1118364992,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118364992	DYKE.ANDREW.P	21	35	1	3	0	\N	\N	\N	3	\N	0	\N
-2380	1	donny.j.east@boeing.com	Donny		East	5	5058538062	2638062		CN=EAST.DONNY.JEROME.1186078523,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186078523	EAST.DONNY.JEROME	20	20	2	5	0	\N	\N	\N	1	\N	0	\N
-2382	1	mark.eastmead@me.usmc.mil	Mark		Eastmead	5	8585774132			CN=EASTMEAD.MARK.ALLEN.JR.1105983251,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1105983251	EASTMEADMA	7	56	3	4	0	\N	\N	\N	3	\N	0	\N
-2384	1	william.eatmon.2@us.af.mil	William		Eatmon	5	5058465067	2465067		CN=EATMON.WILLIAM.S.1133312290,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133312290	EATMON.WILLIAM.S	20	6	1	5	0	\N	\N	\N	1	\N	0	\N
-2388	1	john.engvik@wasp.usmc.mil	John		Engvik	5	9014497090			CN=ENGVIK.JOHN.ANDREW.1292289592,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292289592	ENGVIK.JOHN.ANDREW	6	52	3	2	0	\N	\N	\N	3	\N	0	1
-2390	1	jose.j.escarcega2@boeing.com	Jose		Escarcega	5	5058460315	2460315		CN=ESCARCEGA.JOSE.J.1156718382,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1156718382	ESCARCEGA.JOSE.J	20	20	2	5	0	\N	\N	\N	1	\N	0	2
-2392	1	juandiego.escobedo@usmc.mil	Juandiego		Escobedo	5	3156363509			CN=ESCOBEDO.JUANDIEGO.CRUZ.1384366470,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384366470	escobedojc	5	27	3	7	0	\N	\N	\N	3	\N	0	\N
-2394	1	richard.a.evans3.ctr@navy.mil	Richard		Evans	5	3017570078			CN=EVANS.RICHARD.ALLEN.1267382995,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267382995	EVANS.RICHARD.ALLEN	21	39	2	9	0	\N	\N	\N	4	\N	0	1
-2396	1	robert.evans1@usmc.mil	Robert		Evans	5	8082571191			CN=EVANS.ROBERT.ALAN.1250902626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250902626	EVANS.ROBERT.ALAN	7	24	3	81	0	\N	\N	\N	3	\N	0	\N
-2398	1	todd.l.farrand@boeing.com	Todd		Farrand	5	4256159739			CN=FARRAND.TODD.L.1094805216,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	FARRAND.TODD.L	20	31	2	7	0	\N	\N	\N	3	\N	0	\N
-2400	1	chad.fields@us.af.mil	Chad		Fields	3	8508813612	6413612		CN=FIELDS.CHAD.EVERETT.1127984774,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1127984774	FIELDS.CHAD.EVERETT	6	2	3	11	0	\N	\N	\N	1	\N	0	\N
-2402	0	michael.fincik@usmc.mil	Michael	A	Fincik	\N				CN=FINCIK.MICHAEL.ALAN.1454201503,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FINCIK.MICHAEL.ALAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2404	0	matthew.e.fish@usmc.mil	Matthew	E	Fish	\N				CN=FISH.MATTHEW.E.1254614382,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FISH.MATTHEW.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2406	1	randal.fitzgerald@usmc.mil	Randal		Fitzgerald	5	7607258076			CN=FITZGERALD.RANDAL.SCOTT.1257450186,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257450186	FITZGERALD.RANDAL.SCOTT	6	28	3	8	0	\N	\N	\N	3	\N	0	\N
-2408	1	daniel.k.flaherty@usmc.mil	Daniel		Flaherty	5	8064970775	6367658		CN=FLAHERTY.DANIEL.KEVIN.JR.1362566181,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362566181	FLAHERTY.DANIEL.KEVIN.JR	5	53	3	7	0	\N	\N	\N	3	\N	0	\N
-2410	1	anthony.fontanetta@usmc.mil	Anthony		Fontanetta	4	9104497252			CN=FONTANETTA.ANTHONY.CONRAD.1455839269,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455839269	FONTANETTA.ANTHONY.CONRAD	4	25	3	2	0	\N	\N	\N	3	\N	0	1
-2412	0	brandon.ford.9@us.af.mil	Brandon	M	Ford	\N				CN=FORD.BRANDON.MICHAEL.1365721617,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FORD.BRANDON.MICHAEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-2414	1	thomas.forney@usmc.mil	Thomas		Forney	5	8585774132			CN=FORNEY.THOMAS.CHARLES.1032775000,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1032775000	FORNEY.THOMAS.CHARLES	5	56	3	4	0	\N	\N	\N	3	\N	0	\N
-2416	1	dencil.foster@navy.mil	Paul		Foster	3	2524645618			CN=FOSTER.DENCIL.PAUL.1246896514,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246896514	fosterdp	20	15	1	18	0	\N	\N	\N	4	\N	0	1
-2418	1	heath.foster@usmc.mil	Heath		Foster	5	3156362583			CN=FOSTER.HEATH.ELLIOT.1132448236,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132448236	FOSTER.HEATH.ELLIOT	7	27	3	7	0	\N	\N	\N	3	\N	0	1
-2420	1	jonathan.foster@navy.mil	Jonathan		Foster	3	2524645642			CN=FOSTER.JONATHAN.R.1505512991,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1505512991	FOSTER.JONATHAN.R	21	10	1	18	0	\N	\N	\N	4	\N	0	1
-2422	1	mathew.foster@us.af.mil	Mathew		Foster	3	5759046031			CN=FOSTER.MATHEW.GREG.1256388509,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256388509	fostermg	6	3	3	12	0	\N	\N	\N	1	\N	0	2
-1768	1	lori.birchfield@navy.mil	Lori		Birchfield	5	2522692150	123123123		CN=BIRCHFIELD.LORI.A.1051055540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-2006	1	lawrinda.stone@navy.mil	Lawrinda		Stone	3	2524648770			CN=STONE.LAWRINDA.M.1230678274,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	15	1	18	0	\N	\N	\N	3	\N	0	1
-2065	1	jchmartin@bh.com	Joseph		Martin	5	8508812651			CN=MARTIN.JOSEPH.CURT.1130630924,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1130630924		20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2066	1	ronald.d.page@boeing.com	Ronald		Page	5	8508812645	6412645		CN=PAGE.RONALD.D.1170990079,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	16	2	11	0	\N	\N	\N	1	\N	0	2
-2426	1	william.j.frazier@usmc.mil	William		Frazier	5	9104497127			CN=FRAZIER.WILLIAM.JAMES.1385724485,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1385724485	FRAZIER.WILLIAM.JAMES	15	49	3	2	0	\N	\N	\N	3	\N	0	1
-2428	1	brian.freeman@usmc.mil	Brian		Freeman	5	9102651561			CN=FREEMAN.BRIAN.SHAWN.1186089118,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186089118	FREEMAN.BRIAN.SHAWN	7	49	3	77	0	\N	\N	\N	3	\N	0	1
-2430	0	william.friend@usmc.mil	William	A	Friend	\N				CN=FRIEND.WILLIAM.ALLAN.1266873243, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	friendwa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	0	\N
-3512	1	liann.karni@usmc.mil	Liann		Karni	5	8585778155			CN=KARNI.LIANN.1411524791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411524791		5	43	3	4	0	\N	\N	\N	3	\N	1	\N
-3321	1	stephanie.dunks@usmc.mil	Stephanie		Dunks	4	9104497252			CN=DUNKS.STEPHANIE.MELIN.1407332810,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1407332810		5	25	3	2	0	\N	\N	\N	3	\N	0	1
-3275	1	xuewen.yin@usmc.mil	Xuewen		Yin	5	8585774289			CN=YIN.XUEWEN.1460937430,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460937430		4	23	3	4	0	\N	\N	\N	3	\N	1	1
-3277	1	christian.b.tocatlian@boeing.com	Christian		Tocatlian	5	6105916086			CN=Christian Tocatlian,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	9	0	\N	\N	\N	3	\N	0	\N
-3280	1	roderick.marcum@rolls-royce.com	Roderick		Marcum	5	9104495212			CN=MARCUM.RODERICK.DEAN.1084123877,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1084123877		20	32	2	2	0	\N	\N	\N	3	\N	0	\N
-3285	1	robert.graf.1.ctr@us.af.mil	Robert		Graf	5	5058534650	8634650		CN=GRAF.ROBERT.W.1021390271,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	6	2	5	0	\N	\N	\N	1	\N	1	2
-3289	1	james.m.gawne@rolls-royce.com	James		Gawne	3	3172306238			CN=James Gawne,OU=Rolls-Royce Corporation,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	34	2	18	0	\N	\N	\N	3	\N	0	\N
-3290	1	christopher.hazel@navy.mil	Christopher		Hazel	3	2524646193	4516193		CN=HAZEL.CHRISTOPHER.J.1503481797,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503481797		20	10	1	17	0	\N	\N	\N	4	\N	0	\N
-3291	1	lauren.vachio@usmc.mil	Lauren		Vachio	5	9104497245			CN=VACHIO.LAUREN.ALISON.1463451750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463451750		4	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3313	1	gregory.atchley@usmc.mil	Gregory		Atchleymartin	5	8082570084			CN=ATCHLEYMARTIN.GREGORY.MICHAEL.1454923584,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454923584		5	24	3	81	0	\N	\N	\N	3	\N	1	1
-3350	1	daniel.whalen@navy.mil	Daniel		Whalen	3	2524646288			CN=WHALEN.DANIEL.JAY.1523353914,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523353914		20	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3364	1	robert.pike.11@us.af.mil	Robert		Pike	4	8508814312	6414312		CN=PIKE.ROBERT.L.1170175782,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1170175782		20	15	1	11	0	\N	\N	\N	4	\N	0	2
-3377	1	ryan.schuster@navy.mil	Ryan		Schuster	3	2527208013			CN=SCHUSTER.RYAN.D.1521678506,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1521678506		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3382	1	winhou.chow@navy.mil	Win-Hou		Chow	3	2524646156			CN=CHOW.WIN-HOU.T.1516739009,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1516739009		20	10	1	17	0	\N	\N	\N	4	\N	0	\N
-3390	1	patrick.hoagland.1@us.af.mil	Patrick		Hoagland	4	5058531155	2431155		CN=HOAGLAND.PATRICK.EDWARD.1289528080,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1289528080		20	6	1	5	0	\N	\N	\N	1	\N	1	2
-3410	1	isa.merkt@navy.mil	Isa		Merkt	3	2524646717			CN=MERKT.ISA.E C.1514174730,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514174730		21	15	1	17	0	\N	\N	\N	4	\N	0	1
-3419	1	jacob.eddleman@usmc.mil	Jacob		Eddleman	5	8585774298			CN=EDDLEMAN.JACOB.RAY.1399692888,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399692888		5	23	3	4	0	\N	\N	\N	3	\N	0	1
-3460	1	matthew.h.bruce@navy.mil	Matthew		Bruce	3	2524646173			CN=BRUCE.MATTHEW.H.1527682467,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1527682467		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-3466	1	cody.c.cook@usmc.mil	Cody		Cook	5	8585774298	5774298		CN=COOK.CODY.CHRISTOPHER.1502417629,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502417629		3	23	3	4	0	\N	\N	\N	3	\N	1	1
-3483	1	philip.hindson@me.usmc.mil	Philip		Hindson	5	8585778044	3455286		CN=HINDSON.PHILIP.DALE.1299744970,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299744970		5	47	3	4	0	\N	\N	\N	3	\N	0	\N
-3486	1	michael.holzheimer@us.af.mil	Michael		Holzheimer	5	5058535089			CN=HOLZHEIMER.MICHAEL.ROBERT.1290767209,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290767209		5	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3496	1	auraya.calcote.ctr@us.af.mil	Auraya		Calcote	3	8508813105	6413105		CN=CALCOTE.AURAYA.1534032060,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	15	2	11	0	\N	\N	\N	1	\N	0	\N
-3502	1	arthur.douglas@navy.mil	Arthur		Douglas	4	2527206935	590693522		CN=DOUGLAS.ARTHUR.S.1140116170,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3504	0	shawn.bryant@usmc.mil	Shawn		Bryant	5	8585778090	2678090		CN=BRYANT.SHAWN.M.1243937350,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243937350		11	48	3	4	0	\N	\N	\N	3	\N	0	\N
-3516	1	michael.d.jones2@usmc.mil	Michael		Jones	5	8503464744	6367657		CN=JONES.MICHAEL.DAVID.1298995820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298995820		5	53	3	7	0	\N	\N	\N	3	\N	1	\N
-3517	1	richard.go@usmc.mil	Richard		Go	5	8585778105			CN=GO.RICHARD.SOTTO.1239092183,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239092183		7	48	3	4	0	\N	\N	\N	3	\N	1	\N
-3518	1	bradley.oneill@us.af.mil	Bradley		Oneill	5	5757840919			CN=ONEILL.BRADLEY.M.1020630031,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020630031		6	3	3	12	0	\N	\N	\N	1	\N	1	\N
-3522	1	jose.ramos1@usmc.mil	Jose		Ramos	3	8585779472			CN=RAMOS.JOSE.OCTAVIO.1018706209,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018706209		20	10	1	4	0	\N	\N	\N	3	\N	0	\N
-3524	1	bradford.yazzie@us.af.mil	Bradford		Yazzie	5	5058535089			CN=YAZZIE.BRADFORD.RYAN.1292988091,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292988091		5	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3525	1	charles.beltram@usmc.mil	Charles		Beltram	3	7607631487			CN=BELTRAM.CHARLES.AARON.II.1246365705,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246365705		7	57	3	8	0	\N	\N	\N	3	\N	1	\N
-3528	1	timothy.stumpf@us.af.mil	Timothy		Stumpf	5	3122381862			CN=STUMPF.TIMOTHY.GEORGE.1252608911,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252608911		7	4	3	13	0	\N	\N	\N	1	\N	1	\N
-3530	1	howard.pinnell@navy.mil	Howard		Pinnell	4	3017575186			CN=PINNELL.HOWARD.PERRY.1051795578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051795578		21	38	1	9	0	\N	\N	\N	4	\N	1	\N
-3535	1	christopher.stinnett@usmc.mil	Christopher		Stinnett	5	6109555149			CN=STINNETT.CHRISTOPHER.LOREN.1265628873,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265628873		7	55	3	81	0	\N	\N	\N	3	\N	1	\N
-3536	1	james.dodson@navy.mil	James		Dodson	4	3013427483			CN=DODSON.JAMES.LEONARD.1122247453,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1122247453		21	38	1	9	0	\N	\N	\N	4	\N	1	\N
-3537	1	brandon.mick@usmc.mil	Brandon		Mick	5	8082573562			CN=MICK.BRANDON.JAMES.1174363842,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1174363842		6	55	3	81	0	\N	\N	\N	3	\N	1	\N
-3538	1	jeremy.shedlock@usmc.mil	Jeremy		Shedlock	5	8585779400			CN=SHEDLOCK.JEREMY.DENNIS.1454456153,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454456153		5	60	3	4	0	\N	\N	\N	3	\N	0	\N
-3279	1	david.rupp@usmc.mil	David		Rupp	5	9104497374	7527374		CN=RUPP.DAVID.CHARLES.1036552197,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1036552197		8	54	3	2	0	\N	\N	\N	3	\N	0	\N
-3283	1	teodoro.luna@usmc.mil	Teodoro		Luna	5	9282696873			CN=LUNA.TEODORO.III.1265180554,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265180554		6	62	3	4	0	\N	\N	\N	3	\N	0	1
-3294	1	michael.a.mitchell@navy.mil	Michael		Mitchell	4	2524648744	2524518		CN=MITCHELL.MICHAEL.A.JR.1275574836,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275574836		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-3296	1	jerusha.kaapa@us.af.mil	Jerusha		Kaapa	5	5058533490			CN=KAAPA.JERUSHA.EMALANI LUAIPOU.1179193015,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1179193015		6	6	3	5	0	\N	\N	\N	1	\N	0	\N
-3300	1	carl.decker@usmc.mil	Carl		Decker	5	9104495971			CN=DECKER.CARL.ALBERT.JR.1080103405,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1080103405		7	51	3	2	0	\N	\N	\N	3	\N	0	1
-3303	1	christopher.battiest@usmc.mil	Christophe		Battiest	5	7607630576			CN=BATTIEST.CHRISTOPHE.M.1144405346,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1144405346		7	46	3	8	0	\N	\N	\N	3	\N	0	1
-3304	1	cliff.champ@usmc.mil	Cliff		Champ	5	7607631468			CN=CHAMP.CLIFF.HENRY.1293829248,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293829248		6	57	3	8	0	\N	\N	\N	3	\N	0	\N
-3319	1	timothy.lopez@usmc.mil	Timothy		Lopez	5	8082570100			CN=LOPEZ.TIMOTHY.1234071498,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234071498		6	24	3	81	0	\N	\N	\N	4	\N	1	1
-3323	1	adrian.almanza@usmc.mil	Adrian		Almanza	5	9093467728			CN=ALMANZA.ADRIAN.1462829848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462829848		4	27	3	7	0	\N	\N	\N	3	\N	0	\N
-3325	1	john.whelton@usmc.mil	John		Whelton	5	3156363344	6363344		CN=WHELTON.JOHN.JOSEPH.1465174559,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465174559		4	27	3	7	0	\N	\N	\N	3	\N	0	1
-3328	1	luis.correa.4@us.af.mil	Luis		Correa	5	5053589695			CN=CORREA.LUIS.FERNANDO.1374252891,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	1	2
-3329	1	john.recio@usmc.mil	John		Recio	5	6613438860	6362763		CN=RECIO.JOHN.PAUL.1405128396,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128396		5	27	3	7	0	\N	\N	\N	3	\N	0	1
-3331	1	joshua.barefoot@navy.mil	Joshua		Barefoot	3	2524646189	4516189		CN=BAREFOOT.JOSHUA.H.1454667502,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454667502		21	15	1	18	0	\N	\N	\N	4	\N	0	1
-3339	1	emmanuel.gaffud1@navy.mil	Emmanuel		Gaffud	3	3017571159			CN=GAFFUD.EMMANUEL.AMADA.1172246113,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1172246113		21	38	1	9	0	\N	\N	\N	4	\N	0	2
-3375	1	david.jones@usmc.mil	David		Jones	5	8082570084			CN=JONES.DAVID.MATTHEW.1020739408,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020739408		6	24	3	18	0	\N	\N	\N	3	\N	1	1
-3391	1	earl.clowers@navy.mil	E		Clowers	3	2524646202			CN=CLOWERS.E.ROGER.1229860190,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229860190		20	10	1	18	0	\N	\N	\N	4	\N	1	1
-3394	1	joseph.parvin@usmc.mil	Joseph		Parvin	5	9104496419			CN=PARVIN.JOSEPH.MICHAEL.1286657105,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286657105		6	49	3	2	0	\N	\N	\N	3	\N	1	1
-3397	1	nkosi.leary@yahoo.com	Nkosi		Leary	5	8082575025	4575025	8082575491	CN=LEARY.NKOSI.AMAN.1172350654,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1172350654		8	24	3	81	0	\N	\N	\N	3	\N	1	1
-3407	1	charles.coleman@usmc.mil	Charles		Coleman	5	9104497368			CN=COLEMAN.CHARLES.LEE.1406551128,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1406551128		5	54	3	2	0	\N	\N	\N	3	\N	0	1
-3413	1	wyatt.dodge@usmc.mil	Wyatt		Dodge	5	8082571424			CN=DODGE.WYATT.AUSTYN.1510388620,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1510388620		3	23	3	81	0	\N	\N	\N	4	\N	1	1
-3415	1	katherine.cunningham.3.ctr@us.af.mil	Katherine		Cunningham	4	6182566351			CN=CUNNINGHAM.KATHERINE.S.1007236278,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007236278		20	9	2	11	0	\N	\N	\N	1	\N	1	2
-3428	1	antonio.benitez1@usmc.mil	Antonio		Benitez	3	3156362583	3156362		CN=BENITEZ.ANTONIO.1282984691,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282984691		7	27	3	7	0	\N	\N	\N	3	\N	0	1
-3431	1	daniel.bock@us.af.mil	Daniel		Bock	5	8508815007			CN=BOCK.DANIEL.STEWART.1042849010,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042849010		5	2	3	11	0	\N	\N	\N	1	\N	0	\N
-3432	1	rupert.m.mighty@usmc.mil	Rupert		Mighty	5	7607258087			CN=MIGHTY.RUPERT.MAURICECLAY.1500469788,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1500469788		4	28	3	8	0	\N	\N	\N	3	\N	1	2
-3435	1	brian.cauguiran@navy.mil	Brian		Cauguiranevans	5	8157628450			CN=CAUGUIRANEVANS.BRIAN.JAMES.1367582460,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367582460		5	24	3	81	0	\N	\N	\N	4	\N	1	1
-3449	1	nicholas.cox.1@us.af.mil	Nicholas		Cox	5	8508841309	5791309		CN=COX.NICHOLAS.S.1233857889,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233857889		6	2	3	11	0	\N	\N	\N	1	\N	1	2
-3500	1	richard.mccoy@usmc.mil	Richard		Mccoy	5	9702346732	6362896		CN=MCCOY.RICHARD.ALEXANDER.1410315714,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410315714		5	53	3	7	0	\N	\N	\N	3	\N	1	\N
-3510	1	thomas.gaskell.2.ctr@us.af.mil	Thomas		Gaskell	5	3142384396	2384396		CN=GASKELL.THOMAS.P.1093078221,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	21	2	13	0	\N	\N	\N	1	\N	1	\N
-3511	1	eric.crespo@usmc.mil	Eric		Crespo	3	9104494794	9104494		CN=CRESPO.ERIC.NICHOLAS.1295281630,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295281630		6	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3527	1	calieb.prunty@usmc.mil	Calieb		Prunty	3	7607253262			CN=PRUNTY.CALIEB.LEROY.1465177779,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465177779		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
-25	\N	claire.metcalfe@all.com	Claire	N	Metcalfe	\N	1115551212	\N	\N	CN=METCALFE.CLAIR.N.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:40:38.362506	\N	\N	\N	\N	1	\N
-3529	1	joseph.alarcon@us.af.mil	Joseph		Alarcon	3	5058533497	2533497		CN=ALARCON.JOSEPH.E.1137307177,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137307177		8	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3534	1	david.e.carlson@navy.mil	David		Carlson	3	7323231805			CN=CARLSON.DAVID.E.1228939338,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1228939338		21	35	1	3	0	\N	\N	\N	3	\N	1	\N
-3539	1	dustin.g.jones@usmc.mil	Dustin		Jones	5	9282696874			CN=JONES.DUSTIN.GENE.1365911734,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365911734		5	62	3	2	0	\N	\N	\N	3	\N	0	\N
-3540	1	edmond.e.madden@usmc.mil	Edmond		Madden	5	9282696874			CN=MADDEN.EDMOND.EARL.1282243179,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282243179		6	62	3	2	0	\N	\N	\N	3	\N	0	\N
-3267	1	frank.a.mazza@boeing.com	Frank		Mazza	3	6107428861			CN=Frank Mazza,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	2	17	0	\N	\N	\N	3	\N	0	1
-3278	1	charles.yetman@navy.mil	Charles		Yetman	4	6197674603			CN=YETMAN.CHARLES.F.1258522857,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258522857		20	38	1	6	0	\N	\N	\N	4	\N	1	1
-3286	1	cablair@bh.com	Cory		Blair	4	8172808249			CN=Cory Blair,OU=Bell Helicopter Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	0	1
-3288	1	christopher.scism@us.af.mil	Christopher		Scism	5	3142384613			CN=SCISM.CHRISTOPHER.J.1298384759,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298384759		5	4	3	13	0	\N	\N	\N	1	\N	1	2
-3301	1	john.detwiler@usmc.mil	John		Detwiler	5	9104497376			CN=DETWILER.JOHN.RICHARD.1245754597,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1245754597		7	54	3	2	0	\N	\N	\N	3	\N	1	1
-3302	1	douglas.friedlund@us.af.mil	Douglas		Friedlund	5	5757846516	6816516		CN=FRIEDLUND.DOUGLAS.PALMER.1266361749,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266361749		7	3	3	12	0	\N	\N	\N	1	\N	0	\N
-3305	1	joshua.collins@usmc.mil	Joshua		Collins	5	7607631058			CN=COLLINS.JOSHUA.LEE.1462830056,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462830056		4	28	3	8	0	\N	\N	\N	3	\N	1	1
-3306	1	widler@bh.com	Werner		Idler	3	8172807681			CN=Werner Idler,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	0	1
-3320	0	patrick.cowden@usmc.mil	Patrick		Cowden	5	3156363344			CN=COWDEN.PATRICK.HERBERT.III.1455396723,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455396723		5	27	3	7	0	\N	\N	\N	3	\N	0	1
-3327	1	alexander.sasseen@usmc.mil	Alexander		Sasseen	5	7607254754			CN=SASSEEN.ALEXANDER.GILLESPIE.1142034049,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1142034049		4	28	3	8	0	\N	\N	\N	3	\N	1	1
-3333	1	pedro.r.hernandez@usmc.mil	Pedro		Hernandez	5	3156363977	3153977		CN=HERNANDEZ.PEDRO.RAFAEL.1133107645,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133107645		8	53	3	7	0	\N	\N	\N	3	\N	0	1
-3337	1	ksem@bh.com	Karen		Sem	3	8172807880			CN=Karen Sem,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	18	0	\N	\N	\N	3	\N	0	1
-3343	1	mickenzi.schank@navy.mil	Mickenzi		Schank	3	2524646179			CN=SCHANK.MICKENZI.V.1523584894,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523584894		21	10	1	18	0	\N	\N	\N	4	\N	1	1
-3349	1	jordan.stringfellow@navy.mil	Jordan		Stringfellow	3	2524646158			CN=STRINGFELLOW.JORDAN.BAYNE.1523355445,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523355445		20	10	1	18	0	\N	\N	\N	4	\N	1	2
-3354	1	xavier.collier@navy.mil	Xavier		Collier	3	2524646481			CN=COLLIER.XAVIER.E.1114468793,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114468793		20	10	1	18	0	\N	\N	\N	4	\N	1	1
-3357	1	kidd.hu@usmc.mil	Kidd		Hu	4	9104496267	4496267		CN=HU.KIDD.KT.1469932466,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469932466		4	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3363	1	riaan.coetsee@navy.mil	Riaan		Coetsee	3	2524646654			CN=COETSEE.RIAAN.1522893982,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1522893982		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-3372	1	mhaugan@bh.com	Michael		Michael Haugan	3	8175010519			CN=Michael Haugan,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	0	1
-3388	1	heather.pesante.ctr@navy.mil	Heather		Pesante	4	3019952893			CN=PESANTE.HEATHER.LYNN.1260646814,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260646814		20	38	2	9	0	\N	\N	\N	4	\N	1	1
-3393	0	bryce.cartrette@usmc.mil	Bryce		Cartrette	5	9105154403			CN=CARTRETTE.BRYCE.WAYNE.1287678629,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287678629		6	24	3	81	0	\N	\N	\N	4	\N	0	1
-3396	1	tyler.s.martin1@navy.mil	Tyler		Martin	3	2524646653			CN=MARTIN.TYLER.SETH.1525518384,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518384		21	10	1	18	0	\N	\N	\N	4	\N	0	1
-3403	1	joshua.j.pannell@navy.mil	Joshua		Pannell	3	2524646231			CN=PANNELL.JOSHUA.JAMES.1525518368,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518368		21	15	1	17	0	\N	\N	\N	4	\N	0	\N
-3404	1	mathew.clifford@us.af.mil	Mathew		Clifford	5	5757840919			CN=CLIFFORD.MATHEW.PATRICK.1252171033,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252171033		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3409	1	cody.bowman@usmc.mil	Cody		Bowman	5	8082572513			CN=BOWMAN.CODY.RYAN.1300611377,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300611377		5	24	3	81	0	\N	\N	\N	3	\N	1	1
-3421	1	sergio.valentin@whmo.mil	Sergio		Valentin	5	5714944730			CN=VALENTIN.SERGIO.ANTONIO.1295412263,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295412263		5	17	3	80	0	\N	\N	\N	3	\N	0	1
-3444	1	matthew.r.martin1@usmc.mil	Matthew		Martin	5	9104496267			CN=MARTIN.MATTHEW.RICHARDMAC.1392134073,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1392134073		5	25	3	2	0	\N	\N	\N	3	\N	1	1
-3448	1	michael.simon.3@us.af.mil	Michael		Simon	5	8508813412	6713412		CN=SIMON.MICHAEL.D.II.1240995952,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240995952		8	2	3	11	0	\N	\N	\N	1	\N	0	2
-3452	1	daniel.stagg@marine.mil	Daniel		Stagg	5	8082571191			CN=STAGG.DANIEL.WEBSTER.III.1370159455,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1370159455		5	24	3	81	0	\N	\N	\N	4	\N	1	1
-3456	1	v327mxgqa@us.af.mil	Derek		Bean	5	5757840919			CN=BEAN.DEREK.REED.1420537189,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1420537189		5	3	3	12	0	\N	\N	\N	1	\N	0	\N
-3471	1	thomas.francoeur@usmc.mil	Thomas		Francoeur	5	3156362583			CN=FRANCOEUR.THOMAS.W.1006168058,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1006168058		8	27	3	7	0	\N	\N	\N	3	\N	0	1
-3472	1	michael.winn@usmc.mil	Michael		Winn	5	7607253262			CN=WINN.MICHAEL.ROBERT.1395235954,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395235954		5	28	3	8	0	\N	\N	\N	3	\N	1	\N
-3474	0	berry.tanner@usmc.mil	Tanner		Berry	5	7607253262			CN=BERRY.TANNER.MICHAEL.1502277223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502277223		3	28	3	8	0	\N	\N	\N	3	\N	0	\N
-3482	1	kendrick.anderson@usmc.mil	Kendrick		Anderson	5	7607255871			CN=ANDERSON.KENDRICK.ROBERT.1465553410,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465553410		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
-3217	1	daryl.henderson@us.af.mil	Daryl		Henderson	4	8508842091	5792091		CN=HENDERSON.DARYL.LEON.1275484519,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275484519		6	8	3	11	0	\N	\N	\N	1	\N	1	2
-3123	1	richard.martin@navy.mil	Richard		Martin	4	3017575849			CN=MARTIN.RICHARD.CURRAN.JR.1157752517,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1157752517		18	38	3	9	0	\N	\N	\N	3	\N	0	1
-3127	1	bryant.knox@navy.mil	Bryant		Knox	4	3013427258			CN=KNOX.BRYANT.D.1111311710,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1111311710		21	38	1	9	0	\N	\N	\N	4	\N	1	1
-3135	1	micah.kennedy@navy.mil	Micah		Kennedy	3	2524646162			CN=KENNEDY.MICAH.A.1503429094,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503429094		21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3136	1	jrieschick.rieschick.3.ctr@us.af.mil	Jeremy		Rieschick	1	5752181387	6413175		CN=RIESCHICK.JEREMY.DAVID.1253825460,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253825460		20	33	2	12	0	\N	\N	\N	1	\N	0	2
-3145	1	donald.toro@usmc.mil	Donald		Toro	4	9104494794			CN=TORO.DONALD.J.II.1093851427,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093851427		6	25	3	2	0	\N	\N	\N	3	\N	1	1
-3149	1	james.r.guffey@boeing.com	James		Guffey	5	8583573100			CN=GUFFEY.JAMES.REID.1063817143,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1063817143		20	31	1	4	0	\N	\N	\N	3	\N	0	1
-3150	1	kelsey.brown@us.af.mil	Kelsey		Brown	1	5058535091	2635091		CN=BROWN.KELSEY.DESHOHN.1065234862,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065234862		6	6	3	5	0	\N	\N	\N	1	\N	1	2
-3155	1	larry.jones.16@us.af.mil	Larry		Jones	5	5757847040	6817040		CN=JONES.LARRY.L.1248529047,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248529047		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3157	1	dustin.riegel@usmc.mil	Dustin		Riegel	5	9104497932			CN=RIEGEL.DUSTIN.CODY.1370052723,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1370052723		5	25	3	2	0	\N	\N	\N	3	\N	1	1
-3160	1	kevin.stanton@us.af.mil	Kevin		Stanton	5	1638544613	2384613		CN=STANTON.KEVIN.TOSHIO.1124217810,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1124217810		6	4	3	13	0	\N	\N	\N	1	\N	0	\N
-3163	1	lauren.campbell@usmc.mil	Lauren		Campbell	5	3156367659	3156367		CN=CAMPBELL.LAUREN.EILEEN.1503508679,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503508679		15	53	3	7	0	\N	\N	\N	3	\N	0	1
-3165	1	jared.mccarthy@usmc.mil	Jared		Mccarthy	4	7015109661	6362217		CN=MCCARTHY.JARED.LAYNE.1020421157,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020421157		5	27	3	7	0	\N	\N	\N	3	\N	1	1
-3169	1	kyle.squires@usmc.mil	Kyle		Squires	4	9104496065			CN=SQUIRES.KYLE.LANE.1273325065,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273325065		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-3171	1	john.d.berryhill@navy.mil	John		Berryhill	5	2524648362	4518362	n/a	CN=BERRYHILL.JOHN.D.JR.1230165510,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230165510		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3179	1	cory.bolick@usmc.mil	Cory		Bolick	5	8585779146			CN=BOLICK.CORY.ALEXANDER.1411138832,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411138832		5	23	3	4	0	\N	\N	\N	3	\N	1	1
-3186	1	jack.h.martinez@boeing.com	Jack		Martinez	3	4847684996		6105912112	CN=Jack Martinez Jr,OU=The Boeing Company..,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	0	\N
-3192	1	greg.blackburn.1@us.af.mil	Gregory		Blackburn	5	8508847314			CN=BLACKBURN.GREGORY.L.1281590495,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281590495		5	2	3	11	0	\N	\N	\N	1	\N	1	2
-3194	1	nicholas.read@usmc.mil	Nicholas		Read	5	8585774289			CN=READ.NICHOLAS.ANDREW.1456464218,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456464218		4	23	3	4	0	\N	\N	\N	3	\N	1	1
-3203	1	nicholas.ceo@usmc..mil	Nicholas		Ceo	1	8585774289			CN=CEO.NICHOLAS.JOHN.1283954478,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283954478		6	23	3	4	0	\N	\N	\N	3	\N	1	1
-3209	1	augie.bravo@boeing.com	Augustine		Bravo	3	6105918587			CN=Augustine Bravo,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	1	1
-3216	1	michale.gardner@us.af.mil	Michale		Gardner	5	5759045252			CN=GARDNER.MICHALE.TIMOTHY.1271462170,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271462170		6	3	3	12	0	\N	\N	\N	1	\N	0	2
-3219	1	thornton.west@whmo.mil	Thornton		West	5	5714944730			CN=WEST.THORNTON.DOUGLAS.1365254920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365254920		6	17	3	80	0	\N	\N	\N	3	\N	0	\N
-3220	0	chase.travis@usmc.mil	Chase		Travis	5	7607253052			CN=TRAVIS.CHASE.LAWRENCE.1411013207,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411013207		5	28	3	8	0	\N	\N	\N	3	\N	0	1
-3221	1	ferdinand.hooper@us.af.mil	Ferdinand		Hooper	4	5058531363	2531363		CN=HOOPER.FERDINAND.MIRABEL.1176699228,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176699228		6	6	3	5	0	\N	\N	\N	1	\N	1	2
-3222	1	irving.gutierrez.mx@usmc.mil	Irving		Gutierrez	5	3156363586	6363586		CN=GUTIERREZ.IRVING.NAHIM.1369504807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1369504807		4	27	3	7	0	\N	\N	\N	3	\N	1	1
-3224	1	john.j.spinelli@boeing.com	John		Spinelli	3	6105915142			CN=John Spinelli,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	1	1
-3225	1	casey.grobelny@navy.mil	Casey		Grobelny	3	2524646156			CN=GROBELNY.CASEY.A.1515716307,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1515716307		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3226	1	matthew.cosner@navy.mil	Matthew		Cosner	3	2524646203			CN=COSNER.MATTHEW.E.1093488845,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093488845		21	15	1	18	0	\N	\N	\N	3	\N	1	1
-3229	1	jacob.gatliff@usmc.mil	Jacob		Gatliff	4	8585771318			CN=GATLIFF.JACOB.CHRISTOPHER.1502274127,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502274127		3	23	3	4	0	\N	\N	\N	3	\N	1	1
-3230	1	william.friend@usmc.mil	William		Friend	5	9104497374			CN=FRIEND.WILLIAM.ALLAN.1266873243,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266873243		11	54	3	2	0	\N	\N	\N	3	\N	0	1
-3235	1	roberts.fitzsimmons@usmc.mil	Robert		Fitzsimmons	5	8585778151			CN=FITZSIMMONS.ROBERT.JAMESHANLAN.1019182050,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1019182050		7	43	3	4	0	\N	\N	\N	3	\N	1	1
-3236	1	ryan.guilfoy@usmc.mil	Ryan		Guilfoy	5	7574447818			CN=GUILFOY.RYAN.KENDALL.1269266313,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269266313		6	149	3	79	0	\N	\N	\N	3	\N	1	1
-3238	1	oliver.salder.uk@usmc.mil	Oliver		Salder	5	9282696869			CN=SALDER.OLIVER.JAMES.1237549933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1237549933		7	62	3	6	0	\N	\N	\N	3	\N	1	1
-3244	1	anthony.chiappetta@us.af.mil	Anthony		Chiappetta	5	8508812565	8812565		CN=CHIAPPETTA.ANTHONY.RAY.1277462970,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277462970		6	2	3	11	0	\N	\N	\N	1	\N	1	2
-3261	1	brenda.hathcock@navy.mil	Brenda		Hathcock	3	2524646665			CN=HATHCOCK.BRENDA.ANN.1454292754,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454292754		20	10	1	18	0	\N	\N	\N	4	\N	1	1
-3284	1	robert.north.2@us.af.mil	Robert		North	5	8508812682	6412682		CN=NORTH.ROBERT.C.JR.1040693102,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	2	3	11	0	\N	\N	\N	1	\N	1	2
-3293	1	thomas.mcartor@usmc.mil	Thomas		Mcartor	1	5404467585			CN=MCARTOR.THOMAS.CARL.1396412809,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396412809		5	54	3	2	0	\N	\N	\N	3	\N	0	1
-3311	1	kenneth.lafauci@us.af.mil	Kenneth		Lafauci	5	5058467456			CN=LAFAUCI.KENNETH.ALAN.JR.1298544675,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298544675		5	6	3	5	0	\N	\N	\N	1	\N	1	2
-3314	1	levi.bither@usmc.mil	Levi		Bither	5	9104497228			CN=BITHER.LEVI.PATRICK.1416964935,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	25	3	2	0	\N	\N	\N	3	\N	1	1
-3322	0	wesley.mciver@usmc.mil	Wesley		Mciver	4	8585776624			CN=MCIVER.WESLEY.ROY.1453939614,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1453939614		4	23	3	4	0	\N	\N	\N	3	\N	0	1
-3335	1	randy.price@usmc.mil	Randy		Price	5	9282696875			CN=PRICE.RANDY.EARL.1367501665,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367501665		5	62	3	6	0	\N	\N	\N	3	\N	0	\N
-3359	1	bo.norman@navy.mil	Bo		Norman	2	2524648609	4518609		CN=NORMAN.BO.TRAVIS.1267159420,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267159420		21	15	1	18	0	\N	\N	\N	4	\N	0	1
-3367	1	darrell.l.stanley@boeing.com	Darrell		Stanley	5	2525148292			CN=Darrell Stanley,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=USxx	1141323233		20	31	2	7	0	\N	\N	\N	3	\N	1	1
-3370	0	koen.keith@usmc.mil	Koen		Keith	5	9104497228			CN=KEITH.KOEN.JEFFERSON.1455869680,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455869680		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-3371	1	edgar.k.gutierrez@usmc.mil	Edgar		Gutierrezvillalta	5	9104497225			CN=GUTIERREZVILLALTA.EDGAR.KEVIN.1454198588,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454198588		4	25	3	2	0	\N	\N	\N	3	\N	1	1
-3400	1	daniel.westphal.ctr@usmc.mil	Daniel		Westphal	4	8082575487	4575487		CN=WESTPHAL.DANIEL.ROBERT.1095996562,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1095996562		21	24	2	81	0	\N	\N	\N	3	\N	0	\N
-3414	1	amit.doshi.ctr@navy.mil	Amit		Doshi	3	3017570153			CN=DOSHI.AMIT.R.1378374959,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1378374959		20	38	2	9	0	\N	\N	\N	4	\N	1	2
-3416	1	lucas.saavedra.1@us.af.mil	Lucas		Saavedra	3	5058535470	2535470		CN=SAAVEDRA.LUCAS.CHRISTOPHE.1183960217,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1183960217		7	6	1	5	0	\N	\N	\N	1	\N	1	2
-3426	1	danielle.rogowski@navy.mil	Danielle		Rogowski	4	3019953696			CN=ROGOWSKI.DANIELLE.MARIE.1283425270,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283425270		16	19	3	9	0	\N	\N	\N	1	\N	0	2
-3430	1	thomas.beams@usmc.mil	Thomas		Beams	5	7608051755			CN=BEAMS.THOMAS.GEORGE.1283623129,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283623129		6	55	3	81	0	\N	\N	\N	3	\N	0	\N
-3439	1	michael.frenia@navy.mil	Michael		Frenia	5	9194495051	7515051		CN=FRENIA.MICHAEL.R.1229564613,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229564613		21	10	1	2	0	\N	\N	\N	4	\N	0	2
-3440	1	jmallwein1@gmail.com	Joshua		Allwein	5	6104204322			CN=ALLWEIN.JOSHUA.MICHAEL.1300409225,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300409225		6	24	3	81	0	\N	\N	\N	4	\N	1	1
-3443	0	ryan.ostrowski@us.af.mil	Ryan		Ostrowski	3	8508841313			CN=OSTROWSKI.RYAN.MICHEAL.1264558154,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264558154		6	2	3	11	0	\N	\N	\N	1	\N	0	2
-3461	1	elaine.wiegman.ctr@navy.mil	Elaine		Wiegman	4	3018636512			CN=WIEGMAN.ELAINE.L.1046831710,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1046831710		21	38	2	9	0	\N	\N	\N	4	\N	1	1
-3465	1	james.fogel@usmc.mil	James		Fogel	5	9104495961			CN=FOGEL.JAMES.KENNETH.1037810912,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1037810912		8	51	3	2	0	\N	\N	\N	3	\N	1	1
-3467	1	blake.tucker@usmc.mil	Blake		Tucker	5	5022190161	5774298		CN=TUCKER.BLAKE.ALEXANDER.1502986887,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502986887		3	23	3	4	0	\N	\N	\N	3	\N	1	1
-3470	1	samuel.c.garcia@usmc.mil	Samuel		Garcia	5	9092614731	4497224		CN=GARCIA.SAMUEL.CARRILLO.1256879626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256879626		6	25	3	2	0	\N	\N	\N	3	\N	1	1
-3478	1	joseph.tharpe.1@us.af.mil	Joseph		Tharpe	5	5058467611	2467611		CN=THARPE.JOSEPH.GENE.1113754547,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1113754547		7	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3484	1	daniel.m.fletcher2@usmc.mil	Daniel		Fletcher	5	5183663454	7228011		CN=FLETCHER.DANIEL.MICHAEL.1254754133,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254754133		7	54	3	2	0	\N	\N	\N	3	\N	0	\N
-3488	1	james.charles@us.af.mil	James		Charles	5	5058466777	5058466		CN=CHARLES.JAMES.MICHAEL.1275862238,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275862238		6	6	3	5	0	\N	\N	\N	1	\N	0	\N
-3495	1	allen.lieber@usmc.mil	Allen		Lieber	5	8587615995	5778087		CN=LIEBER.ALLEN.JEFFREY.1270603897,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270603897		6	48	3	4	0	\N	\N	\N	3	\N	0	\N
-3497	1	james.e.garner@usmc.mil	James		Garner	5	9104495971	7525971		CN=GARNER.JAMES.ERICH.1239849446,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239849446		11	51	3	2	0	\N	\N	\N	3	\N	1	\N
-3505	1	austin.hathaway@usmc.mil	Austin		Hathaway	5	9104497252			CN=HATHAWAY.AUSTIN.WILLIAM.1465551620,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		3	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3508	1	charles.bartlett.3@us.af.mil	Charles		Bartlett	3	8508841313			CN=BARTLETT.CHARLES.VALENTINE.JR.1284166120,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1284166120		5	2	3	11	0	\N	\N	\N	1	\N	1	\N
-3509	1	devin.guthrie@navy.mil	Devin		Guthrie	3	2424646282			CN=GUTHRIE.DEVIN.G.1028980694,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1028980694		20	10	1	17	0	\N	\N	\N	4	\N	1	\N
-3514	1	michael.long2@navy.mil	Michael		Long	3	7323234212			CN=LONG.MICHAEL.JOSEPH.JR.1517656549,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1517656549		20	35	1	3	0	\N	\N	\N	4	\N	1	\N
-3532	1	gary.holland.6@us.af.mil	Gary		Holland	5	5058535089	2535089		CN=HOLLAND.GARY.ALLEN.1136944408,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136944408		7	6	1	5	0	\N	\N	\N	1	\N	1	\N
-3533	1	marcelle.novak@navy.mil	Marcelle		Novak	3	2524646690			CN=NOVAK.MARCELLE.E.1091131311,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1091131311		20	15	1	18	0	\N	\N	\N	3	\N	0	\N
-3268	1	eric.t.quigley@boeing.com	Eric		Quigley	3	6105917641			CN=QUIGLEY.ERIC.T.1025976920,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025976920		20	9	2	18	0	\N	\N	\N	3	\N	0	\N
-3272	1	steven.westerdale@us.af.mil	Steven		Westerdale	5	5757840919			CN=WESTERDALE.STEVEN.CRAIG.1364003150,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364003150		5	3	3	12	0	\N	\N	\N	1	\N	1	2
-3274	1	frank.eason@n-t-a.com	Frankie		Eason	3	2524445411			CN=EASON.FRANKIE.R.JR.1229777501,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229777501		20	15	2	18	0	\N	\N	\N	3	\N	1	1
-3298	1	gage.a.griffith@usmc.mil	Gage		Griffith	5	8585774298	5774298		CN=GRIFFITH.GAGE.ANDREW.1503236938,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	23	3	4	0	\N	\N	\N	3	\N	0	\N
-3312	1	carl.kleinow@us.af.mil	Carl		Kleinow	5	5757847828			CN=KLEINOW.CARL.RICHARD.1286672252,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286672252		7	3	3	12	0	\N	\N	\N	1	\N	1	2
-3324	1	cameron.whyte@usmc.mil	Cameron		Whyte	5	3156363487			CN=WHYTE.CAMERON.COURTNEY.1467975621,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467975621		4	27	3	7	0	\N	\N	\N	3	\N	0	1
-3332	1	steven.a.hartman@usmc.mil	Steven		Hartman	5	8585771280	2671280		CN=HARTMAN.STEVEN.A.1187442482,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187442482		7	60	3	4	0	\N	\N	\N	3	\N	1	1
-3334	1	john.pilson@usmc.mil	John		Pilson	5	9104494331			CN=PILSON.JOHN.R.1250937489,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250937489		7	61	3	2	0	\N	\N	\N	3	\N	0	\N
-3340	1	luis.juarez@usmc.mil	Luis		Juarez	5	8585778694			CN=JUAREZ.LUIS.HUMBERTO.1271471838,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271471838		7	23	3	4	0	\N	\N	\N	3	\N	0	\N
-3342	1	joshua.g.webster@navy.mil	Joshua		Webster	3	2524649831			CN=WEBSTER.JOSHUA.G.1523082171,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523082171		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3345	1	ricky.pate@usmc.mil	Ricky		Pate	5	9104495126			CN=PATE.RICKY.GLENN.1275035323,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275035323		6	58	3	2	0	\N	\N	\N	3	\N	0	1
-3346	1	christopher.habersha@usmc.mil	Christopher		Habershaw	5	9104495126			CN=HABERSHAW.CHRISTOPHER.ANDRE.1053443610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1053443610		7	58	3	2	0	\N	\N	\N	3	\N	1	1
-3360	1	kyle.bowler@us.af.mil	Kyle		Bowler	5	5058534765			CN=BOWLER.KYLE.ROBERT.1292333842,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292333842		6	6	3	5	0	\N	\N	\N	1	\N	1	2
-3365	1	tyler.tarr@usmc.mil	Tyler		Tarr	5	9104494683			CN=TARR.TYLER.ALLEN.1268075948,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268075948		6	44	3	2	0	\N	\N	\N	3	\N	1	1
-3366	0	jedidiah.larabee@usmc.mil	Jedidiah		Larabee	5	9104497121	7527121		CN=LARABEE.JEDIDIAH.JOSHUA.1267439750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267439750		10	49	3	2	0	\N	\N	\N	3	\N	0	1
-3373	1	robert.beeton.3@us.af.mil	Robert		Beeton	4	8508814301	6414301		CN=BEETON.ROBERT.ANDREW.1110660363,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110660363		20	15	1	11	0	\N	\N	\N	4	\N	0	2
-3376	1	curtis.lowe@usmc.com	Curtis		Lowe	5	9104495643			CN=LOWE.CURTIS.RICHARD.1300282071,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300282071		5	44	3	2	0	\N	\N	\N	3	\N	0	\N
-3378	1	mark.oleksy@navy.mil	Mark		Oleksy	3	2524648634	4518634	2524646400	CN=OLEKSY.MARK.STANLEY.1091276034,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1091276034		20	10	1	18	0	\N	\N	\N	3	\N	0	1
-3379	1	joel.warren@navy.mil	Joel		Warren	3	2524649113			CN=WARREN.JOEL.PHILLIP.1523846961,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846961		21	10	1	18	0	\N	\N	\N	4	\N	1	1
-3380	1	kristopher.gonzalez@usmc.mil	Kristopher		Gonzalez	5	9104494357			CN=GONZALEZ.KRISTOPHER.ALLEN.1018540084,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018540084		5	25	3	2	0	\N	\N	\N	3	\N	1	1
-3381	1	judge@lhd6.navy.mil	Jamel		Judgeowens	5	3152523914			CN=JUDGEOWENS.JAMEL.SHAMEKE.1402736492,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1402736492		6	11	3	7	0	\N	\N	\N	4	\N	1	1
-3392	1	michael.g.culbert@boeing.com	Michael		Culbert	3	6105919527	4569874563		CN=Michael Culbert,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494		20	9	2	17	0	\N	\N	\N	3	\N	0	\N
-3395	1	charles.a.winslow@usmc.mil	Charles		Winslow	5	9104496669			CN=WINSLOW.CHARLES.ATHOL.1368365250,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368365250		5	61	3	2	0	\N	\N	\N	3	\N	1	1
-3401	1	andrew.p.white@usmc.mil	Andrew		White	4	7607253562			CN=WHITE.ANDREW.PAUL.1399624068,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399624068		5	28	3	8	0	\N	\N	\N	3	\N	1	1
-3405	1	marshel.hargrove@usmc.mil	Marshel		Hargrove	3	8082571194			CN=HARGROVE.MARSHEL.LEEVAN.II.1392281653,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1392281653		5	24	3	81	0	\N	\N	\N	3	\N	1	1
-3417	1	samuel.axtman@navy.mil	Samuel		Axtman	3	2524646263			CN=AXTMAN.SAMUEL.J.1525519143,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525519143		20	10	1	18	0	\N	\N	\N	4	\N	1	1
-3418	1	francisco.cortez@me.usmc.mil	Francisco		Cortezjasso	5	7605476106	3455277		CN=CORTEZJASSO.FRANCISCO.JAVIER.1267245610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267245610		6	56	3	4	0	\N	\N	\N	3	\N	1	1
-3425	0	benjamin.goss@usmc.mil	Benjamin		Goss	5	9104496267			CN=GOSS.BENJAMIN.CHRISTOPHER.1460928750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460928750		3	25	3	2	0	\N	\N	\N	3	\N	0	1
-3427	1	daniel.blocker@navy.mil	Daniel		Blocker	4	2524649824	4519824		CN=BLOCKER.DANIEL.KEITH.1126306845,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1126306845		6	15	1	18	0	\N	\N	\N	1	\N	1	2
-3433	1	clinton.e.salter@navy.mil	Clinton		Salter	3	2524645339			CN=SALTER.CLINTON.E.JR.1243841409,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243841409		20	10	1	18	0	\N	\N	\N	4	\N	0	1
-3434	1	christopher.e.norman@usmc.mil	Christophe		Norman	5	8587407929	3658087		CN=NORMAN.CHRISTOPHE.ELLIOT.1272289227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272289227		6	28	3	8	0	\N	\N	\N	3	\N	1	1
-3437	1	frederick.thomason@navy.mil	Frederick		Thomason	5	9104495424			CN=THOMASON.FREDERICK.I.JR.1229504602,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229504602		21	10	1	11	0	\N	\N	\N	4	\N	0	\N
-3438	1	david.e.pope@navy.mil	David		Pope	5	9104495708	7515708		CN=POPE.DAVID.E.1192399749,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		21	10	1	11	0	\N	\N	\N	4	\N	1	1
-3453	1	david.gullick.ctr@navy.mil	David		Gullick	3	2405614519			CN=GULLICK.DAVID.RAY.1032094313,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1032094313		20	38	2	9	0	\N	\N	\N	1	\N	0	2
-3262	1	andrew.torres@usmc.mil	Andrew		Torres	5	8585776624			CN=TORRES.ANDREW.1367369244,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367369244		5	23	3	4	0	\N	\N	\N	3	\N	0	\N
-3264	1	megan.graf@us.af.mil	Megan		Graf	4	3084337595			CN=GRAF.MEGAN.VANESSA.1273642494,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273642494		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3266	1	ellick.wilson.ctr@navy.mil	Ellick		Wilson	3	2524646639			CN=WILSON.ELLICK.R.1229776009,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229776009		21	10	2	18	0	\N	\N	\N	3	\N	1	1
-3269	1	christopher.hurd.4@af.mil	Christopher		Hurd	5	5757847828			CN=HURD.CHRISTOPHER.J.1236894327,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236894327		6	3	3	12	0	\N	\N	\N	1	\N	1	2
-3270	0	gabriel.arrieta@usmc.mil	Gabriel		Arrieta	5	7607253262			CN=ARRIETA.GABRIEL.1405128108,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128108		5	28	3	8	0	\N	\N	\N	3	\N	0	1
-3276	1	thomas.woloszyk@us.af.mil	Thomas		Woloszyk	5	3122382456	2382456		CN=WOLOSZYK.THOMAS.ANTHONY.1276270075,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276270075		7	4	3	13	0	\N	\N	\N	1	\N	1	2
-3281	1	matthew.dalton@usmc.mil	Matthew		Dalton	5	9104497228			CN=DALTON.MATTHEW.THOMAS.1469936895,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469936895		3	25	3	2	0	\N	\N	\N	3	\N	1	1
-3282	1	jon.hutchison@usmc.mil	Jon		Hutchison	5	7607630576			CN=HUTCHISON.JON.BRYAN.1410448552,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410448552		4	46	3	8	0	\N	\N	\N	3	\N	0	1
-3292	1	richard.j.ytzen@boeing.com	Richard		Ytzen	5	8586927204			CN=Richard Ytzen,OU=BOEING,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	31	2	8	0	\N	\N	\N	3	\N	1	1
-3308	1	jeremie.baldwin.1@us.af.mil	Jeremie		Baldwin	5	5058533490	2633490		CN=BALDWIN.JEREMIE.W.1110742904,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110742904		7	6	3	5	0	\N	\N	\N	1	\N	1	2
-3326	1	keven.snyder@navy.mil	Keven		Snyder	3	2524645685			CN=SNYDER.KEVEN.M.1251892128,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1251892128		20	15	1	18	0	\N	\N	\N	4	\N	0	1
-3338	1	james.fortenberry@us.af.mil	James		Fortenberry	5	3142386143	2386143		CN=FORTENBERRY.JAMES.MATTHEW.1115151483,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		6	4	3	13	0	\N	\N	\N	1	\N	1	2
-3341	1	raymond.chamberlain@us.af.mil	Raymond		Chamberlain	5	8508815007	6415007		CN=CHAMBERLAIN.RAYMOND.LEE.1118455386,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118455386		6	2	3	11	0	\N	\N	\N	1	\N	0	2
-3344	1	karl.w.moheiser@gmail.com	Karl		Moheiser	4	2524646859			CN=MOHEISER.KARL.WILLIAM.1092667410,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1092667410		21	10	1	17	0	\N	\N	\N	3	\N	0	1
-3353	1	david.wachs@navy.mil	David		Wachs	5	2524645573	4515573		CN=WACHS.DAVID.G.1040836744,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		20	10	1	18	0	\N	\N	\N	3	\N	0	\N
-3355	1	kenneth.flores@us.af.mil	Kenneth		Flores	5	8508841313			CN=FLORES.KENNETH.JOEL.1255198528,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255198528		6	2	3	11	0	\N	\N	\N	1	\N	1	2
-3356	1	joe.quintero@usmc.mil	Joe		Quintero	5	9104495643			CN=QUINTERO.JOE.JESSIE.JR.1174141750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1174141750		6	25	3	2	0	\N	\N	\N	3	\N	1	1
-3362	1	william.hood.1@us.af.mil	William		Hood	5	3142384613			CN=HOOD.WILLIAM.LARRY.1290112512,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290112512		6	4	3	13	0	\N	\N	\N	1	\N	0	\N
-3368	1	v327mxgqa@us.af.mil	Keaton		Manshaem	5	5757840919			CN=MANSHAEM.KEATON.CHARLES.1383251709,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1383251709		5	3	3	12	0	\N	\N	\N	1	\N	0	2
-3383	0	kenneth.johnson.28@us.af.mil	Kenneth		Johnson	5	8505822258			CN=JOHNSON.KENNETH.G.1052153219,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1052153219		6	6	3	5	0	\N	\N	\N	1	\N	0	2
-3389	0	james.w.parker@usmc.mil	James		Parker	5	9105468691			CN=PARKER.JAMES.WILLIAM.1287858627,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287858627		6	149	3	79	0	\N	\N	\N	3	\N	0	1
-3398	0	kayla.lopez@usmc.mil	Kayla		Lopez	5	8082571084			CN=LOPEZ.KAYLA.MISHELL.1405128060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128060		5	24	3	81	0	\N	\N	\N	3	\N	0	1
-3406	0	gabirel.donovan@usmc.mil	Gabriel		Donovan	3	8082571194			CN=DONOVAN.GABRIEL.LOUIS.1410933540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410933540		5	24	3	81	0	\N	\N	\N	4	\N	0	1
-3420	0	matthew.belser@navy.mil	Matthew		Belser	3	2524646171			CN=BELSER.MATTHEW.S.1144683494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	10	1	18	0	\N	\N	\N	4	\N	0	2
-3429	1	adrian.dorsman.1.ctr@us.af.mil	Adrian		Dorsman	5	8508813669			CN=DORSMAN.ADRIAN.K.II.1139382770,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1139382770		20	33	2	11	0	\N	\N	\N	1	\N	1	2
-3436	1	william.pearce@navy.mil	William		Pearce	5	2524647592			CN=PEARCE.WILLIAM.J.JR.1229505250,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		21	10	1	11	0	\N	\N	\N	4	\N	1	2
-3447	1	david.j.jankowski@boeing.com	David		Jankowski	5	2524445648			CN=David Jankowski,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		21	10	2	18	0	\N	\N	\N	3	\N	0	\N
-3454	1	anthony.novelly@usmc.mil	Anthony		Novelly	5	9104496870			CN=NOVELLY.ANTHONY.VINCENT.1456298806,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456298806		5	44	3	2	0	\N	\N	\N	3	\N	0	1
-3459	1	philip.a.bell@navy.mil	Philip		Bell	3	2524646258			CN=BELL.PHILIP.A.1525518350,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518350		21	10	1	18	0	\N	\N	\N	3	\N	0	1
-3464	1	nicholas.j.harrel@usmc.mil	Nicholas		Harrel	1	9105541950			CN=HARREL.NICHOLAS.JAMES.1266124976,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266124976		6	49	3	2	0	\N	\N	\N	3	\N	0	\N
-3473	1	vance.baumer@whmo.mil	Vance		Baumer	5	5714944753			CN=BAUMER.VANCE.MATTHEW.1145594657,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1145594657		8	17	3	80	0	\N	\N	\N	3	\N	0	\N
-3477	1	christopher.cook.14@us.af.mil	Christopher		Cook	4	5757845029			CN=COOK.CHRISTOPHER.A.1082162379,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1082162379		7	3	3	12	0	\N	\N	\N	1	\N	1	\N
-3479	1	andre.l.johnson@usmc.mil	Andre		Johnson	5	8582573656			CN=JOHNSON.ANDRE.LAVAL TYLER.1143765977,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1143765977		10	55	3	81	0	\N	\N	\N	3	\N	0	\N
-3480	1	jpimentel@bh.com	Jeremy		Pimentel	3	8585776833			CN=PIMENTEL.JEREMY.RUBEN.1298072811,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	31	2	4	0	\N	\N	\N	3	\N	0	\N
-3487	1	michael.p.williams1@usmc.mil	Michael		Williams	4	7607255871	7607255		CN=WILLIAMS.MICHAEL.PATRICK.1463032609,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463032609		4	28	3	8	0	\N	\N	\N	3	\N	1	\N
-3263	1	gary.karlson@us.af.mil	Gary		Karlson	1	5058535593	2635593		CN=KARLSON.GARY.LEON.JR.1250591337,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	6	3	5	0	\N	\N	\N	1	\N	1	2
-3271	1	sikhan.chin@usmc.mil	Sikhan		Chin	5	3156366206	6366206		CN=CHIN.SIKHAN.ELIJAH.1235601415,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235601415		12	50	3	7	0	\N	\N	\N	3	\N	0	\N
-3273	1	marquis.little@usmc.mil	Marquis		Little	5	7574445453			CN=LITTLE.MARQUIS.NATHANIEL.1246103964,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246103964		5	149	3	79	0	\N	\N	\N	3	\N	1	1
-3295	1	richard.d.ricardo@boeing.com	Richard		Ricardo	3	6105918755			CN=Richard.D.Ricardo.163506,OU=people,O=boeing,C=us	1141323233		20	9	2	17	0	\N	\N	\N	3	\N	0	\N
-3297	1	matthew.sentore@usmc.mil	Matthew		Sentore	5	3156362763			CN=SENTORE.MATTHEW.NICHOLAS.1501605685,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501605685		3	27	3	7	0	\N	\N	\N	3	\N	0	\N
-3307	1	david.k.dennis@usmc.mil	David		Dennis	5	9104495126			CN=DENNIS.DAVID.KEITH.1269890033,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269890033		6	58	3	2	0	\N	\N	\N	3	\N	0	1
-3309	1	brandon.delgado@usmc.mil	Brandon		Delgado	5	8082572513			CN=DELGADO.BRANDON.KYLE.1169587244,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564		5	24	3	81	0	\N	\N	\N	3	\N	0	1
-3316	1	noah.wu@usmc.mil	Noah		Wu	3	8082570084			CN=WU.NOAH.SONG.1398220664,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1398220664		5	24	3	81	0	\N	\N	\N	3	\N	1	1
-3317	1	chase.lennon.ctr@navy.mil	Chase		Lennon	5	3019954632			CN=LENNON.CHASE.ALEXANDER.1275242752,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275242752		21	39	2	9	0	\N	\N	\N	3	\N	1	1
-3336	1	daniel.j.myers2@usmc.mil	Daniel		Myers	5	3156367655			CN=MYERS.DANIEL.JAMES.1379756529,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379756529		5	53	3	7	0	\N	\N	\N	3	\N	0	\N
-3348	1	donald.c.devor1@navy.mil	Donald		Devor	4	2524647986	4517986		CN=DEVOR.DONALD.CLAIR.III.1038774375,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038774375		21	10	1	18	0	\N	\N	\N	4	\N	0	\N
-3361	1	benjamin.westbrook@us.af.mil	Benjamin		Westbrook	5	3142383690			CN=WESTBROOK.BENJAMIN.RAY.1061845077,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061845077		5	4	3	13	0	\N	\N	\N	1	\N	0	\N
-3369	1	erik.werhner@usmc.mil	Erik		Werhner	4	9104497266	752		CN=WERHNER.ERIK.J.1029371756,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029371756		8	25	3	2	0	\N	\N	\N	3	\N	1	1
-3374	1	thomas.colville@usmc.mil	Thomas		Colville	5	9104497252			CN=COLVILLE.THOMAS.JOSEPH.1458509715,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1458509715		4	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3385	1	zackary.barnard@navy.mil	Zackary		Barnard	3	2524646116	4516116		CN=BARNARD.ZACKARY.LANDON.1523846902,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846902		21	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3386	1	rodney.hose.ctr@navy.mil	Rodney		Hose	5	2524645544			CN=HOSE.RODNEY.D.1043651818,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1043651818		20	10	2	18	0	\N	\N	\N	4	\N	1	1
-3387	1	daniel.mier@us.af.mil	Daniel		Mier	4	8508847621	5797621		CN=MIER.DANIEL.L.1099209212,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1099209212		7	2	3	11	0	\N	\N	\N	1	\N	1	2
-3399	1	david.a.murray@usmc.mil	David		Murray	5	8082572513			CN=MURRAY.DAVID.A.1293442785,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293442785		5	24	3	81	0	\N	\N	\N	4	\N	1	1
-3411	1	gerald.vosburg@navy.mil	Gerald		Vosburg	3	2524646173			CN=VOSBURG.GERALD.R.1523846970,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846970		21	10	1	18	0	\N	\N	\N	3	\N	1	1
-3424	1	rocky.rodriguez@usmc.mil	Rocky		Rodriguez	5	3156363744			CN=RODRIGUEZ.ROCKY.1396239619,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396239619		5	27	3	7	0	\N	\N	\N	3	\N	1	1
-3441	1	jacob.silva@usmc.mil	Jacob		Silva	5	7607253994			CN=SILVA.JACOB.GEORGE.1287355765,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287355765		6	28	3	8	0	\N	\N	\N	3	\N	1	1
-3442	1	jason.morris@usmc.mil	Jason		Morris	5	7607253994			CN=MORRIS.JASON.CHARLES.1288350910,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288350910		6	28	3	8	0	\N	\N	\N	3	\N	1	1
-3450	1	stonej@lhd6.navy.mil	Joshua		Stone	5	4045362070			CN=STONE.JOSHUA.KEITH.1453935279,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1453935279		4	10	3	18	0	\N	\N	\N	3	\N	1	1
-3455	1	captain.mullins@usmc.mil	Captain		Mullins	5	9104497363			CN=MULLINS.CAPTAIN.BRACK.JR.1103149386,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1103149386		8	54	3	2	0	\N	\N	\N	3	\N	1	1
-3458	1	john.hendrick.1@us.af.mil	John		Hendrick	3	5759045248	6405248		CN=HENDRICK.JOHN.ALAN.1023007491,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1023007491		20	3	1	12	0	\N	\N	\N	1	\N	0	2
-3463	1	ryan.bullock@navy.mil	Ryan		Bullock	4	2524649583	4519583	2524648566	CN=BULLOCK.RYAN.ASHELY.1265338395,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	1	18	0	\N	\N	\N	4	\N	0	\N
-3468	1	larry.villafana@usmc.mil	Larry		Villafana	5	9495723838			CN=VILLAFANA.LARRY.JOHN.1460513223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460513223		4	27	3	7	0	\N	\N	\N	3	\N	1	1
-3476	1	brandon.darke@whmo.mil	Brandon		Darke	5	5714944729			CN=DARKE.BRANDON.CHRISTOPHER.1131856098,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1131856098		6	17	3	80	0	\N	\N	\N	3	\N	0	\N
-3489	1	timothy.sampley@usmc.mil	Timothy		Sampley	5	8585778155			CN=SAMPLEY.TIMOTHY.SCOT.II.1264711769,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264711769		6	43	3	4	0	\N	\N	\N	3	\N	1	\N
-3493	1	jerrod.hammes@usmc.mil	Jerrod		Hammes	5	8585778075			CN=HAMMES.JERROD.CHRISTOPHER.1082923426,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1082923426		16	48	3	4	0	\N	\N	\N	3	\N	0	\N
-3499	1	brandon.m.jackson@boeing.com	Brandon		Jackson	1	8587806027			CN=Brandon.M.Jackson.1834895,OU=people,O=boeing,C=us	1133281564		20	9	2	4	0	\N	\N	\N	3	\N	1	\N
-3501	1	robyn.kanter@navy.mil	Robyn		Kanter	4	3013426726	3426826		CN=KANTER.ROBYN.H.1239711355,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239711355		21	38	1	9	0	\N	\N	\N	4	\N	0	\N
-3503	1	salvatore.cialino@usmc.mil	Salvatore		Cialino	5	8585778151	2678151		CN=CIALINO.SALVATORE.JR.1384359694,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384359694		5	43	3	4	0	\N	\N	\N	3	\N	1	\N
-3507	1	abraham.vallejo@us.af.mil	Abraham		Vallejo	2	5058465143			CN=VALLEJO.ABRAHAM.UNK.1295119132,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295119132		5	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3491	1	tara.netayavichitr@usmc.mil	Tara		Netayavichitr	5	8585778092			CN=NETAYAVICHITR.TARA.1276749524,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276749524		6	48	3	4	0	\N	\N	\N	3	\N	0	\N
-3287	1	timothy.b.moore1@navy.mil	Timothy		Moore	1	6195453528			CN=MOORE.TIMOTHY.BRIAN.1116343793,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116343793		21	14	1	6	0	\N	\N	\N	4	\N	1	1
-3299	1	zachary.lott.1@us.af.mil	Zachary		Lott	5	8508841310	5791310		CN=LOTT.ZACHARY.BRIAN.1291654955,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291654955		5	2	3	11	0	\N	\N	\N	1	\N	1	2
-3310	1	cody.j.smith@usmc.mil	Cody		Smith	5	9104496267	7526267		CN=SMITH.CODY.JACOB.1503236733,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503236733		3	25	3	2	0	\N	\N	\N	3	\N	1	1
-3315	1	florencio.montanez@usmc.mil	Florencio		Montanez	5	8585776624			CN=MONTANEZ.FLORENCIO.JR.1471956364,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1471956364		3	23	3	4	0	\N	\N	\N	3	\N	0	\N
-3318	0	tyler.shumaker@usmc.mil	Tyler		Shumaker	5	8082572513			CN=SHUMAKER.TYLER.RICHARD.1399469798,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399469798		5	24	3	81	0	\N	\N	\N	3	\N	0	1
-3330	1	travis.e.jones@usmc.mil	Travis		Jones	5	9104496870			CN=JONES.TRAVIS.EDRIS.1404378593,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404378593		4	44	3	2	0	\N	\N	\N	3	\N	0	\N
-3347	1	saul.moreno@usmc.mil	Saul		Moreno	5	3156366239			CN=MORENO.SAUL.1242981460,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242981460		6	50	3	7	0	\N	\N	\N	3	\N	0	\N
-3351	1	rodger.hibbard@usmc.mil	Rodger		Hibbard	5	7607253562	3613562		CN=HIBBARD.RODGER.JAMES.1289923205,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1289923205		6	28	3	8	0	\N	\N	\N	3	\N	1	1
-3352	1	louis.poreider@usmc.mil	Louis		Poreider	5	9104496267			CN=POREIDER.LOUIS.EUGENE.IV.1459395730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1459395730		4	25	3	2	0	\N	\N	\N	3	\N	1	2
-3384	1	virginia.nethercutt@navy.mil	Virginia		Nethercutt	4	2524648529	4518529		CN=NETHERCUTT.VIRGINIA.DARLENE.1282019937,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282019937		21	10	1	18	0	\N	\N	\N	4	\N	1	1
-3402	1	jason.spruiell1@usmc.mil	Jason		Spruiell	3	8082571194			CN=SPRUIELL.JASON.DAVID.1279866874,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279866874		5	24	3	81	0	\N	\N	\N	4	\N	1	1
-3408	1	brandon.capley@us.af.mil	Brandon		Capley	5	8508841309	5791309		CN=CAPLEY.BRANDON.THOMAS.1368276835,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368276835		5	2	3	11	0	\N	\N	\N	1	\N	0	2
-3412	1	besmir.feka@usmc.mil	Besmir		Feka	5	8082571424			CN=FEKA.BESMIR.1469936933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469936933		3	24	3	81	0	\N	\N	\N	3	\N	1	1
-3422	1	alfredo.sepulveda@usmc.mil	Alfredo		Sepulvedacolon	5	7872482292			CN=SEPULVEDACOLON.ALFREDO.JAVIER.1402898042,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1402898042		5	51	3	2	0	\N	\N	\N	3	\N	1	1
-3423	1	abraham.velezrivera@usmc.mil	Abraham		Velezrivera	5	7607254754			CN=VELEZRIVERA.ABRAHAM.JUNIOR.1293830998,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293830998		6	28	3	8	0	\N	\N	\N	3	\N	1	1
-3445	1	james.w.becker@boeing.com	James		Becker	1	8588373084			CN=BECKER.JAMES.W.1250088368,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	31	2	4	0	\N	\N	\N	3	\N	0	\N
-3446	1	christopher.sanford@usmc.mil	Christopher		Sanford	5	9104496412	7526412		CN=SANFORD.CHRISTOPHER.CHARLES.1122344238,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1122344238		11	49	3	2	0	\N	\N	\N	3	\N	0	1
-3451	0	luis.murillovargas@usmc.mil	Luis		Murillovargas	5	2092779950			CN=MURILLOVARGAS.LUIS.ANGEL.1411043017,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411043017		5	23	3	4	0	\N	\N	\N	3	\N	0	1
-3457	1	matthew.sinsel@navy.mil	Matthew		Sinsel	5	2524648589			CN=SINSEL.MATTHEW.BERNARD.1233460601,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233460601		20	10	1	18	0	\N	\N	\N	4	\N	0	2
-3462	1	christian.martin.1@us.af.mil	Christian		Martin	5	5752190498	6812319		CN=MARTIN.CHRISTIAN.MATTHEW.1055749309,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055749309		7	3	3	12	0	\N	\N	\N	1	\N	0	\N
-3469	1	seungchul.roh@usmc.mil	Seungchul		Roh	4	9104497252			CN=ROH.SEUNGCHUL.1468209159,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468209159		4	25	3	2	0	\N	\N	\N	3	\N	0	1
-3475	1	justin.spritzer@us.af.mil	Justin		Spritzer	5	8508815007	6415007		CN=SPRITZER.JUSTIN.EDWARD.1261021915,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261021915		6	2	3	11	0	\N	\N	\N	1	\N	1	\N
-3485	1	jeremy.williams@usmc.mil	Jeremy		Williams	5	3183455286			CN=WILLIAMS.JEREMY.CLINTEL.1267924160,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267924160		6	47	3	6	0	\N	\N	\N	3	\N	1	\N
-3490	1	ericjay.garcia@usmc.mil	Ericjay		Garcia	5	7607250779	3650779		CN=GARCIA.ERICJAY.KONA.1150722116,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1150722116		6	28	3	8	0	\N	\N	\N	3	\N	1	\N
-3492	1	willie.bostic@usmc.mil	Willie		Bostic	5	9104496419			CN=BOSTIC.WILLIE.JAMES.JR.1262067390,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1262067390		4	49	3	2	0	\N	\N	\N	3	\N	1	\N
-3494	1	theirrien.davis@usmc.mil	Theirrien		Davis	5	8585778087	5778087		CN=DAVIS.THEIRRIEN.RAPHAEL.1461997143,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461997143		5	48	3	4	0	\N	\N	\N	3	\N	1	\N
-3506	1	jimmy.potter.2.ctr@us.af.mil	Jimmy		Potter	5	5058467435	2467435		CN=POTTER.JIMMY.HR.1108210350,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1108210350		20	20	2	5	0	\N	\N	\N	1	\N	1	\N
-3513	1	maxim.lazoutchenkov@navy.mil	Maxim		Lazoutchenkov	3	7323237284			CN=LAZOUTCHENKOV.MAXIM.1514102283,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514102283		20	35	1	3	0	\N	\N	\N	4	\N	0	\N
-3515	1	gloria.wu@navy.mil	Gloria		Wu	3	7323235264			CN=WU.GLORIA.1512156130,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1512156130		21	35	1	3	0	\N	\N	\N	4	\N	1	\N
-3523	1	adam.nalder@usmc.mil	Adam		Nalder	5	3156367657			CN=NALDER.ADAM.JOHN.1267095791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267095791		6	53	3	7	0	\N	\N	\N	3	\N	1	\N
-3520	1	timothy.paterson@navy.mil	Timothy		Paterson	4	2524648231	451823		CN=PATERSON.TIMOTHY.ROBERT.1186333833,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186333833		20	10	1	18	0	\N	\N	\N	4	\N	1	\N
-3521	1	leobardo.cegueda@usmc.mil	Leobardo		Cegueda	5	9104497252			CN=CEGUEDA.LEOBARDO.III.1469327740,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469327740		3	25	3	2	0	\N	\N	\N	3	\N	0	\N
-3526	1	thomas.asplund@usmc.mil	Thomas		Asplund	5	5202271822			CN=ASPLUND.THOMAS.ERIC.1092417383,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1092417383		3	28	3	8	0	\N	\N	\N	3	\N	1	\N
-3531	1	myron.burrows.ctr@navy.mil	Myron		Burrows	4	2524646219			CN=BURROWS.MYRON.R.1024668360,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024668360		20	10	2	18	0	\N	\N	\N	4	\N	1	\N
-3542	1	rodrigo.hernandezpol@navy.mil	Rodrigo		Hernandezpolindara	5	9104495710			CN=HERNANDEZPOLINDARA.RODRIGO.ALONSO.1292949924,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292949924		6	41	3	2	0	\N	\N	\N	3	\N	1	\N
-3549	1	george.graves@navy.mil	George		Graves	5	3017575550			CN=GRAVES.GEORGE.REUBEN.III.1117542552,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1117542552		21	38	1	9	0	\N	\N	\N	4	\N	1	\N
-3550	1	toby.hansenbrown@navy.mil	Toby		Hansen-Brown	5	3017572965			CN=HANSEN-BROWN.TOBY.C.1501755369,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501755369		20	40	2	9	0	\N	\N	\N	4	\N	1	\N
-3555	1	robert.w.kirk@navy.mil	Robert		Kirk	3	2524646968			CN=KIRK.ROBERT.WILLIAM.III.1384613906,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384613906		21	10	1	17	0	\N	\N	\N	4	\N	1	\N
-3561	1	clinton.duclos@usmc.mil	Clinton		Duclos	5	7167773682	6363245		CN=DUCLOS.CLINTON.JOHN.1233636122,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233636122		7	50	3	7	0	\N	\N	\N	3	\N	1	\N
-3554	1	anthony.mccalpin@us.af.mil	Anthony		Mccalpin	5	5058535089	35089		CN=MCCALPIN.ANTHONY.JAMES.1287399649,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		5	20	3	5	0	\N	\N	\N	1	\N	0	\N
-3565	1	benjamin.glenn@us.af.mil	Benjamin		Glenn	2	3142381862	2381862		CN=GLENN.BENJAMIN.SCOTT.1387595887,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1387595887		5	4	3	13	0	\N	\N	\N	1	\N	1	\N
-3541	1	jesse.meno@us.af.mil	Jesse		Meno	4	8508844990	5794990		CN=MENO.JESSE.D.1184796771,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1184796771		9	8	3	11	0	\N	\N	\N	1	\N	1	\N
-3559	1	austin.m.lewis@usmc.mil	Austin		Lewis	5	8585776624			CN=LEWIS.AUSTIN.MICHAEL.1459200165,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1459200165		4	23	3	4	0	\N	\N	\N	3	\N	1	\N
-3567	1	john.hannah.1@us.af.mil	John		Hannah	5	5058467990	2467990		CN=HANNAH.JOHN.B.1058520400,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058520400		8	6	3	5	0	\N	\N	\N	1	\N	1	\N
-3560	0	destin.lett@usmc.mil	Destin		Lett	5	3343980021			CN=LETT.DESTIN.TODD.1460082893,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460082893		4	23	3	4	0	\N	\N	\N	3	\N	0	\N
-3548	1	sung.m.kim@navy.mil	Sung		Kim	3	9104490013			CN=KIM.SUNG.MIN.1270032059,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270032059		20	10	1	18	0	\N	\N	\N	4	\N	1	\N
-3551	1	michael.zier@navy.mil	Michael		Zier	3	2524646240			CN=ZIER.MICHAEL.J.1525518104,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518104		21	15	1	18	0	\N	\N	\N	4	\N	1	\N
-3543	1	amie.sparnell@navy.mil	Amie		Sparnell	3	2524646152			CN=SPARNELL.AMIE.A.1394878142,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1394878142		21	15	1	18	0	\N	\N	\N	3	\N	0	\N
-3544	1	jpimentel@bh.com	Jeremy		Pimentel	5	8582459987	5776833		CN=PIMENTEL.JEREMY.RUBEN.1298072811,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US11	1133281564		21	31	2	4	0	\N	\N	\N	3	\N	1	\N
-3546	1	drew.w.phillips@usmc.mil	Drew		Phillips	5	9104497226			CN=PHILLIPS.DREW.WILLIAM.1411144611,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411144611		5	25	3	2	0	\N	\N	\N	3	\N	1	\N
-3547	1	kristopher.n.turner@usmc.mil	Kristopher		Turner	5	9104497252			CN=TURNER.KRISTOPHER.NOAHKOHL.1510348083,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1510348083		3	25	3	2	0	\N	\N	\N	3	\N	1	\N
-3553	1	scott.r.porter@usmc.mil	Scott		Porter	5	8585779400			CN=PORTER.SCOTT.RUSSELL.1400420684,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400420684		5	60	3	4	0	\N	\N	\N	3	\N	1	\N
-3558	1	danny.hare.ctr@navy.mil	Danny		Hare	4	2527207969			CN=HARE.DANNY.MACK.1185447940,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1185447940		20	10	2	18	0	\N	\N	\N	4	\N	1	\N
-3562	1	jacob.leckie@usmc.mil	Jacob		Leckie	5	3156366230			CN=LECKIE.JACOB.MATTHEW.1395164933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395164933		15	50	3	7	0	\N	\N	\N	3	\N	1	\N
-3563	0	andrew.ohlrich@lhd1.navy.mil	Andrew		Ohlrich	5	9104497073			CN=OHLRICH.ANDREW.R.1249318864,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1249318864		11	52	3	2	0	\N	\N	\N	3	\N	0	\N
-3566	1	gamal.meyers@navy.mil	Ga'Mal		Meyers	3	2524646248			CN=MEYERS.GA'MAL.Q.1057774823,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1057774823		21	10	1	17	0	\N	\N	\N	3	\N	1	\N
-3545	1	jared.brady@usmc.mil	Jared		Brady	5	9104495661	7525661		CN=BRADY.JARED.WESLEY.1272943202,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272943202		20	61	2	2	0	\N	\N	\N	3	\N	1	\N
-3552	1	holly.ramirez.ctr@navy.mil	Holly		Ramirez	5	3017570314			CN=RAMIREZ.HOLLY.K.1134056726,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1134056726		20	40	2	9	0	\N	\N	\N	4	\N	1	\N
-3556	1	robert.crims@usmc.mil	Robert		Crims	5	8082571191			CN=CRIMS.ROBERT.LEE.1247526141,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1247526141		7	24	3	81	0	\N	\N	\N	3	\N	1	\N
-3557	1	johan.cotto@usmc.mil	Johan		Cotto	5	4132414747			CN=COTTO.JOHAN.ALBERTO.1396410695,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396410695		5	57	3	8	0	\N	\N	\N	3	\N	1	\N
-3564	1	garrett.hurtt@usmc.mil	Garrett		Hurtt	5	9104497226			CN=HURTT.GARRETT.ALEXANDER.1387728100,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1387728100		5	25	3	2	0	\N	\N	\N	3	\N	1	\N
-3568	1	josh.wetlesen@usmc.mil	Josh		Wetlesen	5	8585776624			CN=WETLESEN.JOSH.RAY.1461783119,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461783119		4	23	3	4	0	\N	\N	\N	3	\N	1	\N
-3572	1	bob@bob.com	Travis		Makarowski	4	2524646396			CN=MAKAROWSKI.TRAVIS.W.1141323233xd,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		19	159	2	17	0	\N	\N	\N	2	\N	0	\N
-3574	1	travis.maka@navy.mil	Travis		Makarowski	1	2343455432			CN=MAKAROWSKI.TRAVIS.W.1141323233x,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	-1		4	3	1	18	0	\N	\N	\N	2	\N	0	\N
-3573	1	steven.groninga@navy.mil	Steven		Groninga	4	2527208500			CN=GRONINGA.STEVEN.CHARLES.1065484494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	0	\N
-2174	1	david.abbott.16@us.af.mil	David		Abbott	5	5058537389	2637389113		CN=ABBOTT.DAVID.J.1248049800,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABBOTT.DAVID.J	20	6	1	5	0	\N	\N	\N	1	\N	0	\N
-3	1	testing.test.16@us.af.mil	Testing	Q	Test	5	1112223333	9999999999	\N	CN=TEST.TESTING.Q.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	1	\N
-11	\N	fred.projecttasks2@squadron.mil	Fred	Q	Projecttasks2	\N	567-111-2234	\N	\N	CN=PROJECTTASKS2.FRED.Q.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:02.917	\N	\N	\N	\N	1	\N
-3575	1	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4	252-464-8744			CN=MARSHALL.GEOFFREY.EDWARD.1510036804,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	0	\N
-10	\N	bob.projecttasks1@squadron.mil	Bob		Projecttasks1	\N	(111)555-1212	\N	\N	CN=PROJECTTASKS1.BOB.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 10:18:31.758	\N	\N	\N	\N	1	\N
-13	\N	root.projecttasks4@navy.mil	Root	\N	Projecttasks4	\N	333-123-3333	\N	\N	CN=PROJECTTASKS4.ROOT.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:20:47.477	\N	\N	\N	\N	1	\N
-12	\N	chris.projecttasks@squadron.mil	Chris	A	Projecttasks3	\N	123-111-1234	\N	\N	CN=PROJECTTASKS3.CHRIS.A.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:29.179	\N	\N	\N	\N	1	\N
-34	\N	sebastian.mills@fsr.mil	Sebastian	B	Mills	\N	1115551212	\N	\N	CN=MILLS.SEBASTION.B.1111111111,OU=FSR,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:01:04.665282	\N	\N	\N	\N	1	\N
-14	\N	bmanager1@navy.mil	Bob	A	Manager1	\N		\N	\N	CN=MANAGER1.BOB.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:52:58.345	\N	\N	\N	\N	1	\N
-15	\N	smanager2@navy.mil	Sue	B	Manager2	\N	\N	\N	\N	CN=MANAGER2.SUE.B.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:18.479	\N	\N	\N	\N	1	\N
-4	\N	blah.blahblah@email.com	Blah	A	Blahblah	\N	1231231234	\N	\N	CN=BLAHBLAH.BLAH.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-09 05:18:50.651	\N	\N	\N	\N	1	\N
-38	\N	sally.graham@oem.com	Sally	F	Graham	\N	1115551212	\N	\N	CN=GRAHAM.SALLY.F.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:04:20.433573	\N	\N	\N	\N	1	\N
-33	\N	matt.bailey@fsr.mil	Matt	A	Bailey	\N	111-555-1212	\N	\N	CN=BAILEY.MATT.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 19:14:55.885	\N	\N	\N	\N	1	\N
-36	\N	carol.fisher@fst.mil	Carol	D	Fisher	\N	1115551212	\N	\N	CN=FISHER.CAROL.D.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:02:21.730429	\N	\N	\N	\N	1	\N
-8	\N	sean.tdtracker3@email.com	Sean	\N	Tdtracker3	\N	\N	\N	\N	CN=TDTRACKER3.SEAN.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:40:00.711216	\N	\N	\N	\N	1	\N
-41	\N	jan.nolan@modteam.org	Jan		Nolan	\N	1115551212	\N	\N	CN=NOLAN.JAN.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:08:55.160078	\N	\N	\N	\N	1	\N
-26	\N	harry.berry@all.com	Harry	\N	Berry	\N	1115551212	\N	\N	CN=BERRY.HARRY.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:41:00.863923	\N	\N	\N	\N	1	\N
-40	\N	jane.mcgrath@modapprover.org	Jane	H	McGrath	\N	1115551212	\N	\N	CN=MCGRATH.JANE.H.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:31.403728	\N	\N	\N	\N	1	\N
-6	\N	dave.tdtracker1@email.com	Dave		Tdtracker1	\N		\N	\N	CN=TDTRACKER1.DAVE.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 23:37:29.847	\N	\N	\N	\N	1	\N
-39	\N	michelle.bower@modapprover.org	Michelle	G	Bower	\N	1115551212	\N	\N	CN=BOWER.MICHELLE.G.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:08.204674	\N	\N	\N	\N	1	\N
-16	\N	gmanager3@navy.mil	Guy	C	Manager3	\N	\N	\N	\N	CN=MANAGER3.GUY.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:40.896	\N	\N	\N	\N	1	\N
-7	\N	donna.tdtracker2	Donna	\N	Tdtracker2	\N	\N	\N	\N	CN=TDTRACKER2.DONNA.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:39:39.899019	\N	\N	\N	\N	1	\N
-42	\N	charles.walsh@modteam.org	Charles	\N	Walsh	\N	1115551212	\N	\N	CN=WALSH.CHARLES.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:09:16.745487	\N	\N	\N	\N	1	\N
-9	\N	superuser.tdtrackeradmin@email.com	Superuser		Tdtrackeradmin	\N		\N	\N	CN=TDTRACKERADMIN.SUPERUSER.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:12:40.507562	\N	\N	\N	\N	1	\N
-35	\N	brian.davidson@fst.mil	Brian	C	Davidson	\N	1115551212	\N	\N	CN=DAVIDSON.BRIAN.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 21:01:55.564	\N	\N	\N	\N	1	\N
-2	1	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	CN=TEST.DAVID.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	1	\N
+3176	t	joe.vang@usmc.mil	Joe		Vang	5	9104496065			CN=VANG.JOE.1455246748,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455246748		4	25	3	2	0	\N	\N	\N	3	\N	t	1
+2366	f	shawn.draper@us.af.mil	Shawn	O	Draper	\N				CN=DRAPER.SHAWN.O.1083630368,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DRAPER.SHAWN.O	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2424	f	carlos.a.franco@navy.mil	Carlos	A	Franco	\N				CN=FRANCO.CARLOS.ALBERTO.1235172905,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FRANCO.CARLOS.ALBERTO	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3358	t	grant.roth@navy.mil	Grant		Roth	3	2524646683			CN=ROTH.GRANT.T.1523583057,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523583057		20	15	1	18	0	\N	\N	\N	4	\N	f	1
+2049	f	victoria.bader.1@us.af.mil	Victoria		Bader	5	5058467622	2467622		CN=BADER.VICTORIA.MARIE.1140927410,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1140927410		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+900	t	gary.m.kline.ctr@navy.mil	Gary		Kline	4	9107501623			CN=KLINE.GARY.M.1093063445,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	KLINE.GARY.M	20	15	2	2	0	\N	\N	\N	3	\N	f	1
+910	t	mguy@bh.com	Michael		Guy	5	5058537160	2637160		CN=GUY.MICHAEL.L.1155567534,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	GUY.MICHAEL.L	20	20	2	5	0	\N	\N	\N	1	\N	f	2
+2021	t	patrick.armentrout@navy.mil	Patrick		Armentrout	1	9104495494			CN=ARMENTROUT.PATRICK.A.1229745480,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	ARMENTROUT.PATRICK.A	20	15	1	2	0	\N	\N	\N	3	\N	f	1
+2022	t	john.dantic@usmc.mil	John		Dantic	1	8585776225	2222		CN=DANTIC.JOHN.M.1133281564,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	DANTIC.JOHN.M	21	10	1	6	0	\N	\N	\N	3	\N	f	\N
+1	t	v22web@navy.mil	Sys		Admin	\N					\N		20	2	1	2	\N	\N	\N	\N	4	\N	t	\N
+2028	t	john.e.plets.civ@mail.mil	John		Plets	3	8004736597			CN=PLETS.JOHN.E.1268158940,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268158940	PLETS.JOHN.E	21	10	1	4	0	\N	\N	\N	4	\N	f	\N
+2050	t	andrew.gartee@usmc.mil	Andrew		Gartee	5	9104496267	7526267		CN=GARTEE.ANDREW.JAMES.JR.1411005271,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3117	f	joshua.r.white1@navy.mil	Joshua		White	5	6195530062		6195534229	CN=WHITE.JOSHUA.R.1369124265,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		20	38	2	6	0	\N	\N	\N	4	\N	f	1
+926	t	jimmy.r.jalil@boeing.com	Jimmy		Jalil	5	8508812645	6412645		CN=JALIL.JIMMY.R.1024394910,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024394910	JALIL.JIMMY.R	20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2038	f	jonathan.miller@usmc.mil	Jonathan		Miller	5	9104497265	7527265		CN=MILLER.JONATHAN.JOB.1265528020,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265528020		6	25	3	2	0	\N	\N	\N	3	\N	f	1
+2051	t	justin.caudle@us.af.mil	Justin		Caudle	5	8508841313			CN=CAUDLE.JUSTIN.EDWARD.1364972233,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364972233		5	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2001	t	jimmy.r.jalil@boeing.com	Jimmy		Jalil	5	8508812645	6412645		CN=Jimmy Jalil,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2004	t	jonathan.reyes3@usmc.mil	Jonathan		Reyes	5	8585771318	5771318		CN=REYES.JONATHAN.AGUYLES.1455990382,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		4	23	3	4	0	\N	\N	\N	3	\N	f	2
+2005	t	kelly.campagna@usmc.mil	Kelly		Campagna	5	8585777694	1231231234		CN=CAMPAGNA.KELLY.ANNE.1362108671,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		6	23	3	6	0	\N	\N	\N	3	\N	f	\N
+2007	t	brian.sulser@usmc.mil	Brian		Sulser	5	8585779107			CN=SULSER.BRIAN.J.1058523662,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		7	45	3	4	0	\N	\N	\N	3	\N	f	1
+2008	t	mark.whittle.2@us.af.mil	Mark		Whittle	3	8508813105	641310511		CN=WHITTLE.MARK.ANTHONY.1060319371,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	WHITTLE.MARK.ANTHONY	21	15	1	11	0	\N	\N	\N	4	\N	f	\N
+2025	t	victor.reyes.1@us.af.mil	Victor		Reyes	5	3142386175	2386175		CN=REYES.VICTOR.M.1243723325,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243723325		7	4	3	13	0	\N	\N	\N	1	\N	f	\N
+2037	f	hadley.hoopes@usmc.mil	Hadley		Hoopes	5	9104497087			CN=HOOPES.HADLEY.BRYAN.1469087812,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469087812		4	52	3	2	0	\N	\N	\N	3	\N	f	1
+3106	f	dejuan.rudolph@usmc.mil	Dejuan		Rudolph	5	8585774132			CN=RUDOLPH.DEJUAN.LEHASHAUN.1258803201,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258803201		6	56	3	4	0	\N	\N	\N	3	\N	f	1
+100	t	scott.a.cottrell@navy.mil	Scott		Cottrell	1	2524646151	4516151	1231231231	CN=COTTRELL.SCOTT.A.1229762679,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	COTTRELL.SCOTT.A	20	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2009	t	matthew.van_benthem.ctr@us.af.mil	Matthew		Van Benthem	3	8508813023	6413023		CN=VAN BENTHEM.MATTHEW.SHERIDAN.1395515655,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	15	2	11	0	\N	\N	\N	1	\N	f	2
+2020	t	jacob.mayes@us.af.mil	Jacob		Mayes	5	5757840919	7840919		CN=MAYES.JACOB.MICHAEL.1292500820,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+2024	t	victor.camacho.ctr@usmc.mil	Victorian		Camacho	3	8585779534	2679534		CN=CAMACHO.VICTORIAN.1176176020,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176176020		20	35	2	4	0	\N	\N	\N	3	\N	f	\N
+2027	t	alan.rivers@usmc.mil	Alan		Rivers	4	9104496065			CN=RIVERS.ALAN.PAUL.1397570360,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1397570360		5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2063	t	zachary.passini@usmc.mil	Zachary		Passini	5	3156367658	6367658		CN=PASSINI.ZACHARY.JOSEPH.1299045214,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299045214		16	53	3	7	0	\N	\N	\N	3	\N	f	1
+3107	t	scarlett.orlando@me.usmc.mil	Orlando		Scarlett	5	8585774132			CN=SCARLETT.ORLANDO.1236752808,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236752808		7	56	3	4	0	\N	\N	\N	3	\N	f	\N
+3108	t	maurice.m.defino@boeing.com	Maurice		Defino	5	8582426983			CN=Maurice DeFino,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	31	2	8	0	\N	\N	\N	3	\N	f	1
+2003	t	gabriel.austin@us.af.mil	Gabriel		Austin	5	5757910854	6817040		CN=AUSTIN.GABRIEL.GUNTLE.1248021868,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248021868		7	3	3	12	0	\N	\N	\N	1	\N	f	\N
+280	t	wabril@bh.com	William		Abril	5	9104495523			CN=ABRIL.WILLIAM.F.1227124420,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1227124420	ABRIL.WILLIAM.F	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2614	f	mark.jones21@us.af.mil	Mark	J	Jones	\N				CN=JONES.MARK.J.1097016581,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	JONES.MARK.J	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2002	t	fructuoso.santos@usmc.mil	Fructuoso		Santosjr	4	8585779638			CN=SANTOSJR.FRUCTUOSO.MARIANO.III.1376419556,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		5	23	3	4	0	\N	\N	\N	3	\N	f	\N
+2036	t	paul.l.smith1@usmc.mil	Paul		Smith	5	9104496053			CN=SMITH.PAUL.LESLIE.1052653807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1052653807		5	49	3	2	0	\N	\N	\N	3	\N	f	\N
+2055	t	zayed.antonio@us.af.mil	Antonio		Zayed	5	5757841501	6811501		CN=ANTONIO.ZAYED.ISAAC.1293747357,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293747357		5	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2554	t	jonathan.hobby@usmc.mil	Jonathan		Hobby	5	7607631460			CN=HOBBY.JONATHAN.MICHAEL.1270642671,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451	HOBBY.JONATHAN.MICHAEL	6	28	3	8	0	\N	\N	\N	3	\N	f	1
+2556	t	john.hoffman.12@us.af.mil	John		Hoffman	5	3142383690	2384646		CN=HOFFMAN.JOHN.AUTHUR.III.1293707940,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293707940	HOFFMAN.JOHN.AUTHUR.III	6	4	3	13	0	\N	\N	\N	1	\N	f	\N
+2558	t	connor.hollern@usmc.mil	Connor		Hollern	5	9104497252			CN=HOLLERN.CONNOR.LESLE.1465548068,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465548068	HOLLERN.CONNOR.LESLE	3	25	3	2	0	\N	\N	\N	3	\N	f	1
+2560	t	gregory.hollinger.ctr@us.af.mil	Gregory		Hollinger	5	5058466519	2466519		CN=HOLLINGER.GREGORY.L.1077683328,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1077683328	HOLLINGER.GREGORY.L	20	20	2	5	0	\N	\N	\N	1	\N	f	\N
+2562	t	choppe@bh.com	Clinton		Hoppe	5	9104515525			CN=HOPPE.CLINTON.C.1066021374,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1066021374	HOPPE.CLINTON.C	20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+2564	t	george.horvath.1@us.af.mil	George		Horvath	5	5058535089	8535089		CN=HORVATH.GEORGE.AARON.1265675308,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265675308	HORVATH.GEORGE.AARON	6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2566	t	mhouck@bh.com	Micah		Houck	5	3142384654			CN=HOUCK.MICAH.MCCLURE.1257377969,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257377969	HOUCK.MICAH.MCCLURE	20	21	2	13	0	\N	\N	\N	1	\N	f	2
+2568	t	jeffrey.a.houston@navy.mil	Jeffrey		Houston	2	2524648797			CN=HOUSTON.JEFFREY.A.1229801739,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229801739	HOUSTON.JEFFREY.A	21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2570	t	jeffrey.hovis.1.ctr@us.af.mil	Jeffrey		Hovis	5	5058537171			CN=HOVIS.JEFFREY.S.1167706777,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167706777	HOVIS.JEFFREY.S	20	6	2	5	0	\N	\N	\N	1	\N	f	2
+2572	t	shawn.howard@usmc.mil	Shawn		Howard	1	9104494331			CN=HOWARD.SHAWN.A.1186869750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186869750	HOWARD.SHAWN.A	7	61	3	2	0	\N	\N	\N	3	\N	f	1
+2574	t	dennis.hudon.2@us.af.mil	Dennis		Hudon	4	8508812641	6412641		CN=HUDON.DENNIS.J.1186701638,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186701638	HUDON.DENNIS.J	21	2	1	11	0	\N	\N	\N	1	\N	f	2
+2576	t	damon.hughes.1.ctr@us.af.mil	Damon		Hughes	5	5759045227	6405227		CN=HUGHES.DAMON.H.1075799299,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1075799299	HUGHES.DAMON.H	20	13	2	12	0	\N	\N	\N	1	\N	f	\N
+2578	t	kevin.o.hughes.ctr@navy.mil	Kevin		Hughes	3	3017570051			CN=HUGHES.KEVIN.O.1283782243,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283782243	HUGHES.KEVIN.O	21	19	2	9	0	\N	\N	\N	3	\N	f	1
+2580	t	anthony.huntington@usmc.mil	Anthony		Huntington	1	9104495352	7524352		CN=HUNTINGTON.ANTHONY.E.1160520546,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1160520546	HUNTINGTON.ANTHONY.E	9	61	3	2	0	\N	\N	\N	3	\N	f	1
+2582	t	rashad.hurd@usmc.mil	Rashad		Hurd	5	8585778155	2678155		CN=HURD.RASHAD.LEON.1263763480,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1263763480	HURD.RASHAD.LEON	6	43	3	4	0	\N	\N	\N	3	\N	f	1
+2584	t	juan.itzol.ctr@navy.mil	Juan		Itzol	5	3019954630			CN=ITZOL.JUAN.C.1028834035,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1028834035	itzoljc	20	39	2	9	0	\N	\N	\N	4	\N	f	1
+2586	t	bryan.jackson.11@us.af.mil	Bryan		Jackson	5	5058533490	2633490		CN=JACKSON.BRYAN.K.1054061419,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1054061419	JACKSON.BRYAN.K	20	6	1	5	0	\N	\N	\N	1	\N	f	2
+2588	t	matthew.c.jackson1@navy.mil	Matthew		Jackson	3	9104495862	7525862	9104495222	CN=JACKSON.MATTHEW.CHRISTOPHER.1252707030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252707030	JACKSON.MATTHEW.CHRISTOPHER	20	15	1	2	0	\N	\N	\N	3	\N	f	\N
+2590	t	michael.jackson.61.ctr@us.af.mil	Michael		Jackson	3	8508814306	6414306		CN=JACKSON.MICHAEL.R.1298084046,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	JACKSON.MICHAEL.R	20	15	2	11	0	\N	\N	\N	1	\N	f	2
+2592	t	jesse.jacobsen@usmc.mil	Jesse		Jacobsen	5	9104497123			CN=JACOBSEN.JESSE.OWEN.JR.1269440461,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269440461	JACOBSEN.JESSE.OWEN.JR	6	49	3	2	0	\N	\N	\N	3	\N	f	1
+2594	t	trevor.james@us.af.mil	Trevor		James	1	8508842592	5792959		CN=JAMES.TREVOR.L.1186181634,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	JAMES.TREVOR.L	8	8	3	11	0	\N	\N	\N	1	\N	f	2
+2596	t	kyle.jarchow@us.af.mil	Kyle		Jarchow	5	0756855976			CN=JARCHOW.KYLE.JAMES.1291652863,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291652863	JARCHOW.KYLE.JAMES	6	4	3	13	0	\N	\N	\N	1	\N	f	2
+2598	t	doug.jefferson@navy.mil	Douglas		Jefferson	3	2524648525			CN=JEFFERSON.DOUGLAS.M.1229776394,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229776394	jeffersondm	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2600	t	adam.johnson.5@us.af.mil	Adam		Johnson	5	5058535755			CN=JOHNSON.ADAM.L.1061541752,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061541752	JOHNSON.ADAM.L	7	6	3	5	0	\N	\N	\N	1	\N	f	2
+2602	t	jeffery.c.johnson@usmc.mil	Jeffery		Johnson	5	9104496970			CN=JOHNSON.JEFFERY.CALVIN.JR.1277946200,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277946200	JOHNSON.JEFFERY.CALVIN.JR	7	25	3	2	0	\N	\N	\N	3	\N	f	1
+2604	t	jeremiah.johnson@usmc.mil	Jeremiah		Johnson	5	9104497252			CN=JOHNSON.JEREMIAH.DEVON.1470537309,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470537309	JOHNSON.JEREMIAH.DEVON	3	25	3	2	0	\N	\N	\N	3	\N	f	1
+2606	t	michael.d.johnson27@boeing.com	Michael		Johnson	5	5058460263	2460263		CN=JOHNSON.MICHAEL.D.1155681957,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1155681957	Johnson, Michael, D	20	20	2	5	0	\N	\N	\N	1	\N	f	2
+2608	t	joseph.joiner.2.ctr@us.af.mil	Joseph		Joiner	5	5058535440	2635440		CN=JOINER.JOSEPH.RYAN.1294320373,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1294320373	JOINER.JOSEPH.RYAN	20	20	2	5	0	\N	\N	\N	1	\N	f	\N
+2610	t	jason.jones.46@us.af.mil	Jason		Jones	5	3142384613	2384613		CN=JONES.JASON.ALLEN.1363612578,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1363612578	JONES.JASON.ALLEN	6	4	3	13	0	\N	\N	\N	1	\N	f	2
+2612	t	ljjones@bh.com	Lawrence		Jones	5	8175425207			CN=JONES.LAWRENCE.JOSEPH.JR.1260039292,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260039292	JONES.LAWRENCE.JOSEPH.JR	20	31	2	7	0	\N	\N	\N	3	\N	f	\N
+2616	t	melisa.jones@navy.mil	Melisa		Jones	5	2524648530	4518530		CN=JONES.MELISA.R.1164255243,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1164255243	JONES.MELISA.R	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2686	f	kevin.macken@usmc.mil	Kevin	C	Macken	\N				CN=MACKEN.KEVIN.CHRISTOPHER.1300123011,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MACKEN.KEVIN.CHRISTOPHER	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2688	t	scott.madden1@navy.mil	Brian		Madden	4	3017574403			CN=MADDEN.BRIAN.SCOTT.1115623482,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	MADDEN.BRIAN.SCOTT	20	38	1	9	0	\N	\N	\N	3	\N	f	1
+2690	f	sebastian.maik@usmc.mil	Sebastian	M	Maik	\N				CN=MAIK.SEBASTIAN.MAREK.1046092763,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MAIK.SEBASTIAN.MAREK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2692	t	christopher.mandich@us.af.mil	Christopher		Mandich	5	5058535089	2535089		CN=MANDICH.CHRISTOPHER.WILLIAM.1296655453,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1296655453	MANDICH.CHRISTOPHER.WILLIAM	5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2694	t	angela.mankowski@navy.mil	Angela		Mankowski	4	3017575577	13121212		CN=MANKOWSKI.ANGELA.A.1047244540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	MANKOWSKI.ANGELA.A	21	38	1	9	0	\N	\N	\N	4	\N	f	\N
+2696	t	enrique.mari@usmc.mil	Enrique		Mari Jr	5	3156366249			CN=MARI.ENRIQUE.JR.1235000314,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235000314	MARI.ENRIQUE.JR	7	50	3	7	0	\N	\N	\N	3	\N	f	1
+2698	t	edward.e.marks@boeing.com	Edward		Marks	4	8503776443			CN=MARKS.EDWARD.E.1121140264,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	MARKS.EDWARD.E	20	16	2	11	0	\N	\N	\N	1	\N	f	\N
+2700	t	amartinez05@bh.com	Abraham		Martinez	5	8585776833	1236547899		CN=MARTINEZ.ABRAHAM.DAVID.1282774891,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	MARTINEZ.ABRAHAM.DAVID	20	31	2	4	0	\N	\N	\N	3	\N	f	\N
+2702	t	ronnie.matthews@usmc.mil	Ronnie		Matthews	5	8082573588			CN=MATTHEWS.RONNIE.ALAN.1157933457,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1157933457	MATTHEWS.RONNIE.ALAN	7	55	3	81	0	\N	\N	\N	3	\N	f	\N
+2704	f	brian.mays@usmc.mil	Brian	D	Mays	\N				CN=MAYS.BRIAN.DEE.1285995775, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	maysbd	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2706	t	mitchell.mccue@us.af.mil	Mitchell		Mccue	5	8508841313	5791313		CN=MCCUE.MITCHELL.LEE.1270810051,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270810051	MCCUE.MITCHELL.LEE	6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2708	t	todd.mcgee1@navy.mil	Todd		Mcgee	4	3019952893	9952893		CN=MCGEE.TODD.A.1147417639,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1147417639	MCGEE.TODD.A	20	38	1	9	0	\N	\N	\N	1	\N	f	1
+2710	t	daniel.mcguigan@usmc.mil	Daniel		Mcguigan	5	3156362024			CN=MCGUIGAN.DANIEL.PATRICK.1035440409,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1035440409	MCGUIGAN.DANIEL.PATRICK	5	50	3	7	0	\N	\N	\N	3	\N	f	1
+2712	t	kristi.mckinney1@navy.mil	Kristi		Mckinney	4	2524646479			CN=MCKINNEY.KRISTI.D.1229811408,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229811408	MCKINNEY.KRISTI.D	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2714	t	richard.medlin@whmo.mil	Richard		Medlin	5	5714944729			CN=MEDLIN.RICHARD.KIETH.1260249211,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260249211	MEDLIN.RICHARD.KIETH	6	17	3	80	0	\N	\N	\N	3	\N	f	\N
+2716	t	jeffrey.mickler@navy.mil	Jeffrey		Mickler	3	2524646158			CN=MICKLER.JEFFREY.L.1502791083,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	MICKLER.JEFFREY.L	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2718	t	bryce.mihelich@me.usmc.mil	Bryce		Mihelich	5	0809458233	6367658		CN=MIHELICH.BRYCE.ROBERT.1388575480,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1388575480	MIHELICH.BRYCE.ROBERT	5	47	3	4	0	\N	\N	\N	3	\N	f	\N
+2720	t	troy.mikko@usmc.mil	Troy		Mikko	5	9104495661			CN=MIKKO.TROY.K.1096306020,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1096306020	MIKKO.TROY.K	20	61	2	2	0	\N	\N	\N	3	\N	f	1
+2722	t	christopher.w.miller@boeing.com	Christopher		Miller	1	9109376842			CN=MILLER.CHRISTOPHER.W.1254393149,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254393149	MILLER.CHRISTOPHER.W	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2724	t	jensen.miller@usmc.mil	Jensen		Miller	5	9104497227	7527227		CN=MILLER.JENSEN.JAMES.1260825034,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260825034	MILLER.JENSEN.JAMES	7	25	3	2	0	\N	\N	\N	3	\N	f	1
+2726	t	kade.miller@usmc.mil	Kade		Miller	5	9104497994			CN=MILLER.KADE.NORMAN.1300817790,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300817790	MILLER.KADE.NORMAN	5	61	3	2	0	\N	\N	\N	3	\N	f	1
+2728	t	stephen.w.miller3@boeing.com	Stephen		Miller	5	9104495220	1236547878		CN=Stephen Miller,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494	MILLER.STEPHEN.WESLEY	20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+2730	t	brodrick.mills@usmc.mil	Brodrick		Mills	5	0906366124			CN=MILLS.BRODRICK.DEAN.1465554920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465554920	MILLS.BRODRICK.DEAN	4	27	3	7	0	\N	\N	\N	3	\N	f	\N
+2732	t	patrick.moholt@navy.mil	Patrick		Moholt	3	9104494080			CN=MOHOLT.PATRICK.J.1379274532,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379274532	MOHOLT.PATRICK.J	21	10	1	2	0	\N	\N	\N	4	\N	f	1
+2734	t	david.montoya.1@us.af.mil	David		Montoya	5	5058469841	2469841		CN=MONTOYA.DAVID.A.1132480580,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132480580	MONTOYA.DAVID.A	6	3	3	5	0	\N	\N	\N	1	\N	f	\N
+2736	t	adalberto.morales@usmc.mil	Adalberto		Morales	5	0806490712			CN=MORALES.ADALBERTO.1380634070,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380634070	MORALES.ADALBERTO	5	50	3	7	0	\N	\N	\N	3	\N	f	1
+2738	f	kenneth.morris.5@us.af.mil	Kenneth	C	Morris	\N				CN=MORRIS.KENNETH.CHARLES.II.1235298860,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MORRIS.KENNETH.CHARLES.II	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2740	t	jonathan.morton.2@us.af.mil	Jonathan		Morton	5	5058533550			CN=MORTON.JONATHAN.GEORGE.1288947526,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288947526	MORTON.JONATHAN.GEORGE	5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2742	t	marshall.mosher@us.af.mil	Marshall		Mosher	5	8508847659	5797659		CN=MOSHER.MARSHALL.HARPER.1249189649,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1249189649	MOSHER.MARSHALL.HARPER	8	8	3	11	0	\N	\N	\N	1	\N	f	2
+2744	t	david.motley@navy.mil	David		Motley	3	2524646276			CN=MOTLEY.DAVID.R.1258799905,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258799905	MOTLEY.DAVID.R	20	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2746	f	carlos.muletromero@whmo.mil	Carlos	n	Muletromero	\N				CN=MULETROMERO.CARLOS.1255617741, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	muletromero.carlos	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2748	t	christopher.munas@usmc.mil	Christopher		Munas	5	9103201654	3156362		CN=MUNAS.CHRISTOPHER.D.1190193779,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	MUNAS.CHRISTOPHER.D	20	34	2	7	0	\N	\N	\N	3	\N	f	\N
+2750	f	john.c.munroe@navy.mil	John	C	Munroe	\N				CN=MUNROE.JOHN.C.1011089000,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MUNROE.JOHN.C	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2622	t	thomas.e.jones4@navy.mil	Thomas		Jones	4	3017572007			CN=JONES.THOMAS.E.1049238700,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1049238700	JONES.THOMAS.E	21	38	1	9	0	\N	\N	\N	4	\N	f	\N
+2752	t	joseph.a.murray@usmc.mil	Joseph		Murray	5	9104494556			CN=MURRAY.JOSEPH.ALLEN.1261578502,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261578502	MURRAY.JOSEPH.ALLEN	7	44	3	2	0	\N	\N	\N	3	\N	f	1
+2754	t	joseph.muscarella@us.af.mil	Joseph		Muscarella	5	5058465089			CN=MUSCARELLA.JOSEPH.B.III.1287966470,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287966470	MUSCARELLA.JOSEPH.B.III	6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2756	t	christopher.d.napier@boeing.com	Christopher		Napier	5	8585776833			CN=NAPIER.CHRISTOPHER.D.1142167286,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	NAPIER.CHRISTOPHER.D	20	31	2	4	0	\N	\N	\N	3	\N	f	1
+2758	t	ashley.napolitano@us.af.mil	Ashley		Napolitano	5	8508841309	5791309		CN=NAPOLITANO.ASHLEY.HUGHES.1272657838,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272657838	NAPOLITANO.ASHLEY.HUGHES	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2760	t	ldnelson@bh.com	Larry		Nelson	5	8508812651	6412651		CN=NELSON.LARRY.DUANE.1136393274,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136393274	NELSON.LARRY.DUANE	20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2762	t	joseph.newhart.1@us.af.mil	Joseph		Newhart	3	5759045249	6405249		CN=NEWHART.JOSEPH.P.1079551364,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1079551364	NEWHART.JOSEPH.P	21	3	1	12	0	\N	\N	\N	1	\N	f	\N
+2764	f	walter.l.norwood@usmc.mil	Walter	L	Norwood	\N				CN=NORWOOD.WALTER.L.1055085818,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	NORWOOD.WALTER.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2766	t	daniel.nosek@usmc.mil	Daniel		Nosek	5	9104495291			CN=NOSEK.DANIEL.RAY.1276229750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276229750	NOSEK.DANIEL.RAY	6	58	3	2	0	\N	\N	\N	3	\N	f	\N
+2768	t	david.j.oconnor1@navy.mil	David		Oconnor	5	2524645495	4515495		CN=OCONNOR.DAVID.J.1007344488,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007344488	OCONNOR.DAVID.J	21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2984	t	zachary.stewart@us.af.mil	Zachary		Stewart	5	5757840529	6810529		CN=STEWART.ZACHARY.DAVID.1077443513,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1077443513	STEWART.ZACHARY.DAVID	7	3	3	12	0	\N	\N	\N	1	\N	f	2
+2986	t	christopher.stoffels@us.af.mil	Christopher		Stoffels	5	3142383192	2383178		CN=STOFFELS.CHRISTOPHER.S.1186961265,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186961265	STOFFELS.CHRISTOPHER.S	7	4	3	13	0	\N	\N	\N	1	\N	f	\N
+2988	t	steven.stone.11@us.af.mil	Steven		Stone	5	3142383159			CN=STONE.STEVEN.P.1078459863,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1078459863	STONE.STEVEN.P	21	4	1	13	0	\N	\N	\N	1	\N	f	2
+2990	t	mark.strohmeyer@navy.mil	Mark		Strohmeyer	3	2524645434			CN=STROHMEYER.MARK.1272478313,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272478313	STROHMEYER.MARK	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2992	t	michael.sullivan.36@us.af.mil	Michael		Sullivan	3	4783272775	4972775		CN=SULLIVAN.MICHAEL.J.1045875551,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1045875551	SULLIVAN.MICHAEL.J	21	7	1	11	0	\N	\N	\N	1	\N	f	\N
+2994	t	david.tavares.ctr@usmc.mil	David		Tavares	4	7607253800			CN=TAVARES.DAVID.ALAN.1168653308,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1168653308	TAVARES.DAVID.ALAN	20	28	2	8	0	\N	\N	\N	3	\N	f	1
+2996	t	anthony.t.taylor1.ctr@navy.mil	Anthony		Taylor	1	3019954656	1231231234		CN=TAYLOR.ANTHONY.TYRONE.SR.1018749722,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	TAYLOR.ANTHONY.TYRONE.SR	20	39	2	9	0	\N	\N	\N	3	\N	f	\N
+2998	t	timothy.tenny@us.af.mil	Timothy		Tenny	5	3142384308			CN=TENNY.TIMOTHY.BROOKS.1298731661,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298731661	TENNY.TIMOTHY.BROOKS	5	4	3	13	0	\N	\N	\N	1	\N	f	\N
+3000	t	daniel.tesh@usmc.mil	Daniel		Tesh	5	9104494683			CN=TESH.DANIEL.LAMAR.1261806459,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261806459	TESH.DANIEL.LAMAR	6	44	3	2	0	\N	\N	\N	3	\N	f	1
+3002	t	anthony.thomas.5@us.af.mil	Anthony		Thomas	5	3122383154			CN=THOMAS.ANTHONY.P.1170990052,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1170990052	THOMAS.ANTHONY.P	20	4	1	13	0	\N	\N	\N	1	\N	f	2
+3004	t	brandon.s.thomas@usmc.mil	Brandon		Thomas	5	9104497368			CN=THOMAS.BRANDON.SHANE.1275859083,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275859083	THOMAS.BRANDON.SHANE	6	54	3	2	0	\N	\N	\N	3	\N	f	1
+3008	t	brian.thompson.28@us.af.mil	Brian		Thompson	5	7554003406	2383192		CN=THOMPSON.BRIAN.DAVID.1266544347,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266544347	THOMPSON.BRIAN.DAVID	7	4	3	13	0	\N	\N	\N	1	\N	f	2
+3010	f	lauren.maldonado@navy.mil	Lauren	J	Maldonado	\N				CN=THORNTON.LAUREN.J.1299007908,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	MALDONADO.LAUREN.J	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3012	t	jon.k.thorsten@usmc.mil	Jon		Thorsten	5	8585771280			CN=THORSTEN.JON.KENT.1265316901,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265316901	THORSTEN.JON.KENT	6	60	3	4	0	\N	\N	\N	3	\N	f	1
+3014	f	jason.tipaldos@usmc.mil	Jason	R	Tipaldos	\N				CN=TIPALDOS.JASON.RICHARD.1258496031,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	TIPALDOS.JASON.RICHARD	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3016	f	andrew.torres@usmc.mil	Andrew		Torres	\N				CN=TORRES.ANDREW.1367369244, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	torresa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3018	t	chad.trask@usmc.mil	Chad		Trask	5	9104496669			CN=TRASK.CHAD.DAVID.1368840633,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368840633	TRASK.CHAD.DAVID	5	61	3	2	0	\N	\N	\N	3	\N	f	1
+3020	t	joseph.trigg.1@us.af.mil	Joseph		Trigg	5	5757840529			CN=TRIGG.JOSEPH.RYAN.1246365683,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246365683	TRIGG.JOSEPH.RYAN	7	3	3	12	0	\N	\N	\N	1	\N	f	2
+3022	f	guillermo.tristan@usmc.mil	Guillermo	A	Tristan	\N				CN=TRISTAN.GUILLERMO.ALEJANDRO.JR.1400583451,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	TRISTAN.GUILLERMO.ALEJANDRO.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3024	t	robert.trunck@usmc.mil	Robert		Trunck	5	3156367658			CN=TRUNCK.ROBERT.WILLIAM.1368840625,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368840625	TRUNCK.ROBERT.WILLIAM	5	53	3	7	0	\N	\N	\N	3	\N	f	\N
+3026	t	holly.tucker@navy.mil	Holly		Tucker	3	2524646240			CN=TUCKER.HOLLY.F.1395976130,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395976130	TUCKER.HOLLY.F	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+3028	t	pdturner@bh.com	Paul		Turner	5	8508812651			CN=TURNER.PAUL.D.1048848431,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	TURNER.PAUL.D	20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2618	t	riley.jones@us.af.mil	Riley		Jones	5	3142383192	2383192		CN=JONES.RILEY.W.1237498166,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1237498166	JONES.RILEY.W	7	4	3	13	0	\N	\N	\N	1	\N	f	2
+2620	t	terry.jones.25.ctr@us.af.mil	Terry		Jones	3	8508815872	6415872		CN=JONES.TERRY.N.1277015508,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277015508	JONES.TERRY.N	20	15	2	11	0	\N	\N	\N	1	\N	f	2
+2846	f	james.k.riddle@navy.mil	James	K	Riddle	\N				CN=RIDDLE.JAMES.KEVIN.1046572277,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RIDDLE.JAMES.KEVIN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2624	t	zachary.l.jones@usmc.mil	Zachary		Jones	5	9104497252			CN=JONES.ZACHARY.LAVAR.1107228868,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1107228868	JONES.ZACHARY.LAVAR	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2626	t	rckellner@bh.com	Robert		Kellner	5	5058535439	2635439		CN=KELLNER.ROBERT.C.III.1240817264,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240817264	KELLNER.ROBERT.C.III	20	20	2	5	0	\N	\N	\N	1	\N	f	\N
+2628	t	kristopher.kendall.2@us.af.mil	Kristopher		Kendall	5	2106525221			CN=KENDALL.KRISTOPHER.M.1064448567,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064448567	KENDALL.KRISTOPHER.M	7	8	3	11	0	\N	\N	\N	1	\N	f	\N
+2630	t	martin.w.kendrex@boeing.com	Martin		Kendrex	5	5759045225	640522544		CN=KENDREX.MARTIN.W.1179535099,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	KENDREX.MARTIN.W	20	13	2	12	0	\N	\N	\N	1	\N	f	\N
+2632	t	jeffrey.kennedy@usmc.mil	Jeffrey		Kennedy	5	9104495971			CN=KENNEDY.JEFFREY.THOMAS.1265017645,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265017645	KENNEDY.JEFFREY.THOMAS	16	51	3	2	0	\N	\N	\N	3	\N	f	1
+2634	t	emily.kerlin@usmc.mil	Emily		Kerlin	3	8585779543			CN=KERLIN.EMILY.B.1271214487,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271214487	KERLIN.EMILY.B	21	10	1	4	0	\N	\N	\N	3	\N	f	1
+2636	t	beau.kitchens@usmc.mil	Beau		Kitchens	5	9104496419			CN=KITCHENS.BEAU.DAREN.1384071909,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384071909	KITCHENS.BEAU.DAREN	5	49	3	2	0	\N	\N	\N	3	\N	f	1
+2640	f	brian.koskey@usmc.mil	Brian	M	Koskey	\N				CN=KOSKEY.BRIAN.MITCHELL.1258239411,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	KOSKEY.BRIAN.MITCHELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2642	t	sanders.kreycik@usmc.mil	Sanders		Kreycik	5	7607636391	3616391		CN=KREYCIK.SANDERS.R.1159528207,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159528207	KREYCIK.SANDERS.R	8	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2644	t	bryan.kruger@usmc.mil	Bryan		Kruger	5	9282696880			CN=KRUGER.BRYAN.CHRISTOPHER.1275242868,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275242868	KRUGER.BRYAN.CHRISTOPHER	6	62	3	6	0	\N	\N	\N	3	\N	f	1
+2646	t	slane2@bh.com	Stanley		Lane	5	9104496560	4496560		CN=LANE.STANLEY.B.1031373308,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1031373308	LANE.STANLEY.B	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2648	t	clarence.langi@us.af.mil	Clarence		Langi	5	8508846954			CN=LANGI.CLARENCE.ELIJAH.1277824805,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277824805	LANGI.CLARENCE.ELIJAH	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2650	t	ronald.lasky@us.af.mil	Ronald		Lasky	5	8508813439	6413439		CN=LASKY.RONALD.J.JR.1072466175,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1072466175	LASKY.RONALD.J.JR	21	2	1	11	0	\N	\N	\N	1	\N	f	2
+2654	t	brandon.laughrey@whmo.mil	Brandon		Laughrey	4	5714944725	5714944		CN=LAUGHREY.BRANDON.PAUL.1011220050,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1011220050	LAUGHREY.BRANDON.PAUL	7	17	3	80	0	\N	\N	\N	3	\N	f	\N
+2656	t	lawrence.lee.5@us.af.mil	Lawrence		Lee	5	5757842939	6812939		CN=LEE.LAWRENCE.III.1246497245,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246497245	LEE.LAWRENCE.III	6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2658	t	matthew.r.lee@usmc.mil	Matthew		Lee	5	7605255487			CN=LEE.MATTHEW.ROYCE.1235298615,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235298615	LEE.MATTHEW.ROYCE	6	57	3	8	0	\N	\N	\N	3	\N	f	1
+2660	t	carlisle.leitch@navy.mil	Carlisle		Leitch	3	2524646177	4516177		CN=LEITCH.CARLISLE.H.1460337344,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460337344	LEITCH.CARLISLE.H	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2662	t	erwin.lewis@navy.mil	Erwin		Lewis	3	9104494080			CN=LEWIS.ERWIN.B.1467818771,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467818771	LEWIS.ERWIN.B	20	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2664	t	robert.liebig@lhd2.navy.mil	Robert		Liebig	4	8585776624			CN=LIEBIG.ROBERT.WILLIAM.JR.1400294980,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400294980	LIEBIG.ROBERT.WILLIAM.JR	5	23	3	4	0	\N	\N	\N	3	\N	f	\N
+2666	t	joe.lingle@usmc.mil	Joe		Lingle	5	8585779146			CN=LINGLE.JOE.DAVID.JR.1368793791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368793791	LINGLE.JOE.DAVID.JR	5	23	3	4	0	\N	\N	\N	3	\N	f	\N
+2668	t	orlando.lloyd@usmc.mil	Orlando		Lloyd	5	8585778035			CN=LLOYD.ORLANDO.LEWIS.1281824933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281824933	LLOYD.ORLANDO.LEWIS	6	47	3	4	0	\N	\N	\N	3	\N	f	\N
+2670	f	john.loizzi@usmc.mil	John	L	Loizzi	\N				CN=LOIZZI.JOHN.L.1186735001,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LOIZZI.JOHN.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2672	t	danilo.a.lopez@usmc.mil	Danilo		Lopez	3	9104497087			CN=LOPEZ.DANILO.ALBERTO.1274271759,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1274271759	LOPEZ.DANILO.ALBERTO	6	52	3	77	0	\N	\N	\N	3	\N	f	1
+2674	f	guillermo.lopez.5.ctr@us.af.mil	Guillermo	M	Lopez	\N				CN=LOPEZ.GUILLERMO.M.1008253060,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LOPEZ.GUILLERMO.M	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2676	t	hector.f.lopezavila@boeing.com	Hector		Lopezavila	5	5759045233	6405233		CN=LOPEZAVILA.HECTOR.FRANCISCO.1267961375,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267961375	LOPEZAVILA.HECTOR.FRANCISCO	20	13	2	12	0	\N	\N	\N	1	\N	f	\N
+2678	f	felipe.lucas@usmc.mil	Felipe	U	Lucas	\N				CN=LUCAS.FELIPE.UDEL.1173777686,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	LUCAS.FELIPE.UDEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2680	t	gary.lynch@usmc.mil	Gary		Lynch	5	9105464191			CN=LYNCH.GARY.DON.1268942650,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268942650	LYNCH.GARY.DON	6	149	3	79	0	\N	\N	\N	3	\N	f	1
+2682	t	jeffrey.mabe@navy.mil	Jeffrey		Mabe	3	2524648636	4518636	2524646400	CN=MABE.JEFFREY.D.1254742291,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254742291	MABE.JEFFREY.D	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2684	t	kenneth.mabe@usmc.mil	Kenneth		Mabe	5	7607630529			CN=MABE.KENNETH.MICHAEL.1054086225,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1054086225	MABE.KENNETH.MICHAEL	8	46	3	8	0	\N	\N	\N	3	\N	f	1
+2950	f	karen.solberg@us.af.mil	Karen	M	Solberg	\N				CN=SOLBERG.KAREN.MICHELLE.1259149777,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RUEBELMAN.KAREN.MICHELLE	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2952	t	aaron.m.soto3.civ@mail.mil	Aaron		Soto	1	1231231234	1231231234		CN=SOTO.AARON.M.1403940808,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	SOTO.AARON.M	16	17	1	8	0	\N	\N	\N	1	\N	f	\N
+2954	t	lauren.sovine@usmc.mil	Lauren		Sovine	5	9104497245			CN=SOVINE.LAUREN.ALISON.1463451750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463451750	SOVINE.LAUREN.ALISON	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2956	f	jeremy.sparkman@us.af.mil	Jeremy	A	Sparkman	\N				CN=SPARKMAN.JEREMY.A.1242354717,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	Sparkman,J,A	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2958	t	christopher.d.sparr@navy.mil	Christopher		Sparr	3	2524646273			CN=SPARR.CHRISTOPHER.D.1374268992,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374268992	SPARR.CHRISTOPHER.D	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2960	t	jeremy.spaulding@navy.mil	Jeremy		Spaulding	4	2402374392			CN=SPAULDING.JEREMY.CARR.1171156781,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	SPAULDING.JEREMY.CARR	20	38	2	9	0	\N	\N	\N	4	\N	f	1
+2962	t	eric.speck@navy.mil	Eric		Speck	3	3013420839			CN=SPECK.ERIC.STANLEY.1200872750,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1200872750	SPECK.ERIC.STANLEY	21	38	1	9	0	\N	\N	\N	4	\N	f	1
+2964	t	derek.spencer.2@us.af.mil	Derek		Spencer	5	5759046031	6416031		CN=SPENCER.DEREK.ALAN.1256747738,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256747738	SPENCER.DEREK.ALAN	6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2966	t	john.spitzer.1@us.af.mil	John		Spitzer	5	8508812682			CN=SPITZER.JOHN.ERIC.1253880500,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253880500	SPITZER.JOHN.ERIC	7	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2968	t	dominic.stabler@navy.mil	Dominic		Stabler	1	3019954656			CN=STABLER.DOMINIC.OWEN.SR.1199104558,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1199104558	STABLER.DOMINIC.OWEN.SR	20	39	2	9	0	\N	\N	\N	4	\N	f	1
+2970	t	darrell.l.stanley@boeing.com	Darrell		Stanley	5	2525148292	6363984		CN=STANLEY.DARRELL.L.1189474802,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1189474802	stanleydl	20	31	2	7	0	\N	\N	\N	3	\N	f	1
+2972	t	sean.starkey@us.af.mil	Sean		Starkey	5	5757842635	6812635		CN=STARKEY.SEAN.T.1126501672,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1126501672	STARKEY.SEAN.T	7	3	3	12	0	\N	\N	\N	1	\N	f	2
+2974	t	jesse.steel@navy.mil	Jesse		Steel	3	2524646968	4516968		CN=STEEL.JESSE.R.1298805363,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298805363	STEEL.JESSE.R	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2976	t	terrance.steele@whmo.mil	Terrance		Steele	5	5714944801			CN=STEELE.TERRANCE.L.1063818611,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1063818611	STEELE.TERRANCE.L	20	32	2	80	0	\N	\N	\N	3	\N	f	1
+2978	t	william.b.sterett@boeing.com	William		Sterett	5	8503016966	1234564566		CN=STERETT.WILLIAM.B.1090432296,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	STERETT.WILLIAM.B	20	21	2	13	0	\N	\N	\N	1	\N	f	\N
+2980	f	robert.stevens.5@us.af.mil	Robert	J	Stevens	\N				CN=STEVENS.ROBERT.JOSEPH.1071517604,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	STEVENS.ROBERT.JOSEPH	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2982	t	russell.d.stewart@navy.mil	Russell		Stewart	5	7578368759			CN=STEWART.RUSSELL.D.1072635759,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1072635759	STEWART.RUSSELL.D	21	38	1	79	0	\N	\N	\N	3	\N	f	\N
+2011	t	richard.edwards.21@us.af.mil	Richard		Edwards	5	5058467456	2467465		CN=EDWARDS.RICHARD.LUCAS.1402322906,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2014	t	alejandro.cordero@usmc.mil	Alejandro		Corderogonzalez	4	7574450134	4450134	7574450134	CN=CORDEROGONZALEZ.ALEJANDRO.1248988920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248988920		6	149	3	79	0	\N	\N	\N	3	\N	f	1
+2015	f	scott.dickover@us.af.mil	Scott		Dickover	5	5757847040	6817040		CN=DICKOVER.SCOTT.E.1088207285,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	3	3	12	0	\N	\N	\N	1	\N	f	2
+2019	t	jeffrey.morand.ctr@navy.mil	Jeffrey		Morand	5	2524648716			CN=MORAND.JEFFREY.M.1209016857,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	2	18	0	\N	\N	\N	3	\N	f	1
+2023	f	fittzpatrick.noel@usmc.mil	Fittzpatrick		Noel	5	9104494556			CN=NOEL.FITTZPATRICK.ARTHUR.1390606377,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		5	44	3	2	0	\N	\N	\N	3	\N	f	1
+2039	t	cameron.a.hubbard@usmc.mil	Cameron		Hubbard	4	7607631479			CN=HUBBARD.CAMERON.ALLEN.1395423386,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		16	57	3	8	0	\N	\N	\N	3	\N	f	1
+2040	f	mark.echard@usmc.mil	Mark		Echard	1	9104496053			CN=ECHARD.MARK.CHRISTOPHER.1281744670,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		5	49	3	2	0	\N	\N	\N	3	\N	f	1
+2041	t	casey.hall@usmc.mil	Casey		Hall	1	9104496053			CN=HALL.CASEY.MITCHELL.1377208583,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1377208583		5	49	3	2	0	\N	\N	\N	3	\N	f	1
+2043	t	kevin.ruby@usmc.mil	Kevin		Ruby	5	7607253262			CN=RUBY.KEVIN.HARRISON.1454918807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454918807		4	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2044	f	carlton.bannerman@us.af.mil	Carlton		Bannerman	5	5058465409			CN=BANNERMAN.CARLTON.V M.1058042575,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058042575		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2045	f	brian.clark.34@us.af.mil	Brian		Clark	5	5058465409	8465409		CN=CLARK.BRIAN.PETER.1391444370,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1391444370		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2048	t	sharon.d.smith3.ctr@navy.mil	Sharon		Smith	4	2524648526	4518526		CN=SMITH.SHARON.D.1029140401,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029140401		20	10	2	18	0	\N	\N	\N	4	\N	f	\N
+2053	t	joshua.haywood@us.af.mil	Joshua		Haywood	5	5757840919			CN=HAYWOOD.JOSHUA.DANIEL.1254319690,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254319690		6	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2054	t	jared.bennett.4@us.af.mil	Jared		Bennett	5	5757840917	6810917		CN=BENNETT.JARED.ANTHONY.1403994843,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1403994843		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+2060	t	michael.e.aguilar1@usmc.mil	Michael		Aguilar	5	9282696863	2696863		CN=AGUILAR.MICHAEL.E.1132431597,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132431597		7	62	3	2	0	\N	\N	\N	3	\N	f	1
+2067	f	jacob.j.cooley@usmc.mil	Jacob		Cooley	5	7605057830			CN=COOLEY.JACOB.JONATHAN.1456760275,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456760275		4	28	3	8	0	\N	\N	\N	3	\N	f	1
+2069	t	ricky.r.boysel@usmc.mil	Ricky		Boysel	5	7607253994	3653994		CN=BOYSEL.RICKY.RAY.JR.1241313227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241313227		7	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2176	t	edward.abma@usmc.mil	Edward		Abma	5	9104496693	1231231233		CN=ABMA.EDWARD.JACOB.1276272655,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABMA.EDWARD.JACOB	16	52	3	2	0	\N	\N	\N	3	\N	f	\N
+2178	f	sergio.acosta@usmc.mil	Sergio	A	Acosta	\N				CN=ACOSTA.SERGIO.A.1134394680,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	ACOSTA.SERGIO.A	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2180	t	lance.p.aja@boeing.com	Lance		Aja	5	8585776833			CN=AJA.LANCE.P.1007718302,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	AJA.LANCE.P	20	32	2	79	0	\N	\N	\N	3	\N	f	\N
+2182	t	victor.alanis.ctr@navy.mil	Victor		Alanis	5	3017570171			CN=ALANIS.VICTOR.HUGO.JR.1129918043,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1129918043	ALANIS.VICTOR.HUGO.JR	20	39	2	9	0	\N	\N	\N	4	\N	f	1
+2184	t	jamie.albonetti@usmc.mil	Jamie		Albonetti	5	3156367659			CN=ALBONETTI.JAMIE.LEIGH.1470083596,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470083596	ALBONETTI.JAMIE.LEIGH	15	53	3	7	0	\N	\N	\N	3	\N	f	1
+2186	t	seth.aldrich@boeing.com	Seth		Aldrich	5	8585776835			CN=ALDRICH.SETH.O.1008962126,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1008962126	ALDRICH.SETH.O	20	31	2	4	0	\N	\N	\N	3	\N	f	1
+2188	t	christopher.almeria@us.af.mil	Christopher		Almeria	5	5058467990	2467990		CN=ALMERIA.CHRISTOPHER.J.1167705444,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167705444	ALMERIA.CHRISTOPHER.J	8	6	3	5	0	\N	\N	\N	1	\N	f	2
+2190	t	richard.ammons@us.af.mil	Richard		Ammons	3	8508814474	6414474		CN=AMMONS.RICHARD.B.1246002807,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	AMMONS.RICHARD.B	21	15	1	11	0	\N	\N	\N	4	\N	f	2
+2256	t	lynn.bowman@navy.mil	Lynn		Bowman	3	2524648717			CN=BOWMAN.LYNN.J.1228632950,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	bowmanlj	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2192	t	lucas.f.anderson.civ@mail.mil	Lucas		Anderson	3	3152642781			CN=ANDERSON.LUCAS.F.1369336866,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1369336866	ANDERSON.LUCAS.F	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2194	t	matthew.a.arsenault@usmc.mil	Matthew		Arsenault	5	7574447818	4447818		CN=ARSENAULT.MATTHEW.A.1013726422,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1013726422	ARSENAULT.MATTHEW.A	6	149	3	79	0	\N	\N	\N	3	\N	f	1
+2198	t	robert.j.baker3.ctr@navy.mil	Robert		Baker	5	3019954630			CN=BAKER.ROBERT.JOHN.1298682164,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298682164	BAKER.ROBERT.JOHN	20	39	2	9	0	\N	\N	\N	4	\N	f	1
+2200	t	julius.e.banks@boeing.com	Julius		Banks	1	5714944800	6465465465		CN=Julius Banks,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494	BANKS.JULIUS.E	20	17	2	80	0	\N	\N	\N	3	\N	f	\N
+2202	t	ruber.banks@us.af.mil	Ruber		Banks	5	5757840892			CN=BANKS.RUBER.J.JR.1114922036,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114922036	banksrj	6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2204	t	tony.bare@us.af.mil	Tony		Bare	5	0000000000			CN=BARE.TONY.R.1057549919,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	BARE.TONY.R	21	8	1	4	0	\N	\N	\N	1	\N	f	2
+2206	t	hannah.baron@navy.mil	Hannah		Baron	3	8585778314			CN=BARON.HANNAH.P.1468176030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468176030	BARON.HANNAH.P	21	15	1	4	0	\N	\N	\N	4	\N	f	1
+2208	t	john.barron.4@us.af.mil	John		Barron	5	8508841313	5791310		CN=BARRON.JOHN.ANDREWS.1290419715,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290419715	BARRON.JOHN.ANDREWS	6	2	3	11	0	\N	\N	\N	1	\N	f	2
+2210	t	aldo.bassignani@navy.mil	Aldo		Bassignani	3	2524646640			CN=BASSIGNANI.ALDO.R.1258528154,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	BASSIGNANI.ALDO.R	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2212	t	timothy.batchler@usmc.mil	Timothy		Batchler	5	0116365665	315		CN=BATCHLER.TIMOTHY.P.1061411638,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061411638	BATCHLER.TIMOTHY.P	7	53	3	7	0	\N	\N	\N	3	\N	f	1
+2214	t	david.beaman@navy.mil	David		Beaman	3	2524646656	4516656		CN=BEAMAN.DAVID.C.1239535433,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239535433	BEAMAN.DAVID.C	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2216	t	anita.becerra@usmc.mil	Anita		Becerra	4	8585771318			CN=BECERRA.ANITA.KAREN.1455548922,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455548922	BECERRA.ANITA.KAREN	5	23	3	4	0	\N	\N	\N	3	\N	f	\N
+2218	t	robert.beeton.3@us.af.mil	Robert		Beeton	4	8508814301	6414301		CN=BEETON.ROBERT.ANDREW.1110660363,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	BEETON.ROBERT.ANDREW	20	15	2	11	0	\N	\N	\N	4	\N	f	\N
+2220	t	lee.bennett@usmc.mil	Lee		Bennett	5	3156367658	6367658		CN=BENNETT.LEE.FREDERICK.1163405365,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1163405365	BENNETT.LEE.FREDERICK	6	53	3	7	0	\N	\N	\N	3	\N	f	\N
+2222	t	steven.bergland@us.af.mil	Steven		Bergland	5	5757840917			CN=BERGLAND.STEVEN.JAMES GUNN.1294775486,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1294775486	BERGLAND.STEVEN.JAMES GUNN	5	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2224	t	mathew.bertalot@navy.mil	Mathew		Bertalot	3	2524646214			CN=BERTALOT.MATHEW.J.1147043054,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	BERTALOT.MATHEW.J	21	15	1	18	0	\N	\N	\N	3	\N	f	1
+2226	t	ted.beszterczei@navy.mil	Ted		Beszterczei	3	2524646183	4516183555		CN=BESZTERCZEI.TED.G.JR.1362611322,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	beszterczeitg	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2228	t	timothy.bierce@usmc.mil	Timothy		Bierce	5	7607630576			CN=BIERCE.TIMOTHY.ALLYN.1299735113,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299735113	BierceTA	5	46	3	8	0	\N	\N	\N	3	\N	f	1
+2230	t	robert.bierly@navy.mil	Robert		Bierly	1	3017570161			CN=BIERLY.ROBERT.JOHN.1007531318,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007531318	BIERLY.ROBERT.JOHN	20	19	2	9	0	\N	\N	\N	3	\N	f	1
+2232	t	mbiles@bh.com	Michael		Biles	5	8174716782	2383172	8172789485	CN=BILES.MICHAEL.RAY.1161201509,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1161201509	BILES.MICHAEL.RAY	20	21	2	13	0	\N	\N	\N	1	\N	f	2
+2234	f	daniel.blocker@navy.mil	Daniel	K	Blocker	\N				CN=BLOCKER.DANIEL.KEITH.1126306845,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BLOCKER.DANIEL.KEITH	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2236	t	kyle.blond@usmc.mil	Kyle		Blond	5	3156363285			CN=BLOND.KYLE.EDWARD.1379789486,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379789486	BLOND.KYLE.EDWARD	15	27	3	7	0	\N	\N	\N	3	\N	f	1
+2238	t	joshua.a.boaz@usmc.mil	Joshua		Boaz	5	8585771677			CN=BOAZ.JOSHUA.A.1088020991,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1088020991	BOAZ.JOSHUA.A	11	60	3	4	0	\N	\N	\N	3	\N	f	1
+2240	t	ronald.bogan@us.af.mil	Ronald		Bogan	5	8508812088	6412088		CN=BOGAN.RONALD.L.1081990030,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	BOGAN.RONALD.L	7	8	3	4	0	\N	\N	\N	1	\N	f	2
+2242	f	thomas.h.bonner@navy.mil	Thomas	H	Bonner	\N				CN=BONNER.THOMAS.HOWARD.JR.1134101578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BONNER.THOMAS.HOWARD.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2244	t	leanne.booth@navy.mil	Leanne		Booth	3	2524649978			CN=BOOTH.LEANNE.M.1262186683,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230678274	BOOTH.LEANNE.M	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+1725	t	travis.makarowski@navy.mil	Travis		Makarowski	4	2524646396			CN=MAKAROWSKI.TRAVIS.W.1141323233,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	TRAVIS MAKAROWSKI	21	23	1	18	0	\N	\N	\N	4	\N	f	\N
+2246	t	travis.borkowski@usmc.mil	Travis		Borkowski	5	8585778089			CN=BORKOWSKI.TRAVIS.CHRISTOPHER.1242523730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242523730	BORKOWSKI.TRAVIS.CHRISTOPHER	7	48	3	4	0	\N	\N	\N	3	\N	f	\N
+2248	t	brad.bosman@usmc.mil	Brad		Bosman	5	9104494357	4494357		CN=BOSMAN.BRAD.WILLIAM.1411008432,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411008432	BOSMAN.BRAD.WILLIAM	5	25	3	2	0	\N	\N	\N	3	\N	f	\N
+37	t	alexandra.poole@oem.com	Alexandra	E	Poole	\N	1115551212	\N	\N		\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:03:54.621326	\N	\N	\N	\N	t	\N
+2250	f	andrew.boston@usmc.mil	Andrew	M	Boston	\N				CN=BOSTON.ANDREW.MARK.1387733848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BOSTON.ANDREW.MARK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2252	t	kennth.bowden@usmc.mil	Kenneth		Bowden	5	9104497231			CN=BOWDEN.KENNETH.WEST.1365099894,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365099894	BOWDEN.KENNETH.WEST	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2254	t	joshua.bowen.1@us.af.mil	Joshua		Bowen	5	0163854461	2384613		CN=BOWEN.JOSHUA.NATHAN.1258473244,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258473244	BOWEN.JOSHUA.NATHAN	6	4	3	13	0	\N	\N	\N	1	\N	f	2
+3498	t	jason.kern@boeing.com	Kern		Jason	1	8584328223			CN=Jason.Kern.2829505,OU=people,O=boeing,C=us	2829505		20	42	2	4	0	\N	\N	\N	3	\N	t	\N
+2258	t	brian.m.boyer@rolls-royce.com	Brian		Boyer	1	8582205619	2671332455		CN=BOYER.BRIAN.MICHAEL.1400960476,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	BOYER.BRIAN.MICHAEL	20	34	2	4	0	\N	\N	\N	3	\N	f	\N
+2260	f	james.brady.4@us.af.mil	James	B	Brady	\N				CN=BRADY.JAMES.B.1082207151,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BRADY.JAMES.B	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2262	t	scott.braun.2@us.af.mil	Scott		Braun	5	8508815007	6415007		CN=BRAUN.SCOTT.MICHAEL.1256185837,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256185837	BRAUN.SCOTT.MICHAEL	6	2	3	11	0	\N	\N	\N	1	\N	f	2
+2264	t	eric.brodd@usmc.mil	Eric		Brodd	5	3156363938			CN=BRODD.ERIC.ANDREW.1176157166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176157166	BRODD.ERIC.ANDREW	12	27	3	7	0	\N	\N	\N	3	\N	f	\N
+2266	t	kara.brody@navy.mil	Kara		Brody	3	2524646209			CN=BRODY.KARA.M.1470493697,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470493697	BRODY.KARA.M	21	15	1	18	0	\N	\N	\N	3	\N	f	\N
+2268	t	douglas.brown0@usmc.mil	Douglas		Brown	3	8585774862			CN=BROWN.DOUGLAS.T.1228825553,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1228825553	BROWN.DOUGLAS.T	21	10	1	4	0	\N	\N	\N	3	\N	f	1
+2270	f	tyler.budgen@usmc.mil	Tyler	D	Budgen	\N				CN=BUDGEN.TYLER.DEAN.1399618360,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BUDGEN.TYLER.DEAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2272	f	matthew.burazin@usmc.mil	Matthew	J	Burazin	\N				CN=BURAZIN.MATTHEW.JOHN.1392126984,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BURAZIN.MATTHEW.JOHN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2274	t	joseph.burros@usmc.mil	Joseph		Burros	5	7607253562			CN=BURROS.JOSEPH.STEVEN.1454771644,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454771644	BURROS.JOSEPH.STEVEN	5	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2276	t	dbutler3@bellhelicopter.textron.com	Douglas		Butler	4	8063670448			CN=BUTLER.DOUGLAS.A.1153560524,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1153560524	butlerda	20	39	2	9	0	\N	\N	\N	3	\N	f	1
+2278	t	james.m.butler2@navy.mil	James		Butler	3	2524645666			CN=BUTLER.JAMES.M.1196731888,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1196731888	Butlerjm	20	15	1	18	0	\N	\N	\N	4	\N	f	1
+2282	f	ethan.calvin@usmc.mil	Ethan	F	Calvin	\N				CN=CALVIN.ETHAN.FRANNELL.1124658353,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	CALVIN.ETHAN.FRANNELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2284	t	joshua.campbell.17@us.af.mil	Joshua		Campbell	5	5058467456	8467456		CN=CAMPBELL.JOSHUA.RYAN.1390748198,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1390748198	CAMPBELL.JOSHUA.RYAN	5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2286	t	zachary.capps@navy.mil	Zachary		Capps	3	2527207946			CN=CAPPS.ZACHARY.W.1105031706,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1105031706	CAPPS.ZACHARY.W	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2288	f	michael.card@us.af.mil	Michael	A	Card	\N				CN=CARD.MICHAEL.ALAN.1102153150,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	CARD.MICHAEL.ALAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2290	t	patrick.j.carr@usmc.mil	Patrick		Carr	5	9104497685			CN=CARR.PATRICK.JAMES.1411011166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411011166	CARR.PATRICK.JAMES	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2292	t	kevin.champaigne1@usmc.mil	Kevin		Champaigne	5	9104496116	7526116		CN=CHAMPAIGNE.KEVIN.FRANCIS.1242238660,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242238660	CHAMPAIGNE.KEVIN.FRANCIS	16	25	3	2	0	\N	\N	\N	3	\N	f	\N
+2280	t	bryant.calcote@us.af.mil	Bryant		Calcote	3	8508812534	6412534		CN=CALCOTE.BRYANT.R.1268086443,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268086443	CALCOTE.BRYANT.R	21	15	1	11	0	\N	\N	\N	4	\N	f	2
+2294	t	jason.charpia@us.af.mil	Jason		Charpia	5	3142383192	2383192		CN=CHARPIA.JASON.W.1159871149,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159871149	CHARPIA.JASON.W	7	4	3	13	0	\N	\N	\N	1	\N	f	2
+2296	t	gary.christie@navy.mil	Gary		Christie	4	2524646232	4516232		CN=CHRISTIE.GARY.W.1055348878,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055348878	CHRISTIE.GARY.W	21	15	1	18	0	\N	\N	\N	3	\N	f	\N
+2298	t	jason.cirioni@us.af.mil	Jason		Cirioni	5	0163854614	2386143		CN=CIRIONI.JASON.C.1235313100,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235313100	CIRIONI.JASON.C	6	4	3	13	0	\N	\N	\N	1	\N	f	2
+2300	t	jacob.a.clark2@usmc.mil	Jacob		Clark	5	7607250576			CN=CLARK.JACOB.ALEXANDER.1290918312,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290918312	CLARK.JACOB.ALEXANDER	6	46	3	6	0	\N	\N	\N	3	\N	f	1
+3030	t	gregory.turney@navy.mil	Gregory		Turney	3	2524648725			CN=TURNEY.GREGORY.D.1229828670,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229828670	turneygd	21	15	1	18	0	\N	\N	\N	3	\N	f	1
+3032	t	christopher.k.underw@navy.mil	Christopher		Underwood	3	2524645313			CN=UNDERWOOD.CHRISTOPHER.K.1367940030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	UNDERWOOD.CHRISTOPHER.K	20	15	1	18	0	\N	\N	\N	3	\N	f	1
+3034	t	roy.uyematsu@us.af.mil	Roy		Uyematsu	3	5759045226	6405226		CN=UYEMATSU.ROY.S.1400711166,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	UYEMATSU.ROY.S	21	15	1	12	0	\N	\N	\N	4	\N	f	2
+3036	t	roy.vancamp.ctr@navy.mil	Roy		Vancamp	5	3017570078			CN=VANCAMP.ROY.EDWARD.1051054748,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051054748	VANCAMP.ROY.EDWARD	20	39	2	9	0	\N	\N	\N	4	\N	f	\N
+3038	t	gerald.vanderstar@usmc.mil	Gerald		Vanderstar	5	9104495865	7825867		CN=VANDERSTAR.GERALD.ELWIN.JR.1093870880,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093870880	VANDERSTAR.GERALD.ELWIN.JR	7	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3040	t	ramon.f.vasquez1@usmc.mil	Ramon		Vasquez	5	9104496839			CN=VASQUEZ.RAMON.F.1187351568,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187351568	VASQUEZ.RAMON.F	16	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3042	t	timothy.j.vaughn@usmc.mil	Timothy		Vaughn	5	9104496065			CN=VAUGHN.TIMOTHY.JOSHUA.1024275180,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024275180	VAUGHN.TIMOTHY.JOSHUA	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+3044	t	leigha.mabe@usmc.mil	Leigha		Veganunez	3	2544627512			CN=VEGANUNEZ.LEIGHA.MARIE.1462636039,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462636039	VEGANUNEZ.LEIGHA.MARIE	3	25	3	77	0	\N	\N	\N	3	\N	f	1
+3046	t	vvillasenor@bh.com	Victor		Villasenor	5	8172401371		8585776830	CN=VILLASENOROJEDA.VICTOR.IVAN.1273605823,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	VILLASENOROJEDA.VICTOR.IVAN	20	31	2	8	0	\N	\N	\N	3	\N	f	1
+3048	t	mvonbergen@bh.com	Michael		Vonbergen	5	8508812651	6412651		CN=VON BERGEN.MICHAEL.EDWARD.1257076551,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257076551	VON BERGEN.MICHAEL.EDWARD	20	16	2	11	0	\N	\N	\N	1	\N	f	2
+3050	t	christopher.voss@usmc.mil	Christopher		Voss	5	3156367661	6367661		CN=VOSS.CHRISTOPHER.JIN.1138177820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1138177820	VOSS.CHRISTOPHER.JIN	12	53	3	7	0	\N	\N	\N	3	\N	f	\N
+3052	t	cory.walker@usmc.mil	Cory		Walker	5	7703612330			CN=WALKER.CORY.DAVID.1410844580,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410844580	WALKER.CORY.DAVID	15	60	3	4	0	\N	\N	\N	3	\N	f	\N
+3054	t	kayo.walton@usmc.mil	Kayo		Walton	1	3156362763			CN=WALTON.KAYO.SCOTT.1397892928,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1397892928	WALTON.KAYO.SCOTT	5	27	3	7	0	\N	\N	\N	3	\N	f	1
+3056	t	william.ward@whmo.mil	William		Ward	5	5714944730			CN=WARD.WILLIAM.ROLAND.1288491352,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288491352	WARD.WILLIAM.ROLAND	6	17	3	80	0	\N	\N	\N	3	\N	f	\N
+3060	t	aaron.watson@navy.mil	Aaron		Watsonss	1	1234567890	654654622		abc	1065484494	aaron.watson	4	3	2	17	0	\N	\N	\N	2	\N	f	\N
+3062	t	tana.watters@navy.mil	Tana		Watters	5	2524646901	4516901		CN=WATTERS.TANA.S.1155533729,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1155533729	WATTERS.TANA.S	21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3064	t	brenton.webster@usmc.mil	Brenton		Webster	5	9104497087			CN=WEBSTER.BRENTON.LEE.1267734549,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267734549	WEBSTER.BRENTON.LEE	6	58	3	2	0	\N	\N	\N	3	\N	f	\N
+3066	t	james.welch2@usmc.mil	James		Welch	5	3156362000	6362000		CN=WELCH.JAMES.LEE.1242208397,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242208397	WELCH.JAMES.LEE	15	27	3	7	0	\N	\N	\N	3	\N	f	\N
+3068	t	john.wells2@whmo.mil	John		Wells	5	5714944729			CN=WELLS.JOHN.KEVINMCDONALD.1267841060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267841060	WELLS.JOHN.KEVINMCDONALD	6	17	3	9	0	\N	\N	\N	3	\N	f	1
+3070	t	aaron.wermy@us.af.mil	Aaron		Wermy	5	8508847515	1236548798		CN=WERMY.AARON.JOSEPH.1269270841,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	WERMY.AARON.JOSEPH	6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+3072	t	maurice.wertz@navy.mil	Maurice		Wertz	4	2524645038	4515038		CN=WERTZ.MAURICE.H.1061301336,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061301336	WERTZ.MAURICE.H	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+3074	f	thornton.west@usmc.mil	Thornton	D	West	\N				CN=WEST.THORNTON.DOUGLAS.1365254920, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	westtd	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3076	t	amy.wheary@navy.mil	Amy		Wheary	3	9104494080			CN=WHEARY.AMY.LYNN.1364811094,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364811094	WHEARY.AMY.LYNN	21	15	1	2	0	\N	\N	\N	3	\N	f	\N
+3078	t	kelly.r.white@navy.mil	Kelly		White	1	2524648388	6546546544	1231231234	CN=WHITE.KELLY.REEVES.1069624240,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	whitekr	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3080	t	erin.whitley@navy.mil	Erin		Whitley	3	3017572427			CN=WHITLEY.ERIN.D.1256859897,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256859897	WHITLEY.ERIN.D	21	38	1	9	0	\N	\N	\N	3	\N	f	1
+3082	t	jrwilliams@ltminc.net	Jimmy		Williams	4	2525157281			CN=WILLIAMS.JIMMY.R.1064495867,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064495867	WILLIAMS.JIMMY.R	20	15	2	18	0	\N	\N	\N	3	\N	f	\N
+3084	f	jon.r.williams@usmc.mil	Jon	R	Williams	\N				CN=WILLIAMS.JON.RUSSELL.1407029808,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	WILLIAMS.JON.RUSSELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3086	t	thomas.williams.41@us.af.mil	Thomas		Williams	5	5757840917	6810917		CN=WILLIAMS.THOMAS.CLAY.1288227779,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288227779	WILLIAMS.THOMAS.CLAY	5	3	3	12	0	\N	\N	\N	1	\N	f	2
+3088	t	matthew.willman@usmc.mil	Matthew		Willman	5	7607631468			CN=WILLMAN.MATTHEW.SCOTT.1258495280,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258495280	WILLMAN.MATTHEW.SCOTT	6	57	3	8	0	\N	\N	\N	3	\N	f	\N
+3090	f	jimmy.winn.1@us.af.mil	Jimmy	D	Winn	\N				CN=WINN.JIMMY.D.JR.1042870303,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	WINN.JIMMY.D.JR	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3092	t	zachary.winter@usmc.mil	Zachary		Winter	5	9104497252			CN=WINTER.ZACHARY.CHARLES.1467472158,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467472158	WINTER.ZACHARY.CHARLES	4	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3094	t	maksim.wolkoff@usmc.mil	Maksim		Wolkoff	5	4405250046			CN=WOLKOFF.MAKSIM.SERGEY.1379358370,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379358370	WOLKOFF.MAKSIM.SERGEY	5	56	3	4	0	\N	\N	\N	3	\N	f	\N
+3096	t	trevor.won@navy.mil	Trevor		Won	3	2524646638			CN=WON.TREVOR.WAY KWONG.1515309299,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1515309299	WON.TREVOR.WAY KWONG	20	10	1	18	0	\N	\N	\N	4	\N	f	1
+3098	t	matthew.wuensch@us.af.mil	Matthew		Wuensch	5	8508846954			CN=WUENSCH.MATTHEW.LEE.1266724922,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266724922	WUENSCH.MATTHEW.LEE	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+3100	t	alan.c.young@usmc.mil	Alan		Young	5	7574447818			CN=YOUNG.ALAN.CY.1267735812,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267735812	YOUNG.ALAN.CY	6	149	3	79	0	\N	\N	\N	3	\N	f	1
+1536	t	steven.hagene@navy.mil	Steven		Hagene	5	2524646386		3232323232	CN=HAGENE.STEVEN.EARL.1287802451,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	STEVEN HAGENE	21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3102	t	richard.j.ytzen@boeing.com	Richard		Ytzen	5	8586927204			CN=Richard Ytzen,OU=BOEING,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233	YTZEN.RICHARD.J	20	31	2	8	0	\N	\N	\N	3	\N	f	1
+3104	t	kevin.zydowsky@usmc.mil	Kevin		Zydowsky	5	7607253262			CN=ZYDOWSKY.KEVIN.ROBERT.1460507223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460507223	ZYDOWSKY.KEVIN.ROBERT	4	28	3	8	0	\N	\N	\N	3	\N	f	\N
+3105	t	tyrone.trotter@us.af.mil	Tyrone		Trotter	1	5058537620	2637620		CN=TROTTER.TYRONE.D.1116385259,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116385259		8	6	3	5	0	\N	\N	\N	1	\N	f	\N
+3109	t	michael.graven@us.af.mil	Michael		Graven	5	5757840919			CN=GRAVEN.MICHAEL.JOHN.1103449177,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1103449177		6	3	3	12	0	\N	\N	\N	1	\N	f	\N
+3110	t	james.pels.2@us.af.mil	James		Pels	3	8508812690			CN=PELS.JAMES.FRANCIS.1262048698,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1262048698		21	2	1	11	0	\N	\N	\N	1	\N	f	\N
+3111	t	allen.h.lee@navy.mil	Allen		Lee	3	2524646200	4516200		CN=LEE.ALLEN.H.IV.1513381863,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513381863		20	10	1	18	0	\N	\N	\N	4	\N	f	1
+3112	t	christopher.celestin@navy.mil	Christopher		Celestino	3	2524646651			CN=CELESTINO.CHRISTOPHER.ROBERT.1268041008,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268041008		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3113	f	seth.rosbrugh@us.af.mil	Seth		Rosbrugh	5	5752182564	7840910		CN=ROSBRUGH.SETH.LOUIS.1292506887,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+3114	f	scott.m.hoffman.ctr@navy.mil	Scott		Hoffman	4	3018636512			CN=HOFFMAN.SCOTT.M.1046531236,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1046531236		20	38	2	9	0	\N	\N	\N	4	\N	f	2
+3115	t	joshua.johannsen@usmc.mil	Joshua		Johannsen	5	9104497228			CN=JOHANNSEN.JOSHUA.EDWARD.1454919749,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454919749		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+1770	t	shawn.shea@makin-island.usmc.mil	Shawn		Shea	1	8585279968			CN=SHEA.SHAWN.MICHAEL.1253214992,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253214992		20	31	2	4	0	\N	\N	\N	3	\N	f	\N
+2000	t	paul.charron@navy.mil	Paul		Charron	3	2524646113			CN=CHARRON.PAUL.W.1513905404,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513905404		21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2010	t	jared.kuhn.1@us.af.mil	Jared		Kuhn	5	8508847543	5797543		CN=KUHN.JARED.THOMAS.1383075552,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1383075552		5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2016	f	roy.zeisloft@us.af.mil	Roy		Zeisloft	5	5052467610	8467610		CN=ZEISLOFT.ROY.LEE.II.1270641012,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2017	t	kenneth.bobby@usmc.mil	Kenneth		Bobby	5	3183455282			CN=BOBBY.KENNETH.STEPHEN.JR.1025144402,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025144402		16	56	3	6	0	\N	\N	\N	3	\N	f	1
+2018	t	matthew.brownell@usmc.mil	Matthew		Brownell	1	9104497231			CN=BROWNELL.MATTHEW.SPENCER.1454761827,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454761827		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2029	t	thankins@bh.com	Tobias		Hankins	5	8588373106			CN=HANKINS.TOBIAS.MICHAEL.1083773886,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564		20	31	2	4	0	\N	\N	\N	3	\N	f	1
+2030	t	christopher.o.pierce@usmc.mil	Christopher		Pierce	5	9104496053			CN=PIERCE.CHRISTOPHE.OSBORNE.1238010523,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1238010523		6	49	3	2	0	\N	\N	\N	3	\N	f	1
+2031	f	jaron.franklin.1@us.af.mil	Jaron		Franklin	5	5058467456	2467456		CN=FRANKLIN.JARON.EDWARD.1100606867,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2032	f	jason.burtnick@navy.mil	Jason		Burtnick	3	2524646178			CN=BURTNICK.JASON.E.1041579494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2033	t	paul.edwards.6@us.af.mil	Paul		Edwards	5	8508841313	579131		CN=EDWARDS.PAUL.CHANNING.1118769852,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118769852		6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2034	t	joseph.hollingsworth@usmc.mil	Joseph		Hollingsworth	5	7607630578	3610578		CN=HOLLINGSWORTH.JOSEPH.HERBERT.1235103172,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235103172		7	46	3	8	0	\N	\N	\N	3	\N	f	\N
+2035	t	david.denis@us.af.mil	David		Denis	5	5058467456	2467456		CN=DENIS.DAVID.JOSEPH.1281048771,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281048771		6	6	3	5	0	\N	\N	\N	1	\N	f	\N
+2042	t	tyler.thielen@usmc.mil	Tyler		Thielen	5	6193287107			CN=THIELEN.TYLER.AUSTIN.1455431855,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455431855		5	23	3	4	0	\N	\N	\N	3	\N	f	1
+2046	t	john.l.reeder@boeing.com	John		Reeder	1	6105917639			CN=John Reeder,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	1	18	0	\N	\N	\N	3	\N	f	1
+2047	t	v327mxgqa@us.af.mil	Christopher		Taylor	5	5757840919			CN=TAYLOR.CHRISTOPHER.DEWAYNE.1290425588,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290425588		6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2052	t	amado.m.aviles.civ@mail.mil	Amado		Aviles	3	8004736597	3152643		CN=AVILES.AMADO.M.1277023977,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277023977		21	14	1	4	0	\N	\N	\N	4	\N	f	\N
+2056	t	v327mxgqa@us.af.mil	Lindsey		Stanley	5	5757840919	6810919		CN=STANLEY.LINDSEY.MICHELE.1275079851,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275079851		5	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2057	f	darryl.saliva@us.af.mil	Darryl		Saliva	5	5058467622			CN=SALIVA.DARRYL.UCOL.1369370266,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	5	0	\N	\N	\N	1	\N	f	2
+2058	t	michael.gruetzmacher@us.af.mil	Michael		Gruetzmacher	5	5757840919	6810919		CN=GRUETZMACHER.MICHAEL.GORDON.1401461511,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1401461511		5	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2059	t	v327mxgqa@us.af.mil	Seth		Bolles	5	5757840919	6810919		CN=BOLLES.SETH.GABRIEL.1367100040,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367100040		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+2061	t	v327mxgqa@us.af.mil	Daniel		Johnson	5	5757840919	6810919		CN=JOHNSON.DANIEL.JAMES.1137781839,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137781839		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+2062	f	james.gerlach@us.af.mil	James		Gerlach	5	5757840919			CN=GERLACH.JAMES.J.1101906589,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1101906589		6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2070	t	clayton.loper@us.af.mil	Clayton		Loper	5	5757840919	6810919		CN=LOPER.CLAYTON.ANDREW.1273809925,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273809925		6	3	3	12	0	\N	\N	\N	1	\N	f	2
+3116	t	jeffrey.r.binder.ctr@navy.mil	Jeffrey		Binder	5	3019954632			CN=BINDER.JEFFREY.RONALD.1029486081,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029486081		21	39	2	9	0	\N	\N	\N	4	\N	f	\N
+2770	t	rodney.olsen@navy.mil	Rodney		Olsen	3	2524646109	9426109		CN=OLSEN.RODNEY.J.1251907273,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	OLSEN.RODNEY.J	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2772	t	steven.orth@usmc.mil	Steven		Orth	5	8585778155			CN=ORTH.STEVEN.ANTONIO.1368373601,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368373601	ORTH.STEVEN.ANTONIO	5	43	3	4	0	\N	\N	\N	3	\N	f	1
+2774	f	donovan.ossman@usmc.mil	Donovan	M	Ossman	\N				CN=OSSMAN.DONOVAN.MICHEAL.1501333570,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	OSSMAN.DONOVAN.MICHEAL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2776	t	joseph.pacella@navy.mil	Joseph		Pacella	3	7323231668			CN=PACELLA.JOSEPH.M.1366314608,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1366314608	PACELLA.JOSEPH.M	21	15	1	3	0	\N	\N	\N	4	\N	f	1
+2778	t	mario.paez@navy.mil	Mario		Paez	3	2524648648			CN=PAEZ.MARIO.A.1297539589,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1297539589	PAEZ.MARIO.A	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2780	t	garrett.h.page@navy.mil	Garrett		Page	3	2524646199	4516199		CN=PAGE.GARRETT.H.1455290380,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455290380	PAGE.GARRETT.H	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2782	f	ian.page@usmc.mil	Ian	R	Page	\N				CN=PAGE.IAN.RUSSELL.1366778612,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PAGE.IAN.RUSSELL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2784	t	casey.parkins@usmc.mil	Casey		Parkins	5	3156366249	3156366		CN=PARKINS.CASEY.LEE.1276588997,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276588997	PARKINS.CASEY.LEE	6	50	3	7	0	\N	\N	\N	3	\N	f	1
+2786	t	edwin.partridge@usmc.mil	Edwin		Partridge	5	9282696834			CN=PARTRIDGE.EDWIN.JAMES.1283144344,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283144344	PARTRIDGE.EDWIN.JAMES	6	62	3	4	0	\N	\N	\N	3	\N	f	1
+2788	t	michell.n.patrick@boeing.com	Michell		Patrick	5	8582455974			CN=PATRICK.MICHELL.N.JR.1155108602,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	PATRICK.MICHELL.N.JR	20	31	2	4	0	\N	\N	\N	3	\N	f	1
+2790	t	nicholas.paulson@whmo.mil	Nicholas		Paulson	5	5714944730			CN=PAULSON.NICHOLAS.BRADFORD.1260253260,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260253260	PAULSON.NICHOLAS.BRADFORD	7	17	3	9	0	\N	\N	\N	3	\N	f	1
+2792	t	adil.pence@boxer.usmc.mil	Adil		Pence	5	8585778087			CN=PENCE.ADIL.MEGUINJESSE.1279863905,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279863905	PENCE.ADIL.MEGUINJESSE	6	48	3	4	0	\N	\N	\N	3	\N	f	1
+2794	t	aimee.perkins@usmc.mil	Aimee		Perkins	3	8585778349			CN=PERKINS.AIMEE.LYNN.1279371166,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279371166	PERKINS.AIMEE.LYNN	21	15	1	4	0	\N	\N	\N	3	\N	f	1
+2796	t	torey.pesterre@usmc.mil	Torey		Pesterre	5	8585779388			CN=PESTERRE.TOREY.WILLIAM.1299547007,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299547007	PESTERRE.TOREY.WILLIAM	5	60	3	4	0	\N	\N	\N	3	\N	f	1
+2798	t	jonathan.peter@us.af.mil	Jonathan		Peter	5	8508841309	5791309		CN=PETER.JONATHAN.ROBERT.1391455178,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1391455178	PETER.JONATHAN.ROBERT	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2800	f	marion.phelps@usmc.mil	Marion	R	Phelps	\N				CN=PHELPS.MARION.RYAN.1141912018,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PHELPS.MARION.RYAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2802	t	roger.phillip@usmc.mil	Roger		Phillip	5	8585778105			CN=PHILLIP.ROGER.GILLIAN.1268617228,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268617228	PHILLIP.ROGER.GILLIAN	6	48	3	4	0	\N	\N	\N	3	\N	f	\N
+2804	t	chad.phillipp@makin-islandusmc.mil	Chad		Phillipp	5	8585779485	2679485		CN=PHILLIPP.CHAD.D.1137880373,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137880373	PHILLIPP.CHAD.D	7	45	3	4	0	\N	\N	\N	3	\N	f	\N
+2806	t	steven.pickering@usmc.mil	Steven		Pickering	1	9104497225			CN=PICKERING.STEVEN.DUANE.1367858776,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367858776	PICKERING.STEVEN.DUANE	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2808	t	irving.pierson@navy.mil	Irving		Pierson	1	3019954372			CN=PIERSON.IRVING.T.1034644868,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1034644868	PIERSON.IRVING.T	20	39	2	9	0	\N	\N	\N	3	\N	f	\N
+2810	t	robert.pike.11@us.af.mil	Robert		Pike	4	8508814312	6414312		CN=PIKE.ROBERT.L.1170175782,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	PIKE.ROBERT.L	20	15	1	11	0	\N	\N	\N	4	\N	f	2
+2812	t	cory.pinkelton@navy.mil	Cory		Pinkelton	3	2524648912			CN=PINKELTON.CORY.A.1454889696,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454889696	PINKELTON.CORY.A	21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2814	t	daniel.plank@usmc.mil	Daniel		Plank	5	8585778050			CN=PLANK.DANIEL.CHARLES.1264228995,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264228995	PLANK.DANIEL.CHARLES	6	56	3	4	0	\N	\N	\N	3	\N	f	\N
+2816	t	isaac.plummer@us.af.mil	Isaac		Plummer	1	5058535752			CN=PLUMMER.ISAAC.H.1110186769,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110186769	PLUMMER.ISAAC.H	7	6	3	5	0	\N	\N	\N	1	\N	f	\N
+2818	t	douglas.pope.1@us.af.mil	Douglas		Pope	5	5055635089			CN=POPE.DOUGLAS.SHANE.1257580152,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257580152	POPE.DOUGLAS.SHANE	6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2820	t	richard.pope@us.af.mil	Richard		Pope	5	8508841313	5791313		CN=POPE.RICHARD.PATRICK.1173558631,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1173558631	POPE.RICHARD.PATRICK	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2822	f	brandon.porter@navy.mil	Brandon	E	Porter	\N				CN=PORTER.BRANDON.E.1274371125,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	PORTER.BRANDON.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2824	t	darren.pugh@usmc.mil	Darren		Pugh	5	9104496267			CN=PUGH.DARREN.TAYLOR.1471128593,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1471128593	PUGH.DARREN.TAYLOR	3	25	3	2	0	\N	\N	\N	3	\N	f	\N
+2826	t	erick.ramirez2@usmc.mil	Erick		Ramirez	4	8183708395			CN=RAMIREZ.ERICK.ALBERT.1465235728,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465235728	RAMIREZ.ERICK.ALBERT	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2828	t	christopher.ramos3@usmc.mil	Christopher		Ramos	5	3156366230			CN=RAMOS.CHRISTOPHER.1386546840,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1386546840	RAMOS.CHRISTOPHER	15	50	3	7	0	\N	\N	\N	3	\N	f	1
+2830	t	garrett.rayfield@us.af.mil	Garrett		Rayfield	3	0162381862			CN=RAYFIELD.GARRETT.WILLIAM.1404262374,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404262374	RAYFIELD.GARRETT.WILLIAM	5	4	3	13	0	\N	\N	\N	1	\N	f	2
+2832	t	jay.raymond@usmc.mil	Jay		Raymond	1	9104497225			CN=RAYMOND.JAY.LYNN.1409033730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1409033730	RAYMOND.JAY.LYNN	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2834	t	abdul.rehman@navy.mil	Abdul		Rehman	3	2524646152	12365455		CN=REHMAN.ABDUL.1387296073,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	REHMAN.ABDUL	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2836	t	daniel.reinbolz@us.af.mil	Daniel		Reinbolz	4	3142384613	2384613		CN=REINBOLZ.DANIEL.JOSEPH.1374792764,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374792764	REINBOLZ.DANIEL.JOSEPH	5	4	3	13	0	\N	\N	\N	1	\N	f	2
+2838	t	ryan.w.reinhart@navy.mil	Ryan		Reinhart	1	2527208289			CN=REINHART.RYAN.W.1079107022,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1079107022	REINHART.RYAN.W	20	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2840	t	kenneth.rhoades@usmc.mil	Kenneth		Rhoades	5	9104494684	7524684		CN=RHOADES.KENNETH.J.1024284928,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024284928	RHOADES.KENNETH.J	7	61	3	2	0	\N	\N	\N	3	\N	f	\N
+2842	f	matthew.richter@whmo.mil	Matthew	R	Richter	\N				CN=RICHTER.MATTHEW.R.1185849089,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RICHTER.MATTHEW.R	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2844	t	louann.rickley.ctr@usmc.mil	Louann		Rickley	5	7607253800	3653800		CN=RICKLEY.LOUANN.1038732605,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038732605	RICKLEY.LOUANN	20	28	2	8	0	\N	\N	\N	3	\N	f	\N
+3190	t	nichole.gill@navy.mil	Nichole		Gill	3	2524646246	4516246		CN=GILL.NICHOLE.A.1385637230,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540		21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2848	t	frederick.m.ridenour@boeing.com	Mike		Ridenour	5	9104494161			CN=RIDENOUR.FREDERICK.M.JR.1183962520,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1183962520	RIDENOUR.FREDERICK.M.JR	20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+2850	t	justin.rivenburgh@usmc.mil	Justin		Rivenburgh	3	8585779107			CN=RIVENBURGH.JUSTIN.MICHAEL.1248797335,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248797335	RIVENBURGH.JUSTIN.MICHAEL	6	45	3	4	0	\N	\N	\N	3	\N	f	1
+2852	t	michael.rivera.41.ctr@us.af.mil	Michael		Rivera	5	8508812529			CN=RIVERA.MICHAEL.A.1025058026,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025058026	RIVERA.MICHAEL.A	21	2	2	11	0	\N	\N	\N	1	\N	f	2
+2854	t	john.w.roberts1@usmc.mil	John		Roberts	4	8585779409			CN=ROBERTS.JOHN.WESLEY.1233747765,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233747765	ROBERTS.JOHN.WESLEY	6	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2856	f	shawn.roberts@usmc.mil	Shawn	A	Roberts	\N				CN=ROBERTS.SHAWN.A.1252406359, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	robertssa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2858	t	kevin.robertson.6@us.af.mil	Kevin		Robertson	4	1638543195	2383195		CN=ROBERTSON.KEVIN.N.JR.1241713888,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241713888	ROBERTSON.KEVIN.N.JR	7	4	3	13	0	\N	\N	\N	1	\N	f	2
+2860	t	noah.robertson@navy.mil	Noah		Robertson	3	2524646690			CN=ROBERTSON.NOAH.DON.1248051350,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248051350	ROBERTSON.NOAH.DON	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2862	f	edwin.e.rodriguez@usmc.mil	Edwin	E	Rodriguez	\N				CN=RODRIGUEZ.EDWIN.E.1182147350,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RODRIGUEZ.EDWIN.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2864	t	harry.rodriguez.2@us.af.mil	Harry		Rodriguez	5	5757840529	6810529		CN=RODRIGUEZ.HARRY.W.1236518481,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236518481	RODRIGUEZ.HARRY.W	7	3	3	12	0	\N	\N	\N	1	\N	f	2
+2866	t	larodriguez@bh.com	Luis		Rodriguez	5	9102657199			CN=RODRIGUEZ.LUIS.A.JR.1256874810,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256874810	RODRIGUEZ.LUIS.A.JR	20	17	2	80	0	\N	\N	\N	3	\N	f	1
+2868	f	richard.l.rodriguez2@usmc.mil	Richard	L	Rodriguez	\N				CN=RODRIGUEZ.RICHARD.L.1018270567,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	RODRIGUEZ.RICHARD.L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2870	t	lance.roe@us.af.mil	Lance		Roe	4	8508841310	5791310		CN=ROE.LANCE.W.1106116489,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1106116489	ROE.LANCE.W	7	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2872	t	edward.g.roeloffzen2@boeing.com	Edward		Roeloffzen	5	3142384654			CN=ROELOFFZEN.EDWARD.G.1084094958,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	ROELOFFZEN.EDWARD.G	20	21	2	13	0	\N	\N	\N	1	\N	f	2
+2874	t	alan.roos.1@us.af.mil	Alan		Roos	5	5058464841	2464841		CN=ROOS.ALAN.L.1178650668,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1178650668	ROOS.ALAN.L	21	6	1	5	0	\N	\N	\N	1	\N	f	2
+2876	t	pwrosenberger@bh.com	Paul		Rosenberger	5	3017570077			CN=ROSENBERGER.PAUL.WARREN.JR.1042638699,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042638699	ROSENBERGER.PAUL.WARREN.JR	20	39	2	9	0	\N	\N	\N	3	\N	f	1
+2878	t	eric.rowland@usmc.mil	Eric		Rowland	5	9104497247			CN=ROWLAND.ERIC.TODD.1298377981,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298377981	ROWLAND.ERIC.TODD	5	25	3	2	0	\N	\N	\N	3	\N	f	\N
+2880	t	stephen.rubel@usmc.mil	Stephen		Rubel	5	7574447818			CN=RUBEL.STEPHEN.LINCOLN.JR.1240844237,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240844237	RUBEL.STEPHEN.LINCOLN.JR	11	149	3	79	0	\N	\N	\N	3	\N	f	1
+2882	t	damien.ruggieri@usmc.mil	Damien		Ruggieri	5	9175179492			CN=RUGGIERI.DAMIEN.JOSEPH.1018541323,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018541323	RUGGIERI.DAMIEN.JOSEPH	6	51	3	2	0	\N	\N	\N	3	\N	f	\N
+2884	t	antonio.ruiz@usmc.mil	Antonio		Ruiz	2	9104497368			CN=RUIZ.ANTONIO.RAMOS.JR.1362432266,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362432266	RUIZ.ANTONIO.RAMOS.JR	5	54	3	2	0	\N	\N	\N	3	\N	f	1
+2886	t	adam.ruse@usmc.mil	Adam		Ruse	5	9104495661			CN=RUSE.ADAM.CHRISTOPHER.1250422365,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250422365	RUSE.ADAM.CHRISTOPHER	6	61	3	2	0	\N	\N	\N	3	\N	f	1
+2888	t	michael.rusinchak@us.af.mil	Michael		Rusinchak	4	8508846492	5796492		CN=RUSINCHAK.MICHAEL.J.1038598208,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038598208	RUSINCHAK.MICHAEL.J	7	2	3	11	0	\N	\N	\N	1	\N	f	2
+2890	t	matthew.russell1@usmc.mil	Matthew		Russell	5	9104497073			CN=RUSSELL.MATTHEW.ROY.1258748294,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258748294	RUSSELL.MATTHEW.ROY	16	52	3	2	0	\N	\N	\N	3	\N	f	1
+2892	t	westley.sage@us.af.mil	Westley		Sage	1	5757847040	6817040		CN=SAGE.WESTLEY.G.1140992590,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1140992590	SAGE.WESTLEY.G	7	3	3	12	0	\N	\N	\N	1	\N	f	2
+2894	t	jerome.salabye@usmc.mil	Jerome		Salabye	5	8585779409	8582789		CN=SALABYE.JEROME.1233500999,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233500999	SALABYE.JEROME	6	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2896	t	paul.salay@whmo.mil	Paul		Salay	5	1571494473			CN=SALAY.PAUL.M.1029001010,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029001010	SALAY.PAUL.M	7	17	3	80	0	\N	\N	\N	3	\N	f	1
+2898	t	ulises.sanchezmartin@usmc.mil	Ulises		Sanchez-Martinez	5	3156362024			CN=SANCHEZMARTINEZ.ULISES.1385011233,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1385011233	SANCHEZMARTINEZ.ULISES	5	50	3	7	0	\N	\N	\N	3	\N	f	\N
+2900	t	brian.sandoval@usmc.mil	Brian		Sandoval	5	8585779406			CN=SANDOVAL.BRIAN.S.1244394929,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244394929	SANDOVAL.BRIAN.S	7	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2902	f	sherri.santos.1@us.af.mil	Sherri	L	Santos	\N				CN=SANTOS.SHERRI.LYNN.1284784096,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SANTOS.SHERRI.LYNN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2904	t	herman.sargent@us.af.mil	Herman		Sargent	5	3122384595	2384595		CN=SARGENT.HERMAN.R.1125881307,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1125881307	SARGENT.HERMAN.R	8	4	3	13	0	\N	\N	\N	1	\N	f	2
+2906	t	andrew.schellenger@us.af.mil	Andrew		Schellenger	2	5757847040			CN=SCHELLENGER.ANDREW.DAVID.1293709706,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293709706	SCHELLENGER.ANDREW.DAVID	6	3	3	12	0	\N	\N	\N	1	\N	f	2
+2908	t	matthew.s.scherhaufe.ctr@navy.mil	Matthew		Scherhaufer	5	3019954632			CN=SCHERHAUFER.MATTHEW.SCOTT.1364481469,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364481469	SCHERHAUFER.MATTHEW.SCOTT	20	39	2	9	0	\N	\N	\N	4	\N	f	1
+2910	t	james.d.schmidt@usmc.mil	James		Schmidt	5	3156366229			CN=SCHMIDT.JAMES.DANIEL.1367062939,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367062939	SCHMIDT.JAMES.DANIEL	6	50	3	18	0	\N	\N	\N	3	\N	f	1
+2912	t	david.schnorenberg@navy.mil	David		Schnorenberg	3	9104495219			CN=SCHNORENBERG.DAVID.GERARD.1099651969,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	SCHNORENBERG.DAVID.GERARD	21	15	1	2	0	\N	\N	\N	3	\N	f	1
+2914	t	paul.schroeder.2@us.af.mil	Paul		Schroeder	1	5058465409			CN=SCHROEDER.PAUL.CHRISTIAN.1244433860,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244433860	SCHROEDER.PAUL.CHRISTIAN	6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2916	t	justin.r.schulz@usmc.mil	Justin		Schulz	5	9104497226			CN=SCHULZ.JUSTIN.RYAN.1380480138,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380480138	schulzjr	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2918	t	cory.schwendemann@usmc.mil	Cory		Schwendemann	5	7607253562			CN=SCHWENDEMANN.CORY.EDWARD.1404520489,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404520489	SCHWENDEMANN.CORY.EDWARD	5	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2920	t	john.sciortino@navy.mil	John		Sciortino	3	2524645847			CN=SCIORTINO.JOHN.J.1256851187,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256851187	SCIORTINO.JOHN.J	21	15	1	18	0	\N	\N	\N	3	\N	f	1
+2922	t	kyle.b.scott@usmc.mil	Kyle		Scott	4	3156361189			CN=SCOTT.KYLE.BRADY.1362718976,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362718976	SCOTT.KYLE.BRADY	5	27	3	7	0	\N	\N	\N	3	\N	f	1
+2924	t	cameron.settle@us.af.mil	Cameron		Settle	1	5757847040	7847040		CN=SETTLE.CAMERON.CURTIS.1267965753,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267965753	SETTLE.CAMERON.CURTIS	6	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2926	f	joshua.settles.4@us.af.mil	Joshua	M	Settles	\N				CN=SETTLES.JOSHUA.MICHAEL.1262984180,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SETTLES.JOSHUA.MICHAEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2928	t	bridget.shideler@navy.mil	Bridget		Shideler	3	5714944760			CN=SHIDELER.BRIDGET.R.1136235962,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136235962	SHIDELER.BRIDGET.R	21	15	1	80	0	\N	\N	\N	3	\N	f	\N
+2930	t	donald.shiffer@us.af.mil	Donald		Shiffer	5	9408820939	2635089		CN=SHIFFER.DONALD.DALTON.1284944000,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1284944000	SHIFFER.DONALD.DALTON	5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2932	t	matthew.shiver@usmc.mil	Matthew		Shiver	5	3156362024			CN=SHIVER.MATTHEW.JAVIER.1279228525,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279228525	SHIVER.MATTHEW.JAVIER	6	50	3	7	0	\N	\N	\N	3	\N	f	1
+2934	t	paul.shutts@me.usmc.mil	Paul		Shutts	5	3183455277	3455277		CN=SHUTTS.PAUL.MATTHEW.1266865321,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266865321	SHUTTS.PAUL.MATTHEW	6	47	3	4	0	\N	\N	\N	3	\N	f	\N
+2936	f	bryant.silverio@usmc.mil	Bryant		Silverio	\N				CN=SILVERIO.BRYANT.1398343227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	SILVERIO.BRYANT	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2938	t	jeffrey.simonton@usmc.mil	Jeffrey		Simonton	5	8585778090			CN=SIMONTON.JEFFREY.CHARLES.1260328260,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260328260	SIMONTON.JEFFREY.CHARLES	15	48	3	6	0	\N	\N	\N	3	\N	f	\N
+2940	t	chaka.d.smith@boeing.com	Chaka		Smith	5	9104495144			CN=SMITH.CHAKA.D A.1239277914,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239277914	SMITH.CHAKA.D A	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2942	t	ryan.smith1@usmc.mil	Ryan		Smith	5	8585778155			CN=SMITH.RYAN.C.1236371103,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236371103	SMITH.RYAN.C	7	43	3	4	0	\N	\N	\N	3	\N	f	1
+2944	t	trevor.m.smith2@usmc.mil	Trevor		Smith	5	8585776184			CN=SMITH.TREVOR.M.1234067059,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234067059	SMITH.TREVOR.M	16	23	3	4	0	\N	\N	\N	3	\N	f	\N
+2946	t	william.d.smith@usmc.mil	William		Smith	5	9104495643	7525643		CN=SMITH.WILLIAM.DANE.1129961879,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1129961879	SMITH.WILLIAM.DANE	6	44	3	2	0	\N	\N	\N	3	\N	f	1
+2948	f	ryan.snipes@usmc.mil	Ryan	c	Snipes	\N				CN=SNIPES.RYAN.CULLAN.1281206938,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	snipesrc	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2432	t	jonathan.friscia@navy.mil	Jonathan		Friscia	4	3019954313			CN=FRISCIA.JONATHAN.R.1112747849,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	FRISCIA.JONATHAN.R	7	38	3	9	0	\N	\N	\N	1	\N	f	2
+2434	t	evan.frock@us.af.mil	Evan		Frock	3	8508841313			CN=FROCK.EVAN.MICHAEL.1379386845,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379386845	FROCK.EVAN.MICHAEL	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2436	t	vincent.frosig@us.af.mil	Vincent		Frosig	5	5759046037	6406037		CN=FROSIG.VINCENT.EUGENE.1260822361,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260822361	FROSIG.VINCENT.EUGENE	6	3	3	12	0	\N	\N	\N	1	\N	f	\N
+2438	t	robert.gallipeau.ctr@navy.mil	Robert		Gallipeau	5	3019954633			CN=GALLIPEAU.ROBERT.FRANCIS.III.1025068528,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GALLIPEAU.ROBERT.FRANCIS.III	20	19	2	9	0	\N	\N	\N	3	\N	f	1
+2440	t	timothy.d.gamble.ctr@usmc.mil	Timothy		Gamble	5	8048788468	6367658		CN=GAMBLE.TIMOTHY.D.1075539688,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	GAMBLE.TIMOTHY.D	21	27	2	7	0	\N	\N	\N	3	\N	f	1
+2442	t	john.gann@navy.mil	John		Gann	3	2524645729			CN=GANN.JOHN.C.1395131296,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395131296	GANN.JOHN.C	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2444	t	carlos.r.garcia@usmc.mil	Carlos		Garcia	5	3156362583	6362583		CN=GARCIA.CARLOS.R.1243291280,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243291280	GARCIA.CARLOS.R	7	27	3	7	0	\N	\N	\N	3	\N	f	\N
+2446	f	ericjay.garcia@afg.usmc.mil	Ericjay	K	Garcia	\N				CN=GARCIA.ERICJAY.KONA.1150722116, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	garcia,e,k	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2448	t	marcos.garcia@usmc.mil	Marcos		Garcia	5	8064921809	6361171		CN=GARCIA.MARCOS.ANTONIO.1288493266,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288493266	GARCIA.MARCOS.ANTONIO	6	27	3	7	0	\N	\N	\N	3	\N	f	\N
+2450	f	michale.gardner@us.af.mil	Michale	T	Gardner	\N				CN=GARDNER.MICHALE.TIMOTHY.1271462170, OU=USAF, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	gardnermt	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2452	t	samuel.garrison@usmc.mil	Samuel		Garrison	5	8585779406			CN=GARRISON.SAMUEL.PAUL.1379018870,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379018870	GARRISON.SAMUEL.PAUL	5	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2454	t	eric.giannettino@usmc.mil	Eric		Giannettino	5	8585779127	2679127		CN=GIANNETTINO.ERIC.J.1027326818,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1027326818	GIANNETTINO.ERIC.J	11	45	3	4	0	\N	\N	\N	3	\N	f	1
+2456	t	jeremy.gilbertson@wasp.usmc.mil	Jeremy		Gilbertson	5	9104497087			CN=GILBERTSON.JEREMY.ALLEN.1276637785,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276637785	GILBERTSON.JEREMY.ALLEN	6	52	3	2	0	\N	\N	\N	3	\N	f	\N
+2458	t	neal.j.gilbreth@boeing.com	Neal		Gilbreth	5	6199950784			CN=GILBRETH.NEAL.JOHN.1115841455,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	GILBRETH.NEAL.JOHN	20	31	2	4	0	\N	\N	\N	3	\N	f	1
+2460	t	kglavin@bh.com	Kenneth		Glavin	5	5759045250	6405250		CN=GLAVIN.KENNETH.WAYNE.1166920953,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1166920953	GLAVIN.KENNETH.WAYNE	20	13	2	12	0	\N	\N	\N	1	\N	f	2
+2462	t	luis.f.godoy@usmc.mil	Luis		Godoy	5	9105464283	3156362		CN=GODOY.LUIS.FELIPE.1256873040,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256873040	godoylf1	7	27	3	7	0	\N	\N	\N	3	\N	f	1
+2464	t	stephen.c.golden@navy.mil	Stephen		Golden	3	2524646256			CN=GOLDEN.STEPHEN.C.1454782522,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051055540	GOLDEN.STEPHEN.C	20	15	1	18	0	\N	\N	\N	4	\N	f	1
+2466	t	simon.gommesen@usmc.mil	Simon		Gommesen	5	9104497247			CN=GOMMESEN.SIMON.ENOCH.1412277798,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1412277798	GOMMESEN.SIMON.ENOCH	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2468	f	kristopher.gonzalez@usmc.mil	Kristopher	A	Gonzalez	\N				CN=GONZALEZ.KRISTOPHER.ALLEN.1018540084, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	gonzalez,k,a	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2470	t	randy.gonzalez@usmc.mil	Randy		Gonzalez	5	9104497252			CN=GONZALEZ.RANDY.1408065239,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1408065239	gonzalezr	5	25	3	2	0	\N	\N	\N	3	\N	f	1
+2472	t	luis.a.gracia@navy.mil	Luis		Gracia	3	9104495215			CN=GRACIA.LUIS.ANGEL.1133447772,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	GRACIA.LUIS.ANGEL	21	15	1	2	0	\N	\N	\N	3	\N	f	1
+2474	t	james.p.graham@navy.mil	James		Graham	5	9104495425			CN=GRAHAM.JAMES.P.1229441341,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229441341	GRAHAM.JAMES.P	21	10	1	2	0	\N	\N	\N	3	\N	f	1
+2476	t	kevin.graninger@usmc.mil	Kevin		Graninger	5	7607630972	3610972		CN=GRANINGER.KEVIN.MICHAEL.1268415196,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268415196	GRANINGER.KEVIN.MICHAEL	11	46	3	8	0	\N	\N	\N	3	\N	f	\N
+2478	t	cody.n.grant@usmc.mil	Cody		Grant	5	9104497367			CN=GRANT.CODY.NICHOLAS.1388577742,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1388577742	GRANT.CODY.NICHOLAS	5	54	3	2	0	\N	\N	\N	3	\N	f	1
+2480	t	aaron.gray.3@us.af.mil	Aaronq		Gray	3	1231231234			CN=GRAY.AARON.MICHAEL.1288225946,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GRAY.AARON.MICHAEL	18	17	1	77	0	\N	\N	\N	2	\N	f	\N
+2482	t	john.h.grogan.ctr@navy.mil	John		Grogan	3	2524645750			CN=GROGAN.JOHN.HENRY.III.1116589300,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116589300	GROGAN.JOHN.HENRY.III	20	15	2	18	0	\N	\N	\N	4	\N	f	\N
+2484	t	charles.grove.2@us.af.mil	Charles		Grove	5	8508841309			CN=GROVE.CHARLES.DILLON.1292504892,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292504892	GROVE.CHARLES.DILLON	6	2	3	11	0	\N	\N	\N	1	\N	f	2
+1769	t	william.brickhouse@navy.mil	William		Brickhouse	5	2524645572	456547821		CN=BRICKHOUSE.WILLIAM.D.1461688841,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2486	t	barrie.m.grubbs@boeing.com	Barrie		Grubbs	5	9104495849	8526547896		CN=GRUBBS.BARRIE.M.1201153405,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	GRUBBS.BARRIE.M	20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+2488	t	enrique.guadalajara1.ctr@navy.mil	Enrique		Guadalajara	5	3019954631			CN=GUADALAJARA.ENRIQUE.NMN.1180700664,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1180700664	GUADALAJARA.ENRIQUE.NMN	20	39	2	9	0	\N	\N	\N	4	\N	f	\N
+2490	t	wesley.guarino@usmc.mil	Wesley		Guarino	5	9104494541	7524541		CN=GUARINO.WESLEY.M.1186599949,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186599949	GUARINO.WESLEY.M	12	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3121	f	richard.harrington2@navy.mil	Richard		Harrington	4	3013429846			CN=HARRINGTON.RICHARD.A.1080286097,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		20	38	1	9	0	\N	\N	\N	4	\N	f	1
+3122	t	patrick.k.wyman@navy.mil	Patrick		Wyman	4	3017571986			CN=WYMAN.PATRICK.K.1033480705,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1033480705		20	38	1	9	0	\N	\N	\N	4	\N	f	1
+3126	t	bryan.p.hill@navy.mil	Bryan		Hill	3	2524646267			CN=HILL.BRYAN.P.1108530800,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1108530800		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+3128	t	linda.macneil@navy.mil	Linda		Macneil	4	3017570150			CN=MACNEIL.LINDA.M.1027727936,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1027727936		21	38	1	9	0	\N	\N	\N	1	\N	t	2
+3129	t	james.withers@navy.mil	James		Withers	1	2524648711	4518711		CN=WITHERS.JAMES.N.1229818054,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229818054		21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3140	t	james.w.paishon.ctr@navy.mil	James		Paishon	5	3019957694			CN=PAISHON.JAMES.WESLEY.1283619130,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283619130		20	19	2	9	0	\N	\N	\N	4	\N	f	\N
+3147	t	matthew.norton.2@us.af.mil	Matthew		Norton	1	5058535457			CN=NORTON.MATTHEW.JAMES.1374239810,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1374239810		6	6	3	5	0	\N	\N	\N	1	\N	t	2
+3156	t	christopher.stamps@usmc.mil	Christopher		Stamps	5	7607630576			CN=STAMPS.CHRISTOPHER.ALLAN.1279222420,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279222420		6	46	3	8	0	\N	\N	\N	3	\N	t	1
+3159	t	robert.laliberte@usmc.mil	Robert		Laliberte	5	7607630576			CN=LALIBERTE.ROBERT.EARLE.1006756162,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1006756162		5	46	3	8	0	\N	\N	\N	3	\N	f	1
+3164	t	david.jones.78@us.af.mil	David		Jones	5	5757847040	6817040		CN=JONES.DAVID.W.JR.1244632978,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1244632978		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3166	t	amonte.latimer@usmc.mil	Amonte		Latimer	5	7607631468			CN=LATIMER.AMONTE.EDWARDKERRY.1291032610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291032610		5	57	3	8	0	\N	\N	\N	3	\N	f	1
+3167	f	jonathan.joya@usmc.mil	Jonathan		Joya	5	7607253262			CN=JOYA.JONATHAN.ELIAS.1505871380,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1505871380		3	28	3	8	0	\N	\N	\N	3	\N	f	1
+3170	t	cristobal.ceron@navy.mil	Cristobal		Ceron	4	3017575951			CN=CERON.CRISTOBAL.N.1513025412,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513025412		21	38	1	9	0	\N	\N	\N	4	\N	t	1
+3172	t	robert.puett@navy.mil	Robert		Puett	3	2524649430			CN=PUETT.ROBERT.E.II.1299008343,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299008343		20	10	1	17	0	\N	\N	\N	4	\N	f	1
+3177	t	aaron.watson@navy.mil	Aaron		Watsons	1	1234567890	1233654722		abc	1065484494		4	3	2	17	0	\N	\N	\N	2	\N	f	\N
+3181	t	jeffrey.fender@usmc.mil	Jeffrey		Fender	5	8585779406			CN=FENDER.JEFFREY.SCOTT.1281421774,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281421774		5	60	3	4	0	\N	\N	\N	3	\N	t	1
+3183	t	jamie.r.jenkins@usmc.mil	Jamie		Jenkins	5	7607630529			CN=JENKINS.JAMIE.R.1055598556,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055598556		7	46	3	8	0	\N	\N	\N	3	\N	f	\N
+3184	t	samuel.n.stiles@boeing.com	Samuel		Stiles	3	6107425194			CN=Samuel Stiles,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	f	\N
+3187	t	christopher.s.mccart@usmc.mil	Christopher		Mccarthy	5	8585779406			CN=MCCARTHY.CHRISTOPHER.SEAN.1376674670,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1376674670		5	60	3	4	0	\N	\N	\N	3	\N	f	1
+3188	t	blake.shulsky@us.af.mil	Blake		Shulsky	1	8508847314	5797314		CN=SHULSKY.BLAKE.CAMERON.1266027598,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266027598		6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+3200	t	jason.a.woodard@usmc.mil	Jason		Woodard	2	7024452533	5771318		CN=WOODARD.JASON.ANTHONY.1455243277,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455243277		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3208	t	demark.l.stewart1@navy.mil	Demark		Stewart	4	2524648719			CN=STEWART.DEMARK.L.1057676490,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1057676490		21	10	1	18	0	\N	\N	\N	4	\N	t	1
+3211	t	jhoppe@bh.com	Justin		Hoppe	5	8177576690			CN=HOPPE.JUSTIN.PRESLEYWILLIAM.1279718875,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279718875		20	13	2	12	0	\N	\N	\N	1	\N	f	2
+3218	t	michael.howeth@navy.mil	Michael		Howeth	4	3017573165	7573165		CN=HOWETH.MICHAEL.D.SR.1042443715,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042443715		21	38	1	9	0	\N	\N	\N	4	\N	f	\N
+3223	t	hunter.johnson2@usmc.mil	Hunter		Johnson	5	3156363586			CN=JOHNSON.HUNTER.BURTON.1464534594,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1464534594		3	27	3	7	0	\N	\N	\N	3	\N	t	1
+3232	t	matthew.ohler@wasp.usmc.mil	Matthew		Ohler	3	9104497087			CN=OHLER.MATTHEW.SCOTT.1381714892,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381714892		5	52	3	2	0	\N	\N	\N	3	\N	f	1
+3233	t	pernell.hepbourn@usmc.mil	Pernell		Hepbourn	4	9104497087	7527087		CN=HEPBOURN.PERNELL.ANSON.JR.1257569965,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257569965		6	52	3	2	0	\N	\N	\N	3	\N	f	\N
+3234	t	wesley.pevahouse@usmc.mil	Wesley		Pevahouse	5	8585778155			CN=PEVAHOUSE.WESLEY.MILES.1381367319,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381367319		5	43	3	4	0	\N	\N	\N	3	\N	f	\N
+3237	t	ismael.andradedelgado@usmc.mil	Ismael		Andradedelgado	4	7607253262			CN=ANDRADEDELGADO.ISMAEL.1468634690,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468634690		4	28	3	8	0	\N	\N	\N	3	\N	t	1
+3239	t	brandon.l.washington@usmc.mil	Brandon		Washington	3	8585779487			CN=WASHINGTON.BRANDON.LEE.1420540864,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1420540864		5	43	3	4	0	\N	\N	\N	3	\N	t	1
+3240	t	matthew.v.le@usmc.mil	Mathew		Le	4	8585771318			CN=LE.MATHEW.VU.1464538115,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1464538115		3	23	3	4	0	\N	\N	\N	3	\N	t	1
+3242	t	jonathan.wiley@navy.mil	Jonathan		Wiley	3	2524646637			CN=WILEY.JONATHAN.A.1513102247,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513102247		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3245	t	jacob.b.lewis@usmc.mil	Jacob		Lewis	5	7607636391	3616391		CN=LEWIS.JACOB.BARTHOLOMEW.1118680290,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118680290		13	28	3	8	0	\N	\N	\N	3	\N	t	1
+3246	t	sheryl.l.hutchison@navy.mil	Sheryl		Hutchison	5	3019954282			CN=HUTCHISON.SHERYL.L.1162249238,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1162249238		20	38	1	9	0	\N	\N	\N	1	\N	t	2
+3247	t	thomas.howard@sofsa.mil	Thomas		Howard	5	8595665104			CN=HOWARD.THOMAS.H.1062806482,OU=USA,OU=PKI,OU=DoD,O=U.S. Government,C=US	1062806482		10	42	1	11	0	\N	\N	\N	1	\N	t	2
+3248	t	jason.fleming.5@us.af.mil	Jason		Fleming	1	3142387341			CN=FLEMING.JASON.ERIC.1273632480,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273632480		6	4	3	13	0	\N	\N	\N	1	\N	t	2
+3124	t	jared.byrd1@navy.mil	Jared		Byrd	4	3013428068			CN=BYRD.JARED.M.1113222170,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480		21	38	1	9	0	\N	\N	\N	4	\N	f	1
+3125	t	steven.j.kretschmer2@boeing.com	Steven		Kretschmer	5	5759045234	6405234		CN=KRETSCHMER.STEVEN.J.1099978739,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1099978739		20	13	2	12	0	\N	\N	\N	1	\N	f	2
+3130	t	john.wasko.2@us.af.mil	John		Wasko	3	8508814304	6414304		CN=WASKO.JOHN.F.1266901352,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266901352		20	15	1	11	0	\N	\N	\N	4	\N	f	2
+3137	t	craig.kornely.2@us.af.mil	Craig		Kornely	4	8508812684	6412684		CN=KORNELY.CRAIG.R.1100976257,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1100976257		21	138	1	11	0	\N	\N	\N	1	\N	f	2
+3141	t	joaquin.hernandez.2@us.af.mil	Joaquin		Hernandez	5	8508813669	6413669		CN=HERNANDEZ.JOAQUIN.1233757434,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	33	2	11	0	\N	\N	\N	1	\N	t	2
+3142	t	joshua.duncan.1@us.af.mil	Joshua		Duncan	5	5757847040	6817040		CN=DUNCAN.JOSHUA.D.1144730824,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1144730824		7	3	3	12	0	\N	\N	\N	1	\N	t	2
+3143	t	alvaro.velador@usmc.mil	Alvaro		Velador	5	7607253389			CN=VELADOR.ALVARO.1461573181,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461573181		4	28	3	8	0	\N	\N	\N	3	\N	t	1
+3144	t	manuel.santiago@usmc.mil	Manuel		Santiago	3	8585776832			CN=SANTIAGO.MANUEL.S.1380711075,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1380711075		20	15	1	4	0	\N	\N	\N	3	\N	f	\N
+3148	t	alex.j.ramirez@usmc.mil	Alex		Ramirez	5	8585771318			CN=RAMIREZ.ALEX.JAMES.1455992989,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455992989		5	23	3	4	0	\N	\N	\N	3	\N	t	1
+3158	t	gregory.clayson@navy.mil	Gregory		Clayson	3	2524646123			CN=CLAYSON.GREGORY.ALLEN.1017366757,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1017366757		21	15	1	18	0	\N	\N	\N	3	\N	f	1
+3173	t	garth.cook@usmc.mil	Garth		Cook	4	9104497252			CN=COOK.GARTH.JANES.1461779936,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461779936		3	25	3	2	0	\N	\N	\N	3	\N	t	1
+3175	t	robert.denecke@whmo.mil	Robert		Denecke	1	5714944803			CN=DENECKE.ROBERT.W.1277365304,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277365304		20	17	2	80	0	\N	\N	\N	3	\N	t	1
+3178	t	richard.collmann@whmo.mil	Richard		Collmann	5	5714944848			CN=COLLMANN.RICHARD.L.1201264886,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1201264886		20	17	2	80	0	\N	\N	\N	3	\N	f	1
+3180	t	rlbrewer@bh.com	Randy		Brewer	5	9104497690			CN=BREWER.RANDY.L.1056030189,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1056030189		20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+3185	t	theodore.c.jones@boeing.com	Theodore		Jones	3	6105912709			CN=Theodore.C.Jones.212937,OU=people,O=boeing,C=us	1287802451		20	9	2	6	0	\N	\N	\N	3	\N	f	\N
+3195	t	luis.a.mendoza1@usmc.mil	Luis		Mendoza	5	8082571424			CN=MENDOZA.LUIS.ANTHONY.1396422626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396422626		5	24	3	81	0	\N	\N	\N	3	\N	f	1
+3199	t	john.h.rodrigues@navy.mil	John		Rodrigues	4	6195453097			CN=RODRIGUES.JOHN.H.1231746362,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1231746362		21	14	1	6	0	\N	\N	\N	4	\N	t	1
+3210	t	brian.mays@usmc.mil	Brian		Mays	5	9104495661			CN=MAYS.BRIAN.DEE.1285995775,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1285995775		6	49	3	2	0	\N	\N	\N	3	\N	f	\N
+3227	t	thoffer@bh.com	Thomas		Hoffer	4	8173726048			CN=Thomas Hoffer,OU=Bell Helicopter\\, Textron\\, INC,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	t	1
+3228	t	tamiller@bh.com	Todd		Miller	4	8175906047		8172806048	CN=Todd Allen Miller,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	2	2	0	\N	\N	\N	3	\N	f	1
+3231	t	evan.hansen@usmc.mil	Evan		Hansen	5	8585774289			CN=HANSEN.EVAN.ALLEN.1501091940,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501091940		3	23	3	6	0	\N	\N	\N	3	\N	t	1
+3241	f	morgan.walker@boxer.usmc.mil	Morgan		Walker	5	8585778091	2678091		CN=WALKER.MORGAN.JONATHAN.1187212843,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187212843		17	48	3	4	0	\N	\N	\N	3	\N	f	1
+3249	t	mike.goncalves@usmc.mil	Mike		Goncalves	5	7607253262			CN=GONCALVES.MIKE.1460497953,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460497953		4	28	3	8	0	\N	\N	\N	3	\N	t	1
+3250	t	william.e.grantham@navy.mil	William		Grantham	2	2524647401	4517401	2524647337	CN=GRANTHAM.WILLIAM.ERWIN.1161530200,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1161530200		21	15	1	17	0	\N	\N	\N	4	\N	f	1
+3251	t	vincent.taitingfong@navy.mil	Vincent		Taitingfong	4	2524648701	1231231236		CN=TAITINGFONG.VINCENT.C.1185485095,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		20	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3252	t	victor.cruz@usmc.mil	Victor		Cruz	5	3156367656			CN=CRUZ.VICTOR.THOMAS.1276005703,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276005703		6	53	3	7	0	\N	\N	\N	3	\N	f	1
+3253	t	joseph.gaccione@us.af.mil	Joseph		Gaccione	5	9105518686	7847040		CN=GACCIONE.JOSEPH.SAVERIO.1260552585,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260552585		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3254	t	brett.mckee@rolls-royce.com	Brett		Mckee	3	8585318608	2679537		CN=MCKEE.JONATHAN.BRETT.1266933254,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266933254		20	34	2	4	0	\N	\N	\N	3	\N	f	\N
+3255	f	samuel.w.tsu@boeing.com	Samuel		Tsu	3	6105917712			CN=Samuel Tsu,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		21	9	1	9	0	\N	\N	\N	3	\N	f	1
+3256	t	brandon.newby@whmo.mil	Brandon		Newby	5	5714944730			CN=NEWBY.BRANDON.LAMONT.1250846610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250846610		7	17	3	80	0	\N	\N	\N	3	\N	f	1
+3257	t	cory.w.demuth@rolls-royce.com	Cory		Demuth	5	8582648778	2679537		CN=DEMUTH.CORY.WAYNE.1241409461,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1241409461		20	34	2	4	0	\N	\N	\N	3	\N	f	\N
+3258	t	brent.culp@usmc.mil	Brent		Culp	5	9104494326			CN=CULP.BRENT.D.1146969166,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1146969166		8	61	3	2	0	\N	\N	\N	3	\N	f	1
+3259	t	jimmy.a.reimert@boeing.com	Jimmy		Reimert	5	6105912452			CN=Jimmy Reimert,OU=Boeing,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	18	0	\N	\N	\N	3	\N	f	1
+3260	f	daniel.vanhoven@usmc.mil	Daniel		Vanhoven	4	9104496267			CN=VANHOVEN.DANIEL.ROBERT.1409030137,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1409030137		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+3131	t	brittany.king@navy.mil	Brittany		King	4	3013421145			CN=KING.BRITTANY.RAYMOND.1395097560,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395097560		21	38	1	9	0	\N	\N	\N	1	\N	t	1
+3132	t	bryan.bunch@navy.mil	Bryan		Bunch	3	2527208014			CN=BUNCH.BRYAN.H.1368434830,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368434830		21	15	1	18	0	\N	\N	\N	3	\N	f	\N
+3133	f	matthew.e.stevenson@navy.mil	Matthew		Stevenson	4	3017571922	7571922		CN=STEVENSON.MATTHEW.E.1167948916,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167948916		21	38	1	9	0	\N	\N	\N	4	\N	f	1
+3134	t	troy.romenesko@us.af.mil	Troy		Romenesko	5	5058535089	8535089		CN=ROMENESKO.TROY.ROBERT.1285291204,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1285291204		5	6	3	5	0	\N	\N	\N	1	\N	f	2
+3138	t	jason.l.badell@boeing.com	Jason		Badell	5	8582301973			CN=BADELL.JASON.L.1015925643,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1015925643		20	9	2	4	0	\N	\N	\N	3	\N	t	\N
+3139	t	rufus.brenneman@us.af.mil	Rufus		Brenneman	5	3142383191			CN=BRENNEMAN.RUFUS.STRONG.II.1400458533,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400458533		5	4	3	13	0	\N	\N	\N	1	\N	t	2
+3146	t	andrew.patterson@usmc.mil	Andrew		Patterson	5	2526261618			CN=PATTERSON.ANDREW.THOMAS.1275422505,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275422505		6	55	3	4	0	\N	\N	\N	3	\N	t	1
+3151	t	stephen.trochesset@us.af.mil	Stephen		Trochesset	5	5757847040	6817040		CN=TROCHESSET.STEPHEN.A.JR.1114790113,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114790113		8	3	3	12	0	\N	\N	\N	1	\N	t	2
+3152	t	neason@bh.com	Nicholas		Eason	5	8176593111			CN=EASON.NICHOLAS.ANDREW.1299543230,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	31	2	4	0	\N	\N	\N	3	\N	f	1
+3153	t	adam.shores@usmc.mil	Adam		Shores	2	8585771318			CN=SHORES.ADAM.JOSEPH.1454767574,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454767574		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3154	t	anthony.c.collins2@navy.mil	Anthony		Collins	4	3017575582			CN=COLLINS.ANTHONY.C.1240040200,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240040200		6	38	3	9	0	\N	\N	\N	3	\N	t	1
+3161	t	stalling.duenas@us.af.mil	Stalling		Duenas	5	3142384613			CN=DUENAS.STALLING.NMN.1365261420,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365261420		5	4	3	13	0	\N	\N	\N	1	\N	t	2
+3162	t	christopher.denver@usmc.mil	Christophe		Denver	5	3156363740	3156363		CN=DENVER.CHRISTOPHE.A.1270185904,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270185904		17	53	3	7	0	\N	\N	\N	3	\N	f	1
+3168	t	wonfung.lee@usmc.mil	Won Fung		Lee	3	8585779535			CN=LEE.WON.FUNG.1234320587,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234320587		21	15	1	4	0	\N	\N	\N	4	\N	f	\N
+3174	t	peter.dimartino@me.usmc.mil	Peter		Dimartino	1	8585778035	2678035		CN=DIMARTINO.PETER.J.III.1159556359,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1159556359		7	47	3	4	0	\N	\N	\N	3	\N	f	\N
+3182	t	fletcher.james.ctr@navy.mil	Fletcher		James	3	9104494075			CN=JAMES.FLETCHER.LEE.1149843210,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	2	2	0	\N	\N	\N	3	\N	f	1
+3189	t	jared.drew@usmc.mil	Jared		Drew	5	9104496059			CN=DREW.JARED.LEE.1243938925,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243938925		6	49	3	2	0	\N	\N	\N	3	\N	f	1
+3191	t	max.neighbors@usmc.mil	Max		Neighbors	4	9104495643			CN=NEIGHBORS.MAX.GREGORY.1286202396,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286202396		6	44	3	2	0	\N	\N	\N	3	\N	f	1
+3193	t	jared.barrow@usmc.mil	Jared		Barrow	3	8585774298			CN=BARROW.JARED.JOSEPH.1461992451,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461992451		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3196	t	edward.m.bolish@boeing.com	Edward		Bolish	3	6105914613	4566544566		CN=Edward.M.Bolish.14213,OU=people,O=boeing,C=us	1065484494		21	9	1	17	0	\N	\N	\N	3	\N	f	\N
+3197	t	xerdan.canlas@lha6.navy.mil	Xerdan		Canlas	5	6195563897			CN=CANLAS.XERDAN.L.1265181585,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265181585		5	158	3	6	0	\N	\N	\N	4	\N	t	1
+3198	t	brandi.parker@us.af.mil	Brandi		Parker	5	8508841309			CN=PARKER.BRANDI.LEIGH.1178994138,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1178994138		6	2	3	11	0	\N	\N	\N	1	\N	f	2
+3201	f	shival.ramroop@usmc.mil	Shival		Ramroop	5	8585778143			CN=RAMROOP.SHIVAL.NICHOLAS.1255481408,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255481408		6	43	3	4	0	\N	\N	\N	3	\N	f	1
+3202	t	gabriel.s.marrow@boeing.com	Gabriel		Marrow	3	2523674895	5714944		CN=MARROW.GABRIEL.S.III.1056554935,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1056554935		20	17	2	80	0	\N	\N	\N	3	\N	f	\N
+3204	t	scot.kinnersley@usmc.mil	Scot		Kinnersley	3	8585779107			CN=KINNERSLEY.SCOT.THOMAS.1236940060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236940060		6	45	3	4	0	\N	\N	\N	3	\N	f	1
+3205	t	daniel.s.nickle@boeing.com	Daniel		Nickle	3	2524645696	4515696		CN=NICKLE.DANIEL.S.1145264797,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1145264797		20	15	2	18	0	\N	\N	\N	4	\N	t	1
+3206	t	maryjane.shofkom@navy.mil	Mary Jane		Shofkom	4	2524648744			CN=SHOFKOM.MARY JANE.1514583192,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514583192		20	15	1	18	0	\N	\N	\N	4	\N	f	1
+3207	t	brandon.s.dixon@navy.mil	Brandon		Dixon	4	2524649909	4549909		CN=DIXON.BRANDON.S.1270669324,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270669324		21	15	1	18	0	\N	\N	\N	4	\N	t	1
+3212	t	jeffrey.frost@usmc.mil	Jeffery		Frost	5	9104497228			CN=FROST.JEFFERY.BRIAN.1456145333,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456145333		3	25	3	2	0	\N	\N	\N	3	\N	f	1
+3213	t	benjamin.a.pugh@navy.mil	Benjamin		Pugh	3	9104495657			CN=PUGH.BENJAMIN.A.1516766359,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1516766359		21	10	1	17	0	\N	\N	\N	4	\N	f	\N
+3214	t	dillon.waite@navy.mil	Dillon		Waite	3	2524646248	8522587893		CN=WAITE.DILLON.M.1521216499,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3215	t	patrick.nager@navy.mil	Patrick		Nager	3	2527208016			CN=NAGER.PATRICK.MICHAEL.1511421035,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1511421035		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2492	t	edwin.gunderson@us.af.mil	Edwin		Gunderson	5	3142384596	2384596		CN=GUNDERSON.EDWIN.JAMES.1276476897,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276476897	GUNDERSON.EDWIN.JAMES	6	4	3	13	0	\N	\N	\N	1	\N	f	\N
+2494	t	sarah.gurganus@navy.mil	Sarah		Gurganus	3	2524646667			CN=GURGANUS.SARAH.C.1501755431,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	GURGANUS.SARAH.C	20	10	1	18	0	\N	\N	\N	4	\N	f	1
+2496	f	william.gurkin@navy.mil	William	H	Gurkin	\N				CN=GURKIN.WILLIAM.NMN.1501190817,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	GURKIN.WILLIAM.NMN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2498	t	clifford.guthrie@navy.mil	Clifford		Guthrie	3	2524646631			CN=GUTHRIE.CLIFFORD.M.1257351382,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	GUTHRIE.CLIFFORD.M	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2500	t	johnathan.hallford@us.af.mil	Johnathan		Hallford	5	8508841313	5791313		CN=HALLFORD.JOHNATHAN.TYLER.1297925977,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1297925977	HALLFORD.JOHNATHAN.TYLER	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2502	t	david.halvorson.5.ctr@us.af.mil	David		Halvorson	5	8508812529			CN=HALVORSON.DAVID.L.1137297619,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137297619	HALVORSON.DAVID.L	21	2	2	11	0	\N	\N	\N	1	\N	f	2
+2504	t	carey.hamil@usmc.mil	Carey		Hamil	5	9104497090			CN=HAMIL.CAREY.ALLEN.1064525820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1064525820	HAMIL.CAREY.ALLEN	7	52	3	2	0	\N	\N	\N	3	\N	f	\N
+2506	t	mhamilton@bh.com	Michael		Hamilton	5	9104497690			CN=HAMILTON.MICHAEL.A.1126207499,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	HAMILTON.MICHAEL.A	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2508	t	john.hamrick.3.ctr@us.af.mil	John		Hamrick	1	8502408496	6413669		CN=HAMRICK.JOHN.E.1156409339,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1156409339	HAMRICK.JOHN.E	20	33	2	11	0	\N	\N	\N	1	\N	f	\N
+2510	t	kevin.hancock.1@us.af.mil	Kevin		Hancock	3	5058535089			CN=HANCOCK.KEVIN.GENE.1272815182,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272815182	HANCOCK.KEVIN.GENE	5	6	3	5	0	\N	\N	\N	1	\N	f	2
+2512	t	thomas.haney@navy.mil	Thomas		Haney	1	2527206932			CN=HANEY.THOMAS.A.1180877602,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1180877602	HANEY.THOMAS.A	21	15	1	17	0	\N	\N	\N	4	\N	f	1
+2514	t	david.m.hanson1@usmc.mil	David		Hanson	4	9104497252			CN=HANSON.DAVID.MARK.1411137828,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411137828	HANSON.DAVID.MARK	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2516	t	lynell.hargrove@usmc.mil	Lynell		Hargrove	5	8585779400			CN=HARGROVE.LYNELL.KEVIN.1282223437,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282223437	HARGROVE.LYNELL.KEVIN	5	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2518	f	michael.d.harmon@navy.mil	Michael	D	Harmon	\N				CN=HARMON.MICHAEL.DAVID.1010869087,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	HARMON.MICHAEL.DAVID	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2520	t	alonzo.harrelson@usmc.mil	Alonzo		Harrelson	5	7607250779			CN=HARRELSON.ALONZO.EUGENE.1037188715,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1037188715	HARRELSON.ALONZO.EUGENE	5	28	3	8	0	\N	\N	\N	3	\N	f	1
+2522	t	eric.w.harris.ctr@navy.mil	Eric		Harris	1	3017571960			CN=HARRIS.ERIC.WILLIAM.1148220499,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1148220499	HARRIS.ERIC.WILLIAM	20	39	2	9	0	\N	\N	\N	3	\N	f	1
+2524	t	robin.harton@navy.mil	Robin		Harton	3	2524646182			CN=HARTON.ROBIN.K.1053084628,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	HARTON.ROBIN.K	21	15	1	18	0	\N	\N	\N	3	\N	f	1
+2526	t	michael.haskell@us.af.mil	Michael		Haskell	5	8508847659			CN=HASKELL.MICHAEL.H.1173288278,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	HASKELL.MICHAEL.H	7	8	3	4	0	\N	\N	\N	1	\N	f	2
+2528	t	christopher.hawk@us.af.mil	Christopher		Hawk	5	8508841309			CN=HAWK.CHRISTOPHER.PAUL.1362430620,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362430620	HAWK.CHRISTOPHER.PAUL	5	2	3	11	0	\N	\N	\N	1	\N	f	2
+2530	t	jhaycraft@bh.com	Jason		Haycraft	5	8176023089	6362864		CN=HAYCRAFT.JASON.LEWIS.1258088650,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	Haycraft Jason L	20	31	2	7	0	\N	\N	\N	3	\N	f	1
+2532	t	jered.healy@usmc.mil	Jered		Healy	5	6117367661	6367661		CN=HEALY.JERED.DOUGLAS.1117589559,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1117589559	HEALY.JERED.DOUGLAS	6	53	3	7	0	\N	\N	\N	3	\N	f	1
+3243	t	james.g.butchko.ctr@navy.mil	James		Butchko	4	3013420257			CN=BUTCHKO.JAMES.G.JR.1017859974,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1017859974		20	38	2	9	0	\N	\N	\N	4	\N	f	\N
+2536	t	edward.s.henderson@navy.mil	Edward		Henderson	4	3017578404	7578404		CN=HENDERSON.EDWARD.SCOTT.1019677822,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	HENDERSON.EDWARD.SCOTT	21	38	1	9	0	\N	\N	\N	4	\N	f	1
+2538	t	gordon.henjum@usmc.mil	Gordon		Henjum	5	7605833979			CN=HENJUM.GORDON.IVAN.1293412622,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293412622	HENJUM.GORDON.IVAN	6	24	3	81	0	\N	\N	\N	3	\N	f	\N
+2540	t	michael.hensley.4@us.af.mil	Michael		Hensley	5	5058466764	2466764		CN=HENSLEY.MICHAEL.J.1234645060,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234645060	HENSLEY.MICHAEL.J	7	6	3	5	0	\N	\N	\N	1	\N	f	\N
+2542	t	brandon.herbert.1@us.af.mil	Brandon		Herbert	5	3142384613			CN=HERBERT.BRANDON.ANDRE.1267101317,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267101317	HERBERT.BRANDON.ANDRE	5	4	3	13	0	\N	\N	\N	1	\N	f	\N
+2544	f	rodrigo.hernandezpol@usmc.mil	Rodrigo	A	Hernandezpolindara	\N				CN=HERNANDEZPOLINDARA.RODRIGO.ALONSO.1292949924,OU	1	HernandezPolindara,R	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2548	t	james.a.higgins@usmc.mil	James		Higgins	5	8585779406			CN=HIGGINS.JAMES.A.1250900810,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250900810	HIGGINS.JAMES.A	7	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2552	t	tai.ho@navy.mil	Tai		Ho	3	2524646114			CN=HO.TAI.D.1256891804,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256891804	HO.TAI.D	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3118	t	alex.thomason@usmc.mil	Alex		Thomason	5	7607630576			CN=THOMASON.ALEX.STEFAN.1284949095,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		6	46	3	8	0	\N	\N	\N	3	\N	f	1
+3119	t	timothy.d.gamble@boeing.com	Timothy		Gamble	5	8048788468		314-545-8183	CN=Timothy Gamble,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	31	2	7	0	\N	\N	\N	3	\N	f	1
+3120	t	william.b.ellington@usmc.mil	William		Ellington	5	0809708285	3156239		CN=ELLINGTON.WILLIAM.B.1058777249,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058777249		7	50	3	7	0	\N	\N	\N	3	\N	t	1
+2302	t	john.clayman@us.af.mil	John		Clayman	1	5058532956			CN=CLAYMAN.JOHN.WILLIAM.III.1255368679,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255368679	CLAYMAN.JOHN.WILLIAM.III	6	6	3	5	0	\N	\N	\N	1	\N	f	2
+2306	t	eddie.clemmons@navy.mil	Eddie		Clemmons	3	2524645846			CN=CLEMMONS.EDDIE.J.1386686030,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1386686030	Clemmonsej	20	10	1	18	0	\N	\N	\N	3	\N	f	1
+2308	f	james.cliffe@usmc.mil	James	E	Cliffe	\N				CN=CLIFFE.JAMES.EDWARD.III.1387063010,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	cliffeje	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2310	t	caspar.cogar@usmc.mil	Caspar		Cogar	5	3092028556			CN=COGAR.CASPAR.JACEY.1456296854,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456296854	COGAR.CASPAR.JACEY	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2312	t	michael.coker@wasp.usmc.mil	Michael		Coker	5	9104495849			CN=COKER.MICHAEL.R.1059711900,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1059711900	COKER.MICHAEL.R	20	32	2	2	0	\N	\N	\N	3	\N	f	1
+2314	t	raymond.r.cole@usmc.mil	Raymond		Cole	5	9104495126			CN=COLE.RAYMOND.ROYCE.1276757764,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276757764	COLE.RAYMOND.ROYCE	6	58	3	2	0	\N	\N	\N	3	\N	f	1
+2316	t	todd.cook@navy.mil	Todd		Cook	3	2524646165			CN=COOK.TODD.J.1230207174,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230207174	COOK.TODD.J	20	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2318	t	james.coons@usmc.mil	James		Coons	5	9104495160			CN=COONS.JAMES.LEVI.IV.1119361946,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1119361946	COONS.JAMES.LEVI.IV	7	51	3	2	0	\N	\N	\N	3	\N	f	1
+2320	t	mihai.g.cosarca@boeing.com	Mihai		Cosarca	5	5058460252	2460252		CN=COSARCA.MIHAI.GABRIEL.1274133364,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1274133364	COSARCA.MIHAI.GABRIEL	20	20	2	5	0	\N	\N	\N	1	\N	f	2
+2322	t	roger.counts@navy.mil	Roger		Counts	3	2524647814	4517814		CN=COUNTS.ROGER.D.JR.1229693626,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229693626	COUNTS.ROGER.D.JR	21	15	1	18	0	\N	\N	\N	4	\N	f	1
+2324	t	barry.courie@navy.mil	Barry		Courie	3	9104495213			CN=COURIE.BARRY.R.1229760790,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229818054	COURIE.BARRY.R	21	15	1	2	0	\N	\N	\N	3	\N	f	1
+2326	t	michael.cowan@usmc.mil	Michael		Cowan	5	9104496953			CN=COWAN.MICHAEL.ANDREW.1296825090,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1296825090	COWAN.MICHAEL.ANDREW	6	51	3	2	0	\N	\N	\N	3	\N	f	1
+2328	t	edmond.cox@usmc.mil	Edmond		Cox	5	7574447818			CN=COX.EDMOND.PAUL.II.1299738112,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299738112	COX.EDMOND.PAUL.II	6	149	3	79	0	\N	\N	\N	3	\N	f	\N
+2330	f	eric.crespo@usmc.mil	Eric	N	Crespo	\N				CN=CRESPO.ERIC.NICHOLAS.1295281630, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	CRESPOEN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2332	t	paul.croom@navy.mil	Paul		Croom	3	2524645665	4515665		CN=CROOM.PAUL.H.1229985783,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229985783	CROOM.PAUL.H	21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+2334	t	forest.cunningham@whmo.mil	Forest		Cunningham	5	5714944729			CN=CUNNINGHAM.FOREST.J.1253120947,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253120947	CUNNINGHAM.FOREST.J	7	17	3	80	0	\N	\N	\N	3	\N	f	\N
+2336	t	jason.darrow@whmo.mil	Jason		Darrow	5	5714944736			CN=DARROW.JASON.W.1065583026,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233	DARROW.JASON.W	8	17	3	80	0	\N	\N	\N	3	\N	f	\N
+2338	t	james.d.davenport@usmc.mil	James		Davenport	5	3156361174			CN=DAVENPORT.JAMES.D.1059336858,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1059336858	DAVENPORT.JAMES.D	8	27	3	7	0	\N	\N	\N	3	\N	f	1
+2340	f	william.dean@usmc.mil	William	H	Dean	\N				CN=DEAN.WILLIAM.H.1167478995,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DEAN.WILLIAM.H	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2342	t	adam.decker.2.ctr@us.af.mil	Adam		Decker	3	8508812503	6412503		CN=DECKER.ADAM.L.1077015740,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	DECKER.ADAM.L	20	15	2	11	0	\N	\N	\N	1	\N	f	2
+2344	t	keith.decker.ctr@navy.mil	Keith		Decker	5	3017572020			CN=DECKER.KEITH.A.1045531291,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1045531291	DECKER.KEITH.A	20	39	2	9	0	\N	\N	\N	3	\N	f	\N
+2348	t	randal.degrave@us.af.mil	Randal		Degrave	5	3142384613	3142384		CN=DEGRAVE.RANDAL.NEAL.JR.1381755220,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1381755220	DEGRAVE.RANDAL.NEAL.JR	5	4	3	13	0	\N	\N	\N	1	\N	f	2
+2350	t	walter.dehaan@usmc.mil	Walter		Dehaan	5	9104497367	7527367		CN=DEHAAN.WALTER.ALLEN.1254285583,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254285583	DEHAAN.WALTER.ALLEN	7	54	3	2	0	\N	\N	\N	3	\N	f	1
+2352	t	michael.demars@usmc.mil	Michael		Demars	1	9104497376	7228011		CN=DEMARS.MICHAEL.JOSEPH.1283462230,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283462230	DEMARS.MICHAEL.JOSEPH	11	54	3	2	0	\N	\N	\N	3	\N	f	\N
+2354	t	rose.denbleyker@usmc.mil	Rose		Denbleyker	3	8585778349			CN=DENBLEYKER.ROSE.VICTORIA.1395330345,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395330345	DENBLEYKER.ROSE.VICTORIA	21	15	1	4	0	\N	\N	\N	3	\N	f	1
+2356	f	ryan.dibble@whmo.mil	Ryan	C	Dibble	\N				CN=DIBBLE.RYAN.CHRISTOPHER.1266320694,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DIBBLE.RYAN.CHRISTOPHER	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2358	t	walker.dillenbeck@usmc.mil	Walker		Dillenbeck	5	8585779400			CN=DILLENBECK.WALKER.JARRED.1454460622,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454460622	DILLENBECK.WALKER.JARRED	5	60	3	4	0	\N	\N	\N	3	\N	f	\N
+2360	f	james.dodson@navy.mil	James	L	Dodson	\N				CN=DODSON.JAMES.LEONARD.1122247453, OU=USN, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	Dodson,James L	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2362	f	phillip.downey.1@us.af.mil	Phillip	E	Downey Ii	\N				CN=DOWNEY.PHILLIP.ERIC.II.1072326500,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DOWNEY.PHILLIP.ERIC.II	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2364	t	shawn.drake.3@us.af.mil	Shawn		Drake	4	2106529543	487954333		CN=DRAKE.SHAWN.G.1082896933,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	DRAKE.SHAWN.G	7	8	3	5	0	\N	\N	\N	1	\N	f	\N
+2368	f	mitchell.duffy@usmc.mil	Mitchell	R	Duffy	\N				CN=DUFFY.MITCHELL.RYAN.1392591385,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	DUFFY.MITCHELL.RYAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2370	t	daniel.duggan.1@us.af.mil	Daniel		Duggan	3	8508847104	5797104		CN=DUGGAN.DANIEL.A.1247703280,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1247703280	DUGGAN.DANIEL.A	6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2372	t	michael.dumestre@us.af.mil	Michael		Dumestre	5	3142384613	2384613		CN=DUMESTRE.MICHAEL.EDMOND.1121636600,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1121636600	DUMESTRE.MICHAEL.EDMOND	5	4	3	13	0	\N	\N	\N	1	\N	f	2
+2374	t	joshua.durnell@usmc.mil	Joshua		Durnell	3	7607631468			CN=DURNELL.JOSHUA.STEVEN.1256242105,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256242105	DURNELL.JOSHUA.STEVEN	7	57	3	8	0	\N	\N	\N	3	\N	f	\N
+2376	t	andrew.p.dyke@navy.mil	Andrew		Dyke	3	9105452464			CN=DYKE.ANDREW.P.1118364992,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118364992	DYKE.ANDREW.P	21	35	1	3	0	\N	\N	\N	3	\N	f	\N
+2380	t	donny.j.east@boeing.com	Donny		East	5	5058538062	2638062		CN=EAST.DONNY.JEROME.1186078523,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186078523	EAST.DONNY.JEROME	20	20	2	5	0	\N	\N	\N	1	\N	f	\N
+2382	t	mark.eastmead@me.usmc.mil	Mark		Eastmead	5	8585774132			CN=EASTMEAD.MARK.ALLEN.JR.1105983251,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1105983251	EASTMEADMA	7	56	3	4	0	\N	\N	\N	3	\N	f	\N
+2384	t	william.eatmon.2@us.af.mil	William		Eatmon	5	5058465067	2465067		CN=EATMON.WILLIAM.S.1133312290,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133312290	EATMON.WILLIAM.S	20	6	1	5	0	\N	\N	\N	1	\N	f	\N
+2388	t	john.engvik@wasp.usmc.mil	John		Engvik	5	9014497090			CN=ENGVIK.JOHN.ANDREW.1292289592,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292289592	ENGVIK.JOHN.ANDREW	6	52	3	2	0	\N	\N	\N	3	\N	f	1
+2390	t	jose.j.escarcega2@boeing.com	Jose		Escarcega	5	5058460315	2460315		CN=ESCARCEGA.JOSE.J.1156718382,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1156718382	ESCARCEGA.JOSE.J	20	20	2	5	0	\N	\N	\N	1	\N	f	2
+2392	t	juandiego.escobedo@usmc.mil	Juandiego		Escobedo	5	3156363509			CN=ESCOBEDO.JUANDIEGO.CRUZ.1384366470,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384366470	escobedojc	5	27	3	7	0	\N	\N	\N	3	\N	f	\N
+2394	t	richard.a.evans3.ctr@navy.mil	Richard		Evans	5	3017570078			CN=EVANS.RICHARD.ALLEN.1267382995,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267382995	EVANS.RICHARD.ALLEN	21	39	2	9	0	\N	\N	\N	4	\N	f	1
+2396	t	robert.evans1@usmc.mil	Robert		Evans	5	8082571191			CN=EVANS.ROBERT.ALAN.1250902626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250902626	EVANS.ROBERT.ALAN	7	24	3	81	0	\N	\N	\N	3	\N	f	\N
+2398	t	todd.l.farrand@boeing.com	Todd		Farrand	5	4256159739			CN=FARRAND.TODD.L.1094805216,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	FARRAND.TODD.L	20	31	2	7	0	\N	\N	\N	3	\N	f	\N
+2400	t	chad.fields@us.af.mil	Chad		Fields	3	8508813612	6413612		CN=FIELDS.CHAD.EVERETT.1127984774,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1127984774	FIELDS.CHAD.EVERETT	6	2	3	11	0	\N	\N	\N	1	\N	f	\N
+2402	f	michael.fincik@usmc.mil	Michael	A	Fincik	\N				CN=FINCIK.MICHAEL.ALAN.1454201503,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FINCIK.MICHAEL.ALAN	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2404	f	matthew.e.fish@usmc.mil	Matthew	E	Fish	\N				CN=FISH.MATTHEW.E.1254614382,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FISH.MATTHEW.E	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2406	t	randal.fitzgerald@usmc.mil	Randal		Fitzgerald	5	7607258076			CN=FITZGERALD.RANDAL.SCOTT.1257450186,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257450186	FITZGERALD.RANDAL.SCOTT	6	28	3	8	0	\N	\N	\N	3	\N	f	\N
+2408	t	daniel.k.flaherty@usmc.mil	Daniel		Flaherty	5	8064970775	6367658		CN=FLAHERTY.DANIEL.KEVIN.JR.1362566181,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1362566181	FLAHERTY.DANIEL.KEVIN.JR	5	53	3	7	0	\N	\N	\N	3	\N	f	\N
+2410	t	anthony.fontanetta@usmc.mil	Anthony		Fontanetta	4	9104497252			CN=FONTANETTA.ANTHONY.CONRAD.1455839269,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455839269	FONTANETTA.ANTHONY.CONRAD	4	25	3	2	0	\N	\N	\N	3	\N	f	1
+2412	f	brandon.ford.9@us.af.mil	Brandon	M	Ford	\N				CN=FORD.BRANDON.MICHAEL.1365721617,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	FORD.BRANDON.MICHAEL	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+2414	t	thomas.forney@usmc.mil	Thomas		Forney	5	8585774132			CN=FORNEY.THOMAS.CHARLES.1032775000,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1032775000	FORNEY.THOMAS.CHARLES	5	56	3	4	0	\N	\N	\N	3	\N	f	\N
+2416	t	dencil.foster@navy.mil	Paul		Foster	3	2524645618			CN=FOSTER.DENCIL.PAUL.1246896514,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246896514	fosterdp	20	15	1	18	0	\N	\N	\N	4	\N	f	1
+2418	t	heath.foster@usmc.mil	Heath		Foster	5	3156362583			CN=FOSTER.HEATH.ELLIOT.1132448236,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1132448236	FOSTER.HEATH.ELLIOT	7	27	3	7	0	\N	\N	\N	3	\N	f	1
+2420	t	jonathan.foster@navy.mil	Jonathan		Foster	3	2524645642			CN=FOSTER.JONATHAN.R.1505512991,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1505512991	FOSTER.JONATHAN.R	21	10	1	18	0	\N	\N	\N	4	\N	f	1
+2422	t	mathew.foster@us.af.mil	Mathew		Foster	3	5759046031			CN=FOSTER.MATHEW.GREG.1256388509,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256388509	fostermg	6	3	3	12	0	\N	\N	\N	1	\N	f	2
+1768	t	lori.birchfield@navy.mil	Lori		Birchfield	5	2522692150	123123123		CN=BIRCHFIELD.LORI.A.1051055540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+2006	t	lawrinda.stone@navy.mil	Lawrinda		Stone	3	2524648770			CN=STONE.LAWRINDA.M.1230678274,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	15	1	18	0	\N	\N	\N	3	\N	f	1
+2065	t	jchmartin@bh.com	Joseph		Martin	5	8508812651			CN=MARTIN.JOSEPH.CURT.1130630924,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1130630924		20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2066	t	ronald.d.page@boeing.com	Ronald		Page	5	8508812645	6412645		CN=PAGE.RONALD.D.1170990079,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	16	2	11	0	\N	\N	\N	1	\N	f	2
+2426	t	william.j.frazier@usmc.mil	William		Frazier	5	9104497127			CN=FRAZIER.WILLIAM.JAMES.1385724485,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1385724485	FRAZIER.WILLIAM.JAMES	15	49	3	2	0	\N	\N	\N	3	\N	f	1
+2428	t	brian.freeman@usmc.mil	Brian		Freeman	5	9102651561			CN=FREEMAN.BRIAN.SHAWN.1186089118,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186089118	FREEMAN.BRIAN.SHAWN	7	49	3	77	0	\N	\N	\N	3	\N	f	1
+2430	f	william.friend@usmc.mil	William	A	Friend	\N				CN=FRIEND.WILLIAM.ALLAN.1266873243, OU=USMC, OU=PKI, OU=DoD, O=U.S. Government, C=US	1	friendwa	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
+3512	t	liann.karni@usmc.mil	Liann		Karni	5	8585778155			CN=KARNI.LIANN.1411524791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411524791		5	43	3	4	0	\N	\N	\N	3	\N	t	\N
+3321	t	stephanie.dunks@usmc.mil	Stephanie		Dunks	4	9104497252			CN=DUNKS.STEPHANIE.MELIN.1407332810,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1407332810		5	25	3	2	0	\N	\N	\N	3	\N	f	1
+3275	t	xuewen.yin@usmc.mil	Xuewen		Yin	5	8585774289			CN=YIN.XUEWEN.1460937430,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460937430		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3277	t	christian.b.tocatlian@boeing.com	Christian		Tocatlian	5	6105916086			CN=Christian Tocatlian,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	9	0	\N	\N	\N	3	\N	f	\N
+3280	t	roderick.marcum@rolls-royce.com	Roderick		Marcum	5	9104495212			CN=MARCUM.RODERICK.DEAN.1084123877,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1084123877		20	32	2	2	0	\N	\N	\N	3	\N	f	\N
+3285	t	robert.graf.1.ctr@us.af.mil	Robert		Graf	5	5058534650	8634650		CN=GRAF.ROBERT.W.1021390271,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	6	2	5	0	\N	\N	\N	1	\N	t	2
+3289	t	james.m.gawne@rolls-royce.com	James		Gawne	3	3172306238			CN=James Gawne,OU=Rolls-Royce Corporation,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	34	2	18	0	\N	\N	\N	3	\N	f	\N
+3290	t	christopher.hazel@navy.mil	Christopher		Hazel	3	2524646193	4516193		CN=HAZEL.CHRISTOPHER.J.1503481797,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503481797		20	10	1	17	0	\N	\N	\N	4	\N	f	\N
+3291	t	lauren.vachio@usmc.mil	Lauren		Vachio	5	9104497245			CN=VACHIO.LAUREN.ALISON.1463451750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463451750		4	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3313	t	gregory.atchley@usmc.mil	Gregory		Atchleymartin	5	8082570084			CN=ATCHLEYMARTIN.GREGORY.MICHAEL.1454923584,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454923584		5	24	3	81	0	\N	\N	\N	3	\N	t	1
+3350	t	daniel.whalen@navy.mil	Daniel		Whalen	3	2524646288			CN=WHALEN.DANIEL.JAY.1523353914,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523353914		20	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3364	t	robert.pike.11@us.af.mil	Robert		Pike	4	8508814312	6414312		CN=PIKE.ROBERT.L.1170175782,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1170175782		20	15	1	11	0	\N	\N	\N	4	\N	f	2
+3377	t	ryan.schuster@navy.mil	Ryan		Schuster	3	2527208013			CN=SCHUSTER.RYAN.D.1521678506,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1521678506		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3382	t	winhou.chow@navy.mil	Win-Hou		Chow	3	2524646156			CN=CHOW.WIN-HOU.T.1516739009,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1516739009		20	10	1	17	0	\N	\N	\N	4	\N	f	\N
+3390	t	patrick.hoagland.1@us.af.mil	Patrick		Hoagland	4	5058531155	2431155		CN=HOAGLAND.PATRICK.EDWARD.1289528080,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1289528080		20	6	1	5	0	\N	\N	\N	1	\N	t	2
+3410	t	isa.merkt@navy.mil	Isa		Merkt	3	2524646717			CN=MERKT.ISA.E C.1514174730,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514174730		21	15	1	17	0	\N	\N	\N	4	\N	f	1
+3419	t	jacob.eddleman@usmc.mil	Jacob		Eddleman	5	8585774298			CN=EDDLEMAN.JACOB.RAY.1399692888,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399692888		5	23	3	4	0	\N	\N	\N	3	\N	f	1
+3460	t	matthew.h.bruce@navy.mil	Matthew		Bruce	3	2524646173			CN=BRUCE.MATTHEW.H.1527682467,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1527682467		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+3466	t	cody.c.cook@usmc.mil	Cody		Cook	5	8585774298	5774298		CN=COOK.CODY.CHRISTOPHER.1502417629,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502417629		3	23	3	4	0	\N	\N	\N	3	\N	t	1
+3483	t	philip.hindson@me.usmc.mil	Philip		Hindson	5	8585778044	3455286		CN=HINDSON.PHILIP.DALE.1299744970,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1299744970		5	47	3	4	0	\N	\N	\N	3	\N	f	\N
+3486	t	michael.holzheimer@us.af.mil	Michael		Holzheimer	5	5058535089			CN=HOLZHEIMER.MICHAEL.ROBERT.1290767209,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290767209		5	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3496	t	auraya.calcote.ctr@us.af.mil	Auraya		Calcote	3	8508813105	6413105		CN=CALCOTE.AURAYA.1534032060,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	15	2	11	0	\N	\N	\N	1	\N	f	\N
+3502	t	arthur.douglas@navy.mil	Arthur		Douglas	4	2527206935	590693522		CN=DOUGLAS.ARTHUR.S.1140116170,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3504	f	shawn.bryant@usmc.mil	Shawn		Bryant	5	8585778090	2678090		CN=BRYANT.SHAWN.M.1243937350,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243937350		11	48	3	4	0	\N	\N	\N	3	\N	f	\N
+3516	t	michael.d.jones2@usmc.mil	Michael		Jones	5	8503464744	6367657		CN=JONES.MICHAEL.DAVID.1298995820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298995820		5	53	3	7	0	\N	\N	\N	3	\N	t	\N
+3517	t	richard.go@usmc.mil	Richard		Go	5	8585778105			CN=GO.RICHARD.SOTTO.1239092183,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239092183		7	48	3	4	0	\N	\N	\N	3	\N	t	\N
+3518	t	bradley.oneill@us.af.mil	Bradley		Oneill	5	5757840919			CN=ONEILL.BRADLEY.M.1020630031,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020630031		6	3	3	12	0	\N	\N	\N	1	\N	t	\N
+3522	t	jose.ramos1@usmc.mil	Jose		Ramos	3	8585779472			CN=RAMOS.JOSE.OCTAVIO.1018706209,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018706209		20	10	1	4	0	\N	\N	\N	3	\N	f	\N
+3524	t	bradford.yazzie@us.af.mil	Bradford		Yazzie	5	5058535089			CN=YAZZIE.BRADFORD.RYAN.1292988091,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292988091		5	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3525	t	charles.beltram@usmc.mil	Charles		Beltram	3	7607631487			CN=BELTRAM.CHARLES.AARON.II.1246365705,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246365705		7	57	3	8	0	\N	\N	\N	3	\N	t	\N
+3528	t	timothy.stumpf@us.af.mil	Timothy		Stumpf	5	3122381862			CN=STUMPF.TIMOTHY.GEORGE.1252608911,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252608911		7	4	3	13	0	\N	\N	\N	1	\N	t	\N
+3530	t	howard.pinnell@navy.mil	Howard		Pinnell	4	3017575186			CN=PINNELL.HOWARD.PERRY.1051795578,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1051795578		21	38	1	9	0	\N	\N	\N	4	\N	t	\N
+3535	t	christopher.stinnett@usmc.mil	Christopher		Stinnett	5	6109555149			CN=STINNETT.CHRISTOPHER.LOREN.1265628873,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265628873		7	55	3	81	0	\N	\N	\N	3	\N	t	\N
+3536	t	james.dodson@navy.mil	James		Dodson	4	3013427483			CN=DODSON.JAMES.LEONARD.1122247453,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1122247453		21	38	1	9	0	\N	\N	\N	4	\N	t	\N
+3537	t	brandon.mick@usmc.mil	Brandon		Mick	5	8082573562			CN=MICK.BRANDON.JAMES.1174363842,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1174363842		6	55	3	81	0	\N	\N	\N	3	\N	t	\N
+3538	t	jeremy.shedlock@usmc.mil	Jeremy		Shedlock	5	8585779400			CN=SHEDLOCK.JEREMY.DENNIS.1454456153,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454456153		5	60	3	4	0	\N	\N	\N	3	\N	f	\N
+3279	t	david.rupp@usmc.mil	David		Rupp	5	9104497374	7527374		CN=RUPP.DAVID.CHARLES.1036552197,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1036552197		8	54	3	2	0	\N	\N	\N	3	\N	f	\N
+3283	t	teodoro.luna@usmc.mil	Teodoro		Luna	5	9282696873			CN=LUNA.TEODORO.III.1265180554,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265180554		6	62	3	4	0	\N	\N	\N	3	\N	f	1
+3294	t	michael.a.mitchell@navy.mil	Michael		Mitchell	4	2524648744	2524518		CN=MITCHELL.MICHAEL.A.JR.1275574836,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275574836		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+3296	t	jerusha.kaapa@us.af.mil	Jerusha		Kaapa	5	5058533490			CN=KAAPA.JERUSHA.EMALANI LUAIPOU.1179193015,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1179193015		6	6	3	5	0	\N	\N	\N	1	\N	f	\N
+3300	t	carl.decker@usmc.mil	Carl		Decker	5	9104495971			CN=DECKER.CARL.ALBERT.JR.1080103405,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1080103405		7	51	3	2	0	\N	\N	\N	3	\N	f	1
+3303	t	christopher.battiest@usmc.mil	Christophe		Battiest	5	7607630576			CN=BATTIEST.CHRISTOPHE.M.1144405346,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1144405346		7	46	3	8	0	\N	\N	\N	3	\N	f	1
+3304	t	cliff.champ@usmc.mil	Cliff		Champ	5	7607631468			CN=CHAMP.CLIFF.HENRY.1293829248,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293829248		6	57	3	8	0	\N	\N	\N	3	\N	f	\N
+3319	t	timothy.lopez@usmc.mil	Timothy		Lopez	5	8082570100			CN=LOPEZ.TIMOTHY.1234071498,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1234071498		6	24	3	81	0	\N	\N	\N	4	\N	t	1
+3323	t	adrian.almanza@usmc.mil	Adrian		Almanza	5	9093467728			CN=ALMANZA.ADRIAN.1462829848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462829848		4	27	3	7	0	\N	\N	\N	3	\N	f	\N
+3325	t	john.whelton@usmc.mil	John		Whelton	5	3156363344	6363344		CN=WHELTON.JOHN.JOSEPH.1465174559,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465174559		4	27	3	7	0	\N	\N	\N	3	\N	f	1
+3328	t	luis.correa.4@us.af.mil	Luis		Correa	5	5053589695			CN=CORREA.LUIS.FERNANDO.1374252891,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	6	3	5	0	\N	\N	\N	1	\N	t	2
+3329	t	john.recio@usmc.mil	John		Recio	5	6613438860	6362763		CN=RECIO.JOHN.PAUL.1405128396,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128396		5	27	3	7	0	\N	\N	\N	3	\N	f	1
+3331	t	joshua.barefoot@navy.mil	Joshua		Barefoot	3	2524646189	4516189		CN=BAREFOOT.JOSHUA.H.1454667502,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454667502		21	15	1	18	0	\N	\N	\N	4	\N	f	1
+3339	t	emmanuel.gaffud1@navy.mil	Emmanuel		Gaffud	3	3017571159			CN=GAFFUD.EMMANUEL.AMADA.1172246113,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1172246113		21	38	1	9	0	\N	\N	\N	4	\N	f	2
+3375	t	david.jones@usmc.mil	David		Jones	5	8082570084			CN=JONES.DAVID.MATTHEW.1020739408,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020739408		6	24	3	18	0	\N	\N	\N	3	\N	t	1
+3391	t	earl.clowers@navy.mil	E		Clowers	3	2524646202			CN=CLOWERS.E.ROGER.1229860190,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229860190		20	10	1	18	0	\N	\N	\N	4	\N	t	1
+3394	t	joseph.parvin@usmc.mil	Joseph		Parvin	5	9104496419			CN=PARVIN.JOSEPH.MICHAEL.1286657105,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286657105		6	49	3	2	0	\N	\N	\N	3	\N	t	1
+3397	t	nkosi.leary@yahoo.com	Nkosi		Leary	5	8082575025	4575025	8082575491	CN=LEARY.NKOSI.AMAN.1172350654,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1172350654		8	24	3	81	0	\N	\N	\N	3	\N	t	1
+3407	t	charles.coleman@usmc.mil	Charles		Coleman	5	9104497368			CN=COLEMAN.CHARLES.LEE.1406551128,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1406551128		5	54	3	2	0	\N	\N	\N	3	\N	f	1
+3413	t	wyatt.dodge@usmc.mil	Wyatt		Dodge	5	8082571424			CN=DODGE.WYATT.AUSTYN.1510388620,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1510388620		3	23	3	81	0	\N	\N	\N	4	\N	t	1
+3415	t	katherine.cunningham.3.ctr@us.af.mil	Katherine		Cunningham	4	6182566351			CN=CUNNINGHAM.KATHERINE.S.1007236278,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1007236278		20	9	2	11	0	\N	\N	\N	1	\N	t	2
+3428	t	antonio.benitez1@usmc.mil	Antonio		Benitez	3	3156362583	3156362		CN=BENITEZ.ANTONIO.1282984691,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282984691		7	27	3	7	0	\N	\N	\N	3	\N	f	1
+3431	t	daniel.bock@us.af.mil	Daniel		Bock	5	8508815007			CN=BOCK.DANIEL.STEWART.1042849010,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1042849010		5	2	3	11	0	\N	\N	\N	1	\N	f	\N
+3432	t	rupert.m.mighty@usmc.mil	Rupert		Mighty	5	7607258087			CN=MIGHTY.RUPERT.MAURICECLAY.1500469788,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1500469788		4	28	3	8	0	\N	\N	\N	3	\N	t	2
+3435	t	brian.cauguiran@navy.mil	Brian		Cauguiranevans	5	8157628450			CN=CAUGUIRANEVANS.BRIAN.JAMES.1367582460,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367582460		5	24	3	81	0	\N	\N	\N	4	\N	t	1
+3449	t	nicholas.cox.1@us.af.mil	Nicholas		Cox	5	8508841309	5791309		CN=COX.NICHOLAS.S.1233857889,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233857889		6	2	3	11	0	\N	\N	\N	1	\N	t	2
+3500	t	richard.mccoy@usmc.mil	Richard		Mccoy	5	9702346732	6362896		CN=MCCOY.RICHARD.ALEXANDER.1410315714,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410315714		5	53	3	7	0	\N	\N	\N	3	\N	t	\N
+3510	t	thomas.gaskell.2.ctr@us.af.mil	Thomas		Gaskell	5	3142384396	2384396		CN=GASKELL.THOMAS.P.1093078221,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	21	2	13	0	\N	\N	\N	1	\N	t	\N
+3511	t	eric.crespo@usmc.mil	Eric		Crespo	3	9104494794	9104494		CN=CRESPO.ERIC.NICHOLAS.1295281630,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295281630		6	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3527	t	calieb.prunty@usmc.mil	Calieb		Prunty	3	7607253262			CN=PRUNTY.CALIEB.LEROY.1465177779,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465177779		4	28	3	8	0	\N	\N	\N	3	\N	t	\N
+25	t	claire.metcalfe@all.com	Claire	N	Metcalfe	\N	1115551212	\N	\N	CN=METCALFE.CLAIR.N.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:40:38.362506	\N	\N	\N	\N	t	\N
+3529	t	joseph.alarcon@us.af.mil	Joseph		Alarcon	3	5058533497	2533497		CN=ALARCON.JOSEPH.E.1137307177,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1137307177		8	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3534	t	david.e.carlson@navy.mil	David		Carlson	3	7323231805			CN=CARLSON.DAVID.E.1228939338,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1228939338		21	35	1	3	0	\N	\N	\N	3	\N	t	\N
+3539	t	dustin.g.jones@usmc.mil	Dustin		Jones	5	9282696874			CN=JONES.DUSTIN.GENE.1365911734,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365911734		5	62	3	2	0	\N	\N	\N	3	\N	f	\N
+3540	t	edmond.e.madden@usmc.mil	Edmond		Madden	5	9282696874			CN=MADDEN.EDMOND.EARL.1282243179,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282243179		6	62	3	2	0	\N	\N	\N	3	\N	f	\N
+3267	t	frank.a.mazza@boeing.com	Frank		Mazza	3	6107428861			CN=Frank Mazza,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1060319371		20	9	2	17	0	\N	\N	\N	3	\N	f	1
+3278	t	charles.yetman@navy.mil	Charles		Yetman	4	6197674603			CN=YETMAN.CHARLES.F.1258522857,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258522857		20	38	1	6	0	\N	\N	\N	4	\N	t	1
+3286	t	cablair@bh.com	Cory		Blair	4	8172808249			CN=Cory Blair,OU=Bell Helicopter Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	f	1
+3288	t	christopher.scism@us.af.mil	Christopher		Scism	5	3142384613			CN=SCISM.CHRISTOPHER.J.1298384759,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298384759		5	4	3	13	0	\N	\N	\N	1	\N	t	2
+3301	t	john.detwiler@usmc.mil	John		Detwiler	5	9104497376			CN=DETWILER.JOHN.RICHARD.1245754597,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1245754597		7	54	3	2	0	\N	\N	\N	3	\N	t	1
+3302	t	douglas.friedlund@us.af.mil	Douglas		Friedlund	5	5757846516	6816516		CN=FRIEDLUND.DOUGLAS.PALMER.1266361749,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266361749		7	3	3	12	0	\N	\N	\N	1	\N	f	\N
+3305	t	joshua.collins@usmc.mil	Joshua		Collins	5	7607631058			CN=COLLINS.JOSHUA.LEE.1462830056,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462830056		4	28	3	8	0	\N	\N	\N	3	\N	t	1
+3306	t	widler@bh.com	Werner		Idler	3	8172807681			CN=Werner Idler,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	f	1
+3320	f	patrick.cowden@usmc.mil	Patrick		Cowden	5	3156363344			CN=COWDEN.PATRICK.HERBERT.III.1455396723,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455396723		5	27	3	7	0	\N	\N	\N	3	\N	f	1
+3327	t	alexander.sasseen@usmc.mil	Alexander		Sasseen	5	7607254754			CN=SASSEEN.ALEXANDER.GILLESPIE.1142034049,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1142034049		4	28	3	8	0	\N	\N	\N	3	\N	t	1
+3333	t	pedro.r.hernandez@usmc.mil	Pedro		Hernandez	5	3156363977	3153977		CN=HERNANDEZ.PEDRO.RAFAEL.1133107645,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133107645		8	53	3	7	0	\N	\N	\N	3	\N	f	1
+3337	t	ksem@bh.com	Karen		Sem	3	8172807880			CN=Karen Sem,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	18	0	\N	\N	\N	3	\N	f	1
+3343	t	mickenzi.schank@navy.mil	Mickenzi		Schank	3	2524646179			CN=SCHANK.MICKENZI.V.1523584894,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523584894		21	10	1	18	0	\N	\N	\N	4	\N	t	1
+3349	t	jordan.stringfellow@navy.mil	Jordan		Stringfellow	3	2524646158			CN=STRINGFELLOW.JORDAN.BAYNE.1523355445,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523355445		20	10	1	18	0	\N	\N	\N	4	\N	t	2
+3354	t	xavier.collier@navy.mil	Xavier		Collier	3	2524646481			CN=COLLIER.XAVIER.E.1114468793,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1114468793		20	10	1	18	0	\N	\N	\N	4	\N	t	1
+3357	t	kidd.hu@usmc.mil	Kidd		Hu	4	9104496267	4496267		CN=HU.KIDD.KT.1469932466,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469932466		4	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3363	t	riaan.coetsee@navy.mil	Riaan		Coetsee	3	2524646654			CN=COETSEE.RIAAN.1522893982,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1522893982		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+3372	t	mhaugan@bh.com	Michael		Michael Haugan	3	8175010519			CN=Michael Haugan,OU=Bell Helicopter\\, Textron Inc.,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	f	1
+3388	t	heather.pesante.ctr@navy.mil	Heather		Pesante	4	3019952893			CN=PESANTE.HEATHER.LYNN.1260646814,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1260646814		20	38	2	9	0	\N	\N	\N	4	\N	t	1
+3393	f	bryce.cartrette@usmc.mil	Bryce		Cartrette	5	9105154403			CN=CARTRETTE.BRYCE.WAYNE.1287678629,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287678629		6	24	3	81	0	\N	\N	\N	4	\N	f	1
+3396	t	tyler.s.martin1@navy.mil	Tyler		Martin	3	2524646653			CN=MARTIN.TYLER.SETH.1525518384,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518384		21	10	1	18	0	\N	\N	\N	4	\N	f	1
+3403	t	joshua.j.pannell@navy.mil	Joshua		Pannell	3	2524646231			CN=PANNELL.JOSHUA.JAMES.1525518368,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518368		21	15	1	17	0	\N	\N	\N	4	\N	f	\N
+3404	t	mathew.clifford@us.af.mil	Mathew		Clifford	5	5757840919			CN=CLIFFORD.MATHEW.PATRICK.1252171033,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1252171033		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3409	t	cody.bowman@usmc.mil	Cody		Bowman	5	8082572513			CN=BOWMAN.CODY.RYAN.1300611377,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300611377		5	24	3	81	0	\N	\N	\N	3	\N	t	1
+3421	t	sergio.valentin@whmo.mil	Sergio		Valentin	5	5714944730			CN=VALENTIN.SERGIO.ANTONIO.1295412263,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295412263		5	17	3	80	0	\N	\N	\N	3	\N	f	1
+3444	t	matthew.r.martin1@usmc.mil	Matthew		Martin	5	9104496267			CN=MARTIN.MATTHEW.RICHARDMAC.1392134073,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1392134073		5	25	3	2	0	\N	\N	\N	3	\N	t	1
+3448	t	michael.simon.3@us.af.mil	Michael		Simon	5	8508813412	6713412		CN=SIMON.MICHAEL.D.II.1240995952,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1240995952		8	2	3	11	0	\N	\N	\N	1	\N	f	2
+3452	t	daniel.stagg@marine.mil	Daniel		Stagg	5	8082571191			CN=STAGG.DANIEL.WEBSTER.III.1370159455,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1370159455		5	24	3	81	0	\N	\N	\N	4	\N	t	1
+3456	t	v327mxgqa@us.af.mil	Derek		Bean	5	5757840919			CN=BEAN.DEREK.REED.1420537189,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1420537189		5	3	3	12	0	\N	\N	\N	1	\N	f	\N
+3471	t	thomas.francoeur@usmc.mil	Thomas		Francoeur	5	3156362583			CN=FRANCOEUR.THOMAS.W.1006168058,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1006168058		8	27	3	7	0	\N	\N	\N	3	\N	f	1
+3472	t	michael.winn@usmc.mil	Michael		Winn	5	7607253262			CN=WINN.MICHAEL.ROBERT.1395235954,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395235954		5	28	3	8	0	\N	\N	\N	3	\N	t	\N
+3474	f	berry.tanner@usmc.mil	Tanner		Berry	5	7607253262			CN=BERRY.TANNER.MICHAEL.1502277223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502277223		3	28	3	8	0	\N	\N	\N	3	\N	f	\N
+3482	t	kendrick.anderson@usmc.mil	Kendrick		Anderson	5	7607255871			CN=ANDERSON.KENDRICK.ROBERT.1465553410,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1465553410		4	28	3	8	0	\N	\N	\N	3	\N	t	\N
+3217	t	daryl.henderson@us.af.mil	Daryl		Henderson	4	8508842091	5792091		CN=HENDERSON.DARYL.LEON.1275484519,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275484519		6	8	3	11	0	\N	\N	\N	1	\N	t	2
+3123	t	richard.martin@navy.mil	Richard		Martin	4	3017575849			CN=MARTIN.RICHARD.CURRAN.JR.1157752517,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1157752517		18	38	3	9	0	\N	\N	\N	3	\N	f	1
+3127	t	bryant.knox@navy.mil	Bryant		Knox	4	3013427258			CN=KNOX.BRYANT.D.1111311710,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1111311710		21	38	1	9	0	\N	\N	\N	4	\N	t	1
+3135	t	micah.kennedy@navy.mil	Micah		Kennedy	3	2524646162			CN=KENNEDY.MICAH.A.1503429094,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503429094		21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3136	t	jrieschick.rieschick.3.ctr@us.af.mil	Jeremy		Rieschick	1	5752181387	6413175		CN=RIESCHICK.JEREMY.DAVID.1253825460,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253825460		20	33	2	12	0	\N	\N	\N	1	\N	f	2
+3145	t	donald.toro@usmc.mil	Donald		Toro	4	9104494794			CN=TORO.DONALD.J.II.1093851427,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093851427		6	25	3	2	0	\N	\N	\N	3	\N	t	1
+3149	t	james.r.guffey@boeing.com	James		Guffey	5	8583573100			CN=GUFFEY.JAMES.REID.1063817143,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1063817143		20	31	1	4	0	\N	\N	\N	3	\N	f	1
+3150	t	kelsey.brown@us.af.mil	Kelsey		Brown	1	5058535091	2635091		CN=BROWN.KELSEY.DESHOHN.1065234862,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065234862		6	6	3	5	0	\N	\N	\N	1	\N	t	2
+3155	t	larry.jones.16@us.af.mil	Larry		Jones	5	5757847040	6817040		CN=JONES.LARRY.L.1248529047,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1248529047		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3157	t	dustin.riegel@usmc.mil	Dustin		Riegel	5	9104497932			CN=RIEGEL.DUSTIN.CODY.1370052723,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1370052723		5	25	3	2	0	\N	\N	\N	3	\N	t	1
+3160	t	kevin.stanton@us.af.mil	Kevin		Stanton	5	1638544613	2384613		CN=STANTON.KEVIN.TOSHIO.1124217810,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1124217810		6	4	3	13	0	\N	\N	\N	1	\N	f	\N
+3163	t	lauren.campbell@usmc.mil	Lauren		Campbell	5	3156367659	3156367		CN=CAMPBELL.LAUREN.EILEEN.1503508679,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503508679		15	53	3	7	0	\N	\N	\N	3	\N	f	1
+3165	t	jared.mccarthy@usmc.mil	Jared		Mccarthy	4	7015109661	6362217		CN=MCCARTHY.JARED.LAYNE.1020421157,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1020421157		5	27	3	7	0	\N	\N	\N	3	\N	t	1
+3169	t	kyle.squires@usmc.mil	Kyle		Squires	4	9104496065			CN=SQUIRES.KYLE.LANE.1273325065,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273325065		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+3171	t	john.d.berryhill@navy.mil	John		Berryhill	5	2524648362	4518362	n/a	CN=BERRYHILL.JOHN.D.JR.1230165510,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1230165510		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3179	t	cory.bolick@usmc.mil	Cory		Bolick	5	8585779146			CN=BOLICK.CORY.ALEXANDER.1411138832,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411138832		5	23	3	4	0	\N	\N	\N	3	\N	t	1
+3186	t	jack.h.martinez@boeing.com	Jack		Martinez	3	4847684996		6105912112	CN=Jack Martinez Jr,OU=The Boeing Company..,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	17	0	\N	\N	\N	3	\N	f	\N
+3192	t	greg.blackburn.1@us.af.mil	Gregory		Blackburn	5	8508847314			CN=BLACKBURN.GREGORY.L.1281590495,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1281590495		5	2	3	11	0	\N	\N	\N	1	\N	t	2
+3194	t	nicholas.read@usmc.mil	Nicholas		Read	5	8585774289			CN=READ.NICHOLAS.ANDREW.1456464218,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456464218		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3203	t	nicholas.ceo@usmc..mil	Nicholas		Ceo	1	8585774289			CN=CEO.NICHOLAS.JOHN.1283954478,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283954478		6	23	3	4	0	\N	\N	\N	3	\N	t	1
+3209	t	augie.bravo@boeing.com	Augustine		Bravo	3	6105918587			CN=Augustine Bravo,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	t	1
+3216	t	michale.gardner@us.af.mil	Michale		Gardner	5	5759045252			CN=GARDNER.MICHALE.TIMOTHY.1271462170,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271462170		6	3	3	12	0	\N	\N	\N	1	\N	f	2
+3219	t	thornton.west@whmo.mil	Thornton		West	5	5714944730			CN=WEST.THORNTON.DOUGLAS.1365254920,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365254920		6	17	3	80	0	\N	\N	\N	3	\N	f	\N
+3220	f	chase.travis@usmc.mil	Chase		Travis	5	7607253052			CN=TRAVIS.CHASE.LAWRENCE.1411013207,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411013207		5	28	3	8	0	\N	\N	\N	3	\N	f	1
+3221	t	ferdinand.hooper@us.af.mil	Ferdinand		Hooper	4	5058531363	2531363		CN=HOOPER.FERDINAND.MIRABEL.1176699228,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1176699228		6	6	3	5	0	\N	\N	\N	1	\N	t	2
+3222	t	irving.gutierrez.mx@usmc.mil	Irving		Gutierrez	5	3156363586	6363586		CN=GUTIERREZ.IRVING.NAHIM.1369504807,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1369504807		4	27	3	7	0	\N	\N	\N	3	\N	t	1
+3224	t	john.j.spinelli@boeing.com	John		Spinelli	3	6105915142			CN=John Spinelli,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		20	9	2	9	0	\N	\N	\N	3	\N	t	1
+3225	t	casey.grobelny@navy.mil	Casey		Grobelny	3	2524646156			CN=GROBELNY.CASEY.A.1515716307,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1515716307		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3226	t	matthew.cosner@navy.mil	Matthew		Cosner	3	2524646203			CN=COSNER.MATTHEW.E.1093488845,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1093488845		21	15	1	18	0	\N	\N	\N	3	\N	t	1
+3229	t	jacob.gatliff@usmc.mil	Jacob		Gatliff	4	8585771318			CN=GATLIFF.JACOB.CHRISTOPHER.1502274127,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502274127		3	23	3	4	0	\N	\N	\N	3	\N	t	1
+3230	t	william.friend@usmc.mil	William		Friend	5	9104497374			CN=FRIEND.WILLIAM.ALLAN.1266873243,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266873243		11	54	3	2	0	\N	\N	\N	3	\N	f	1
+3235	t	roberts.fitzsimmons@usmc.mil	Robert		Fitzsimmons	5	8585778151			CN=FITZSIMMONS.ROBERT.JAMESHANLAN.1019182050,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1019182050		7	43	3	4	0	\N	\N	\N	3	\N	t	1
+3236	t	ryan.guilfoy@usmc.mil	Ryan		Guilfoy	5	7574447818			CN=GUILFOY.RYAN.KENDALL.1269266313,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269266313		6	149	3	79	0	\N	\N	\N	3	\N	t	1
+3238	t	oliver.salder.uk@usmc.mil	Oliver		Salder	5	9282696869			CN=SALDER.OLIVER.JAMES.1237549933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1237549933		7	62	3	6	0	\N	\N	\N	3	\N	t	1
+3244	t	anthony.chiappetta@us.af.mil	Anthony		Chiappetta	5	8508812565	8812565		CN=CHIAPPETTA.ANTHONY.RAY.1277462970,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1277462970		6	2	3	11	0	\N	\N	\N	1	\N	t	2
+3261	t	brenda.hathcock@navy.mil	Brenda		Hathcock	3	2524646665			CN=HATHCOCK.BRENDA.ANN.1454292754,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454292754		20	10	1	18	0	\N	\N	\N	4	\N	t	1
+3284	t	robert.north.2@us.af.mil	Robert		North	5	8508812682	6412682		CN=NORTH.ROBERT.C.JR.1040693102,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	2	3	11	0	\N	\N	\N	1	\N	t	2
+3293	t	thomas.mcartor@usmc.mil	Thomas		Mcartor	1	5404467585			CN=MCARTOR.THOMAS.CARL.1396412809,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396412809		5	54	3	2	0	\N	\N	\N	3	\N	f	1
+3311	t	kenneth.lafauci@us.af.mil	Kenneth		Lafauci	5	5058467456			CN=LAFAUCI.KENNETH.ALAN.JR.1298544675,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1298544675		5	6	3	5	0	\N	\N	\N	1	\N	t	2
+3314	t	levi.bither@usmc.mil	Levi		Bither	5	9104497228			CN=BITHER.LEVI.PATRICK.1416964935,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	25	3	2	0	\N	\N	\N	3	\N	t	1
+3322	f	wesley.mciver@usmc.mil	Wesley		Mciver	4	8585776624			CN=MCIVER.WESLEY.ROY.1453939614,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1453939614		4	23	3	4	0	\N	\N	\N	3	\N	f	1
+3335	t	randy.price@usmc.mil	Randy		Price	5	9282696875			CN=PRICE.RANDY.EARL.1367501665,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367501665		5	62	3	6	0	\N	\N	\N	3	\N	f	\N
+3359	t	bo.norman@navy.mil	Bo		Norman	2	2524648609	4518609		CN=NORMAN.BO.TRAVIS.1267159420,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267159420		21	15	1	18	0	\N	\N	\N	4	\N	f	1
+3367	t	darrell.l.stanley@boeing.com	Darrell		Stanley	5	2525148292			CN=Darrell Stanley,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=USxx	1141323233		20	31	2	7	0	\N	\N	\N	3	\N	t	1
+3370	f	koen.keith@usmc.mil	Koen		Keith	5	9104497228			CN=KEITH.KOEN.JEFFERSON.1455869680,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1455869680		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+3371	t	edgar.k.gutierrez@usmc.mil	Edgar		Gutierrezvillalta	5	9104497225			CN=GUTIERREZVILLALTA.EDGAR.KEVIN.1454198588,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454198588		4	25	3	2	0	\N	\N	\N	3	\N	t	1
+3400	t	daniel.westphal.ctr@usmc.mil	Daniel		Westphal	4	8082575487	4575487		CN=WESTPHAL.DANIEL.ROBERT.1095996562,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1095996562		21	24	2	81	0	\N	\N	\N	3	\N	f	\N
+3414	t	amit.doshi.ctr@navy.mil	Amit		Doshi	3	3017570153			CN=DOSHI.AMIT.R.1378374959,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1378374959		20	38	2	9	0	\N	\N	\N	4	\N	t	2
+3416	t	lucas.saavedra.1@us.af.mil	Lucas		Saavedra	3	5058535470	2535470		CN=SAAVEDRA.LUCAS.CHRISTOPHE.1183960217,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1183960217		7	6	1	5	0	\N	\N	\N	1	\N	t	2
+3426	t	danielle.rogowski@navy.mil	Danielle		Rogowski	4	3019953696			CN=ROGOWSKI.DANIELLE.MARIE.1283425270,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283425270		16	19	3	9	0	\N	\N	\N	1	\N	f	2
+3430	t	thomas.beams@usmc.mil	Thomas		Beams	5	7608051755			CN=BEAMS.THOMAS.GEORGE.1283623129,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1283623129		6	55	3	81	0	\N	\N	\N	3	\N	f	\N
+3439	t	michael.frenia@navy.mil	Michael		Frenia	5	9194495051	7515051		CN=FRENIA.MICHAEL.R.1229564613,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229564613		21	10	1	2	0	\N	\N	\N	4	\N	f	2
+3440	t	jmallwein1@gmail.com	Joshua		Allwein	5	6104204322			CN=ALLWEIN.JOSHUA.MICHAEL.1300409225,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300409225		6	24	3	81	0	\N	\N	\N	4	\N	t	1
+3443	f	ryan.ostrowski@us.af.mil	Ryan		Ostrowski	3	8508841313			CN=OSTROWSKI.RYAN.MICHEAL.1264558154,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264558154		6	2	3	11	0	\N	\N	\N	1	\N	f	2
+3461	t	elaine.wiegman.ctr@navy.mil	Elaine		Wiegman	4	3018636512			CN=WIEGMAN.ELAINE.L.1046831710,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1046831710		21	38	2	9	0	\N	\N	\N	4	\N	t	1
+3465	t	james.fogel@usmc.mil	James		Fogel	5	9104495961			CN=FOGEL.JAMES.KENNETH.1037810912,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1037810912		8	51	3	2	0	\N	\N	\N	3	\N	t	1
+3467	t	blake.tucker@usmc.mil	Blake		Tucker	5	5022190161	5774298		CN=TUCKER.BLAKE.ALEXANDER.1502986887,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1502986887		3	23	3	4	0	\N	\N	\N	3	\N	t	1
+3470	t	samuel.c.garcia@usmc.mil	Samuel		Garcia	5	9092614731	4497224		CN=GARCIA.SAMUEL.CARRILLO.1256879626,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1256879626		6	25	3	2	0	\N	\N	\N	3	\N	t	1
+3478	t	joseph.tharpe.1@us.af.mil	Joseph		Tharpe	5	5058467611	2467611		CN=THARPE.JOSEPH.GENE.1113754547,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1113754547		7	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3484	t	daniel.m.fletcher2@usmc.mil	Daniel		Fletcher	5	5183663454	7228011		CN=FLETCHER.DANIEL.MICHAEL.1254754133,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1254754133		7	54	3	2	0	\N	\N	\N	3	\N	f	\N
+3488	t	james.charles@us.af.mil	James		Charles	5	5058466777	5058466		CN=CHARLES.JAMES.MICHAEL.1275862238,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275862238		6	6	3	5	0	\N	\N	\N	1	\N	f	\N
+3495	t	allen.lieber@usmc.mil	Allen		Lieber	5	8587615995	5778087		CN=LIEBER.ALLEN.JEFFREY.1270603897,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270603897		6	48	3	4	0	\N	\N	\N	3	\N	f	\N
+3497	t	james.e.garner@usmc.mil	James		Garner	5	9104495971	7525971		CN=GARNER.JAMES.ERICH.1239849446,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239849446		11	51	3	2	0	\N	\N	\N	3	\N	t	\N
+3505	t	austin.hathaway@usmc.mil	Austin		Hathaway	5	9104497252			CN=HATHAWAY.AUSTIN.WILLIAM.1465551620,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287802451		3	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3508	t	charles.bartlett.3@us.af.mil	Charles		Bartlett	3	8508841313			CN=BARTLETT.CHARLES.VALENTINE.JR.1284166120,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1284166120		5	2	3	11	0	\N	\N	\N	1	\N	t	\N
+3509	t	devin.guthrie@navy.mil	Devin		Guthrie	3	2424646282			CN=GUTHRIE.DEVIN.G.1028980694,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1028980694		20	10	1	17	0	\N	\N	\N	4	\N	t	\N
+3514	t	michael.long2@navy.mil	Michael		Long	3	7323234212			CN=LONG.MICHAEL.JOSEPH.JR.1517656549,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1517656549		20	35	1	3	0	\N	\N	\N	4	\N	t	\N
+3532	t	gary.holland.6@us.af.mil	Gary		Holland	5	5058535089	2535089		CN=HOLLAND.GARY.ALLEN.1136944408,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1136944408		7	6	1	5	0	\N	\N	\N	1	\N	t	\N
+3533	t	marcelle.novak@navy.mil	Marcelle		Novak	3	2524646690			CN=NOVAK.MARCELLE.E.1091131311,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1091131311		20	15	1	18	0	\N	\N	\N	3	\N	f	\N
+3268	t	eric.t.quigley@boeing.com	Eric		Quigley	3	6105917641			CN=QUIGLEY.ERIC.T.1025976920,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1025976920		20	9	2	18	0	\N	\N	\N	3	\N	f	\N
+3272	t	steven.westerdale@us.af.mil	Steven		Westerdale	5	5757840919			CN=WESTERDALE.STEVEN.CRAIG.1364003150,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1364003150		5	3	3	12	0	\N	\N	\N	1	\N	t	2
+3274	t	frank.eason@n-t-a.com	Frankie		Eason	3	2524445411			CN=EASON.FRANKIE.R.JR.1229777501,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229777501		20	15	2	18	0	\N	\N	\N	3	\N	t	1
+3298	t	gage.a.griffith@usmc.mil	Gage		Griffith	5	8585774298	5774298		CN=GRIFFITH.GAGE.ANDREW.1503236938,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		4	23	3	4	0	\N	\N	\N	3	\N	f	\N
+3312	t	carl.kleinow@us.af.mil	Carl		Kleinow	5	5757847828			CN=KLEINOW.CARL.RICHARD.1286672252,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1286672252		7	3	3	12	0	\N	\N	\N	1	\N	t	2
+3324	t	cameron.whyte@usmc.mil	Cameron		Whyte	5	3156363487			CN=WHYTE.CAMERON.COURTNEY.1467975621,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1467975621		4	27	3	7	0	\N	\N	\N	3	\N	f	1
+3332	t	steven.a.hartman@usmc.mil	Steven		Hartman	5	8585771280	2671280		CN=HARTMAN.STEVEN.A.1187442482,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1187442482		7	60	3	4	0	\N	\N	\N	3	\N	t	1
+3334	t	john.pilson@usmc.mil	John		Pilson	5	9104494331			CN=PILSON.JOHN.R.1250937489,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1250937489		7	61	3	2	0	\N	\N	\N	3	\N	f	\N
+3340	t	luis.juarez@usmc.mil	Luis		Juarez	5	8585778694			CN=JUAREZ.LUIS.HUMBERTO.1271471838,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1271471838		7	23	3	4	0	\N	\N	\N	3	\N	f	\N
+3342	t	joshua.g.webster@navy.mil	Joshua		Webster	3	2524649831			CN=WEBSTER.JOSHUA.G.1523082171,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523082171		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3345	t	ricky.pate@usmc.mil	Ricky		Pate	5	9104495126			CN=PATE.RICKY.GLENN.1275035323,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275035323		6	58	3	2	0	\N	\N	\N	3	\N	f	1
+3346	t	christopher.habersha@usmc.mil	Christopher		Habershaw	5	9104495126			CN=HABERSHAW.CHRISTOPHER.ANDRE.1053443610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1053443610		7	58	3	2	0	\N	\N	\N	3	\N	t	1
+3360	t	kyle.bowler@us.af.mil	Kyle		Bowler	5	5058534765			CN=BOWLER.KYLE.ROBERT.1292333842,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292333842		6	6	3	5	0	\N	\N	\N	1	\N	t	2
+3365	t	tyler.tarr@usmc.mil	Tyler		Tarr	5	9104494683			CN=TARR.TYLER.ALLEN.1268075948,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268075948		6	44	3	2	0	\N	\N	\N	3	\N	t	1
+3366	f	jedidiah.larabee@usmc.mil	Jedidiah		Larabee	5	9104497121	7527121		CN=LARABEE.JEDIDIAH.JOSHUA.1267439750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267439750		10	49	3	2	0	\N	\N	\N	3	\N	f	1
+3373	t	robert.beeton.3@us.af.mil	Robert		Beeton	4	8508814301	6414301		CN=BEETON.ROBERT.ANDREW.1110660363,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110660363		20	15	1	11	0	\N	\N	\N	4	\N	f	2
+3376	t	curtis.lowe@usmc.com	Curtis		Lowe	5	9104495643			CN=LOWE.CURTIS.RICHARD.1300282071,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1300282071		5	44	3	2	0	\N	\N	\N	3	\N	f	\N
+3378	t	mark.oleksy@navy.mil	Mark		Oleksy	3	2524648634	4518634	2524646400	CN=OLEKSY.MARK.STANLEY.1091276034,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1091276034		20	10	1	18	0	\N	\N	\N	3	\N	f	1
+3379	t	joel.warren@navy.mil	Joel		Warren	3	2524649113			CN=WARREN.JOEL.PHILLIP.1523846961,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846961		21	10	1	18	0	\N	\N	\N	4	\N	t	1
+3380	t	kristopher.gonzalez@usmc.mil	Kristopher		Gonzalez	5	9104494357			CN=GONZALEZ.KRISTOPHER.ALLEN.1018540084,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1018540084		5	25	3	2	0	\N	\N	\N	3	\N	t	1
+3381	t	judge@lhd6.navy.mil	Jamel		Judgeowens	5	3152523914			CN=JUDGEOWENS.JAMEL.SHAMEKE.1402736492,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1402736492		6	11	3	7	0	\N	\N	\N	4	\N	t	1
+3392	t	michael.g.culbert@boeing.com	Michael		Culbert	3	6105919527	4569874563		CN=Michael Culbert,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1065484494		20	9	2	17	0	\N	\N	\N	3	\N	f	\N
+3395	t	charles.a.winslow@usmc.mil	Charles		Winslow	5	9104496669			CN=WINSLOW.CHARLES.ATHOL.1368365250,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368365250		5	61	3	2	0	\N	\N	\N	3	\N	t	1
+3401	t	andrew.p.white@usmc.mil	Andrew		White	4	7607253562			CN=WHITE.ANDREW.PAUL.1399624068,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399624068		5	28	3	8	0	\N	\N	\N	3	\N	t	1
+3405	t	marshel.hargrove@usmc.mil	Marshel		Hargrove	3	8082571194			CN=HARGROVE.MARSHEL.LEEVAN.II.1392281653,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1392281653		5	24	3	81	0	\N	\N	\N	3	\N	t	1
+3417	t	samuel.axtman@navy.mil	Samuel		Axtman	3	2524646263			CN=AXTMAN.SAMUEL.J.1525519143,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525519143		20	10	1	18	0	\N	\N	\N	4	\N	t	1
+3418	t	francisco.cortez@me.usmc.mil	Francisco		Cortezjasso	5	7605476106	3455277		CN=CORTEZJASSO.FRANCISCO.JAVIER.1267245610,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267245610		6	56	3	4	0	\N	\N	\N	3	\N	t	1
+3425	f	benjamin.goss@usmc.mil	Benjamin		Goss	5	9104496267			CN=GOSS.BENJAMIN.CHRISTOPHER.1460928750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460928750		3	25	3	2	0	\N	\N	\N	3	\N	f	1
+3427	t	daniel.blocker@navy.mil	Daniel		Blocker	4	2524649824	4519824		CN=BLOCKER.DANIEL.KEITH.1126306845,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1126306845		6	15	1	18	0	\N	\N	\N	1	\N	t	2
+3433	t	clinton.e.salter@navy.mil	Clinton		Salter	3	2524645339			CN=SALTER.CLINTON.E.JR.1243841409,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1243841409		20	10	1	18	0	\N	\N	\N	4	\N	f	1
+3434	t	christopher.e.norman@usmc.mil	Christophe		Norman	5	8587407929	3658087		CN=NORMAN.CHRISTOPHE.ELLIOT.1272289227,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272289227		6	28	3	8	0	\N	\N	\N	3	\N	t	1
+3437	t	frederick.thomason@navy.mil	Frederick		Thomason	5	9104495424			CN=THOMASON.FREDERICK.I.JR.1229504602,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229504602		21	10	1	11	0	\N	\N	\N	4	\N	f	\N
+3438	t	david.e.pope@navy.mil	David		Pope	5	9104495708	7515708		CN=POPE.DAVID.E.1192399749,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		21	10	1	11	0	\N	\N	\N	4	\N	t	1
+3453	t	david.gullick.ctr@navy.mil	David		Gullick	3	2405614519			CN=GULLICK.DAVID.RAY.1032094313,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1032094313		20	38	2	9	0	\N	\N	\N	1	\N	f	2
+3262	t	andrew.torres@usmc.mil	Andrew		Torres	5	8585776624			CN=TORRES.ANDREW.1367369244,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1367369244		5	23	3	4	0	\N	\N	\N	3	\N	f	\N
+3264	t	megan.graf@us.af.mil	Megan		Graf	4	3084337595			CN=GRAF.MEGAN.VANESSA.1273642494,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1273642494		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3266	t	ellick.wilson.ctr@navy.mil	Ellick		Wilson	3	2524646639			CN=WILSON.ELLICK.R.1229776009,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229776009		21	10	2	18	0	\N	\N	\N	3	\N	t	1
+3269	t	christopher.hurd.4@af.mil	Christopher		Hurd	5	5757847828			CN=HURD.CHRISTOPHER.J.1236894327,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1236894327		6	3	3	12	0	\N	\N	\N	1	\N	t	2
+3270	f	gabriel.arrieta@usmc.mil	Gabriel		Arrieta	5	7607253262			CN=ARRIETA.GABRIEL.1405128108,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128108		5	28	3	8	0	\N	\N	\N	3	\N	f	1
+3276	t	thomas.woloszyk@us.af.mil	Thomas		Woloszyk	5	3122382456	2382456		CN=WOLOSZYK.THOMAS.ANTHONY.1276270075,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276270075		7	4	3	13	0	\N	\N	\N	1	\N	t	2
+3281	t	matthew.dalton@usmc.mil	Matthew		Dalton	5	9104497228			CN=DALTON.MATTHEW.THOMAS.1469936895,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469936895		3	25	3	2	0	\N	\N	\N	3	\N	t	1
+3282	t	jon.hutchison@usmc.mil	Jon		Hutchison	5	7607630576			CN=HUTCHISON.JON.BRYAN.1410448552,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410448552		4	46	3	8	0	\N	\N	\N	3	\N	f	1
+3292	t	richard.j.ytzen@boeing.com	Richard		Ytzen	5	8586927204			CN=Richard Ytzen,OU=BOEING,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	31	2	8	0	\N	\N	\N	3	\N	t	1
+3308	t	jeremie.baldwin.1@us.af.mil	Jeremie		Baldwin	5	5058533490	2633490		CN=BALDWIN.JEREMIE.W.1110742904,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1110742904		7	6	3	5	0	\N	\N	\N	1	\N	t	2
+3326	t	keven.snyder@navy.mil	Keven		Snyder	3	2524645685			CN=SNYDER.KEVEN.M.1251892128,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1251892128		20	15	1	18	0	\N	\N	\N	4	\N	f	1
+3338	t	james.fortenberry@us.af.mil	James		Fortenberry	5	3142386143	2386143		CN=FORTENBERRY.JAMES.MATTHEW.1115151483,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		6	4	3	13	0	\N	\N	\N	1	\N	t	2
+3341	t	raymond.chamberlain@us.af.mil	Raymond		Chamberlain	5	8508815007	6415007		CN=CHAMBERLAIN.RAYMOND.LEE.1118455386,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1118455386		6	2	3	11	0	\N	\N	\N	1	\N	f	2
+3344	t	karl.w.moheiser@gmail.com	Karl		Moheiser	4	2524646859			CN=MOHEISER.KARL.WILLIAM.1092667410,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1092667410		21	10	1	17	0	\N	\N	\N	3	\N	f	1
+3353	t	david.wachs@navy.mil	David		Wachs	5	2524645573	4515573		CN=WACHS.DAVID.G.1040836744,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		20	10	1	18	0	\N	\N	\N	3	\N	f	\N
+3355	t	kenneth.flores@us.af.mil	Kenneth		Flores	5	8508841313			CN=FLORES.KENNETH.JOEL.1255198528,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1255198528		6	2	3	11	0	\N	\N	\N	1	\N	t	2
+3356	t	joe.quintero@usmc.mil	Joe		Quintero	5	9104495643			CN=QUINTERO.JOE.JESSIE.JR.1174141750,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1174141750		6	25	3	2	0	\N	\N	\N	3	\N	t	1
+3362	t	william.hood.1@us.af.mil	William		Hood	5	3142384613			CN=HOOD.WILLIAM.LARRY.1290112512,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1290112512		6	4	3	13	0	\N	\N	\N	1	\N	f	\N
+3368	t	v327mxgqa@us.af.mil	Keaton		Manshaem	5	5757840919			CN=MANSHAEM.KEATON.CHARLES.1383251709,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1383251709		5	3	3	12	0	\N	\N	\N	1	\N	f	2
+3383	f	kenneth.johnson.28@us.af.mil	Kenneth		Johnson	5	8505822258			CN=JOHNSON.KENNETH.G.1052153219,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1052153219		6	6	3	5	0	\N	\N	\N	1	\N	f	2
+3389	f	james.w.parker@usmc.mil	James		Parker	5	9105468691			CN=PARKER.JAMES.WILLIAM.1287858627,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287858627		6	149	3	79	0	\N	\N	\N	3	\N	f	1
+3398	f	kayla.lopez@usmc.mil	Kayla		Lopez	5	8082571084			CN=LOPEZ.KAYLA.MISHELL.1405128060,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1405128060		5	24	3	81	0	\N	\N	\N	3	\N	f	1
+3406	f	gabirel.donovan@usmc.mil	Gabriel		Donovan	3	8082571194			CN=DONOVAN.GABRIEL.LOUIS.1410933540,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410933540		5	24	3	81	0	\N	\N	\N	4	\N	f	1
+3420	f	matthew.belser@navy.mil	Matthew		Belser	3	2524646171			CN=BELSER.MATTHEW.S.1144683494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	10	1	18	0	\N	\N	\N	4	\N	f	2
+3429	t	adrian.dorsman.1.ctr@us.af.mil	Adrian		Dorsman	5	8508813669			CN=DORSMAN.ADRIAN.K.II.1139382770,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1139382770		20	33	2	11	0	\N	\N	\N	1	\N	t	2
+3436	t	william.pearce@navy.mil	William		Pearce	5	2524647592			CN=PEARCE.WILLIAM.J.JR.1229505250,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		21	10	1	11	0	\N	\N	\N	4	\N	t	2
+3447	t	david.j.jankowski@boeing.com	David		Jankowski	5	2524445648			CN=David Jankowski,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	-1		21	10	2	18	0	\N	\N	\N	3	\N	f	\N
+3454	t	anthony.novelly@usmc.mil	Anthony		Novelly	5	9104496870			CN=NOVELLY.ANTHONY.VINCENT.1456298806,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1456298806		5	44	3	2	0	\N	\N	\N	3	\N	f	1
+3459	t	philip.a.bell@navy.mil	Philip		Bell	3	2524646258			CN=BELL.PHILIP.A.1525518350,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518350		21	10	1	18	0	\N	\N	\N	3	\N	f	1
+3464	t	nicholas.j.harrel@usmc.mil	Nicholas		Harrel	1	9105541950			CN=HARREL.NICHOLAS.JAMES.1266124976,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1266124976		6	49	3	2	0	\N	\N	\N	3	\N	f	\N
+3473	t	vance.baumer@whmo.mil	Vance		Baumer	5	5714944753			CN=BAUMER.VANCE.MATTHEW.1145594657,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1145594657		8	17	3	80	0	\N	\N	\N	3	\N	f	\N
+3477	t	christopher.cook.14@us.af.mil	Christopher		Cook	4	5757845029			CN=COOK.CHRISTOPHER.A.1082162379,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1082162379		7	3	3	12	0	\N	\N	\N	1	\N	t	\N
+3479	t	andre.l.johnson@usmc.mil	Andre		Johnson	5	8582573656			CN=JOHNSON.ANDRE.LAVAL TYLER.1143765977,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1143765977		10	55	3	81	0	\N	\N	\N	3	\N	f	\N
+3480	t	jpimentel@bh.com	Jeremy		Pimentel	3	8585776833			CN=PIMENTEL.JEREMY.RUBEN.1298072811,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		21	31	2	4	0	\N	\N	\N	3	\N	f	\N
+3487	t	michael.p.williams1@usmc.mil	Michael		Williams	4	7607255871	7607255		CN=WILLIAMS.MICHAEL.PATRICK.1463032609,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1463032609		4	28	3	8	0	\N	\N	\N	3	\N	t	\N
+3263	t	gary.karlson@us.af.mil	Gary		Karlson	1	5058535593	2635593		CN=KARLSON.GARY.LEON.JR.1250591337,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		7	6	3	5	0	\N	\N	\N	1	\N	t	2
+3271	t	sikhan.chin@usmc.mil	Sikhan		Chin	5	3156366206	6366206		CN=CHIN.SIKHAN.ELIJAH.1235601415,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1235601415		12	50	3	7	0	\N	\N	\N	3	\N	f	\N
+3273	t	marquis.little@usmc.mil	Marquis		Little	5	7574445453			CN=LITTLE.MARQUIS.NATHANIEL.1246103964,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1246103964		5	149	3	79	0	\N	\N	\N	3	\N	t	1
+3295	t	richard.d.ricardo@boeing.com	Richard		Ricardo	3	6105918755			CN=Richard.D.Ricardo.163506,OU=people,O=boeing,C=us	1141323233		20	9	2	17	0	\N	\N	\N	3	\N	f	\N
+3297	t	matthew.sentore@usmc.mil	Matthew		Sentore	5	3156362763			CN=SENTORE.MATTHEW.NICHOLAS.1501605685,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501605685		3	27	3	7	0	\N	\N	\N	3	\N	f	\N
+3307	t	david.k.dennis@usmc.mil	David		Dennis	5	9104495126			CN=DENNIS.DAVID.KEITH.1269890033,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1269890033		6	58	3	2	0	\N	\N	\N	3	\N	f	1
+3309	t	brandon.delgado@usmc.mil	Brandon		Delgado	5	8082572513			CN=DELGADO.BRANDON.KYLE.1169587244,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564		5	24	3	81	0	\N	\N	\N	3	\N	f	1
+3316	t	noah.wu@usmc.mil	Noah		Wu	3	8082570084			CN=WU.NOAH.SONG.1398220664,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1398220664		5	24	3	81	0	\N	\N	\N	3	\N	t	1
+3317	t	chase.lennon.ctr@navy.mil	Chase		Lennon	5	3019954632			CN=LENNON.CHASE.ALEXANDER.1275242752,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275242752		21	39	2	9	0	\N	\N	\N	3	\N	t	1
+3336	t	daniel.j.myers2@usmc.mil	Daniel		Myers	5	3156367655			CN=MYERS.DANIEL.JAMES.1379756529,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1379756529		5	53	3	7	0	\N	\N	\N	3	\N	f	\N
+3348	t	donald.c.devor1@navy.mil	Donald		Devor	4	2524647986	4517986		CN=DEVOR.DONALD.CLAIR.III.1038774375,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1038774375		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
+3361	t	benjamin.westbrook@us.af.mil	Benjamin		Westbrook	5	3142383690			CN=WESTBROOK.BENJAMIN.RAY.1061845077,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1061845077		5	4	3	13	0	\N	\N	\N	1	\N	f	\N
+3369	t	erik.werhner@usmc.mil	Erik		Werhner	4	9104497266	752		CN=WERHNER.ERIK.J.1029371756,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1029371756		8	25	3	2	0	\N	\N	\N	3	\N	t	1
+3374	t	thomas.colville@usmc.mil	Thomas		Colville	5	9104497252			CN=COLVILLE.THOMAS.JOSEPH.1458509715,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1458509715		4	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3385	t	zackary.barnard@navy.mil	Zackary		Barnard	3	2524646116	4516116		CN=BARNARD.ZACKARY.LANDON.1523846902,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846902		21	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3386	t	rodney.hose.ctr@navy.mil	Rodney		Hose	5	2524645544			CN=HOSE.RODNEY.D.1043651818,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1043651818		20	10	2	18	0	\N	\N	\N	4	\N	t	1
+3387	t	daniel.mier@us.af.mil	Daniel		Mier	4	8508847621	5797621		CN=MIER.DANIEL.L.1099209212,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1099209212		7	2	3	11	0	\N	\N	\N	1	\N	t	2
+3399	t	david.a.murray@usmc.mil	David		Murray	5	8082572513			CN=MURRAY.DAVID.A.1293442785,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293442785		5	24	3	81	0	\N	\N	\N	4	\N	t	1
+3411	t	gerald.vosburg@navy.mil	Gerald		Vosburg	3	2524646173			CN=VOSBURG.GERALD.R.1523846970,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1523846970		21	10	1	18	0	\N	\N	\N	3	\N	t	1
+3424	t	rocky.rodriguez@usmc.mil	Rocky		Rodriguez	5	3156363744			CN=RODRIGUEZ.ROCKY.1396239619,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396239619		5	27	3	7	0	\N	\N	\N	3	\N	t	1
+3441	t	jacob.silva@usmc.mil	Jacob		Silva	5	7607253994			CN=SILVA.JACOB.GEORGE.1287355765,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1287355765		6	28	3	8	0	\N	\N	\N	3	\N	t	1
+3442	t	jason.morris@usmc.mil	Jason		Morris	5	7607253994			CN=MORRIS.JASON.CHARLES.1288350910,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1288350910		6	28	3	8	0	\N	\N	\N	3	\N	t	1
+3450	t	stonej@lhd6.navy.mil	Joshua		Stone	5	4045362070			CN=STONE.JOSHUA.KEITH.1453935279,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1453935279		4	10	3	18	0	\N	\N	\N	3	\N	t	1
+3455	t	captain.mullins@usmc.mil	Captain		Mullins	5	9104497363			CN=MULLINS.CAPTAIN.BRACK.JR.1103149386,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1103149386		8	54	3	2	0	\N	\N	\N	3	\N	t	1
+3458	t	john.hendrick.1@us.af.mil	John		Hendrick	3	5759045248	6405248		CN=HENDRICK.JOHN.ALAN.1023007491,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1023007491		20	3	1	12	0	\N	\N	\N	1	\N	f	2
+3463	t	ryan.bullock@navy.mil	Ryan		Bullock	4	2524649583	4519583	2524648566	CN=BULLOCK.RYAN.ASHELY.1265338395,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	15	1	18	0	\N	\N	\N	4	\N	f	\N
+3468	t	larry.villafana@usmc.mil	Larry		Villafana	5	9495723838			CN=VILLAFANA.LARRY.JOHN.1460513223,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460513223		4	27	3	7	0	\N	\N	\N	3	\N	t	1
+3476	t	brandon.darke@whmo.mil	Brandon		Darke	5	5714944729			CN=DARKE.BRANDON.CHRISTOPHER.1131856098,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1131856098		6	17	3	80	0	\N	\N	\N	3	\N	f	\N
+3489	t	timothy.sampley@usmc.mil	Timothy		Sampley	5	8585778155			CN=SAMPLEY.TIMOTHY.SCOT.II.1264711769,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1264711769		6	43	3	4	0	\N	\N	\N	3	\N	t	\N
+3493	t	jerrod.hammes@usmc.mil	Jerrod		Hammes	5	8585778075			CN=HAMMES.JERROD.CHRISTOPHER.1082923426,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1082923426		16	48	3	4	0	\N	\N	\N	3	\N	f	\N
+3499	t	brandon.m.jackson@boeing.com	Brandon		Jackson	1	8587806027			CN=Brandon.M.Jackson.1834895,OU=people,O=boeing,C=us	1133281564		20	9	2	4	0	\N	\N	\N	3	\N	t	\N
+3501	t	robyn.kanter@navy.mil	Robyn		Kanter	4	3013426726	3426826		CN=KANTER.ROBYN.H.1239711355,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1239711355		21	38	1	9	0	\N	\N	\N	4	\N	f	\N
+3503	t	salvatore.cialino@usmc.mil	Salvatore		Cialino	5	8585778151	2678151		CN=CIALINO.SALVATORE.JR.1384359694,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384359694		5	43	3	4	0	\N	\N	\N	3	\N	t	\N
+3507	t	abraham.vallejo@us.af.mil	Abraham		Vallejo	2	5058465143			CN=VALLEJO.ABRAHAM.UNK.1295119132,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1295119132		5	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3491	t	tara.netayavichitr@usmc.mil	Tara		Netayavichitr	5	8585778092			CN=NETAYAVICHITR.TARA.1276749524,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1276749524		6	48	3	4	0	\N	\N	\N	3	\N	f	\N
+3287	t	timothy.b.moore1@navy.mil	Timothy		Moore	1	6195453528			CN=MOORE.TIMOTHY.BRIAN.1116343793,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1116343793		21	14	1	6	0	\N	\N	\N	4	\N	t	1
+3299	t	zachary.lott.1@us.af.mil	Zachary		Lott	5	8508841310	5791310		CN=LOTT.ZACHARY.BRIAN.1291654955,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1291654955		5	2	3	11	0	\N	\N	\N	1	\N	t	2
+3310	t	cody.j.smith@usmc.mil	Cody		Smith	5	9104496267	7526267		CN=SMITH.CODY.JACOB.1503236733,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1503236733		3	25	3	2	0	\N	\N	\N	3	\N	t	1
+3315	t	florencio.montanez@usmc.mil	Florencio		Montanez	5	8585776624			CN=MONTANEZ.FLORENCIO.JR.1471956364,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1471956364		3	23	3	4	0	\N	\N	\N	3	\N	f	\N
+3318	f	tyler.shumaker@usmc.mil	Tyler		Shumaker	5	8082572513			CN=SHUMAKER.TYLER.RICHARD.1399469798,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1399469798		5	24	3	81	0	\N	\N	\N	3	\N	f	1
+3330	t	travis.e.jones@usmc.mil	Travis		Jones	5	9104496870			CN=JONES.TRAVIS.EDRIS.1404378593,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1404378593		4	44	3	2	0	\N	\N	\N	3	\N	f	\N
+3347	t	saul.moreno@usmc.mil	Saul		Moreno	5	3156366239			CN=MORENO.SAUL.1242981460,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242981460		6	50	3	7	0	\N	\N	\N	3	\N	f	\N
+3351	t	rodger.hibbard@usmc.mil	Rodger		Hibbard	5	7607253562	3613562		CN=HIBBARD.RODGER.JAMES.1289923205,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1289923205		6	28	3	8	0	\N	\N	\N	3	\N	t	1
+3352	t	louis.poreider@usmc.mil	Louis		Poreider	5	9104496267			CN=POREIDER.LOUIS.EUGENE.IV.1459395730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1459395730		4	25	3	2	0	\N	\N	\N	3	\N	t	2
+3384	t	virginia.nethercutt@navy.mil	Virginia		Nethercutt	4	2524648529	4518529		CN=NETHERCUTT.VIRGINIA.DARLENE.1282019937,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1282019937		21	10	1	18	0	\N	\N	\N	4	\N	t	1
+3402	t	jason.spruiell1@usmc.mil	Jason		Spruiell	3	8082571194			CN=SPRUIELL.JASON.DAVID.1279866874,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1279866874		5	24	3	81	0	\N	\N	\N	4	\N	t	1
+3408	t	brandon.capley@us.af.mil	Brandon		Capley	5	8508841309	5791309		CN=CAPLEY.BRANDON.THOMAS.1368276835,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1368276835		5	2	3	11	0	\N	\N	\N	1	\N	f	2
+3412	t	besmir.feka@usmc.mil	Besmir		Feka	5	8082571424			CN=FEKA.BESMIR.1469936933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469936933		3	24	3	81	0	\N	\N	\N	3	\N	t	1
+3422	t	alfredo.sepulveda@usmc.mil	Alfredo		Sepulvedacolon	5	7872482292			CN=SEPULVEDACOLON.ALFREDO.JAVIER.1402898042,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1402898042		5	51	3	2	0	\N	\N	\N	3	\N	t	1
+3423	t	abraham.velezrivera@usmc.mil	Abraham		Velezrivera	5	7607254754			CN=VELEZRIVERA.ABRAHAM.JUNIOR.1293830998,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293830998		6	28	3	8	0	\N	\N	\N	3	\N	t	1
+3445	t	james.w.becker@boeing.com	James		Becker	1	8588373084			CN=BECKER.JAMES.W.1250088368,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		20	31	2	4	0	\N	\N	\N	3	\N	f	\N
+3446	t	christopher.sanford@usmc.mil	Christopher		Sanford	5	9104496412	7526412		CN=SANFORD.CHRISTOPHER.CHARLES.1122344238,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1122344238		11	49	3	2	0	\N	\N	\N	3	\N	f	1
+3451	f	luis.murillovargas@usmc.mil	Luis		Murillovargas	5	2092779950			CN=MURILLOVARGAS.LUIS.ANGEL.1411043017,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411043017		5	23	3	4	0	\N	\N	\N	3	\N	f	1
+3457	t	matthew.sinsel@navy.mil	Matthew		Sinsel	5	2524648589			CN=SINSEL.MATTHEW.BERNARD.1233460601,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233460601		20	10	1	18	0	\N	\N	\N	4	\N	f	2
+3462	t	christian.martin.1@us.af.mil	Christian		Martin	5	5752190498	6812319		CN=MARTIN.CHRISTIAN.MATTHEW.1055749309,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1055749309		7	3	3	12	0	\N	\N	\N	1	\N	f	\N
+3469	t	seungchul.roh@usmc.mil	Seungchul		Roh	4	9104497252			CN=ROH.SEUNGCHUL.1468209159,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1468209159		4	25	3	2	0	\N	\N	\N	3	\N	f	1
+3475	t	justin.spritzer@us.af.mil	Justin		Spritzer	5	8508815007	6415007		CN=SPRITZER.JUSTIN.EDWARD.1261021915,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1261021915		6	2	3	11	0	\N	\N	\N	1	\N	t	\N
+3485	t	jeremy.williams@usmc.mil	Jeremy		Williams	5	3183455286			CN=WILLIAMS.JEREMY.CLINTEL.1267924160,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267924160		6	47	3	6	0	\N	\N	\N	3	\N	t	\N
+3490	t	ericjay.garcia@usmc.mil	Ericjay		Garcia	5	7607250779	3650779		CN=GARCIA.ERICJAY.KONA.1150722116,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1150722116		6	28	3	8	0	\N	\N	\N	3	\N	t	\N
+3492	t	willie.bostic@usmc.mil	Willie		Bostic	5	9104496419			CN=BOSTIC.WILLIE.JAMES.JR.1262067390,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1262067390		4	49	3	2	0	\N	\N	\N	3	\N	t	\N
+3494	t	theirrien.davis@usmc.mil	Theirrien		Davis	5	8585778087	5778087		CN=DAVIS.THEIRRIEN.RAPHAEL.1461997143,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461997143		5	48	3	4	0	\N	\N	\N	3	\N	t	\N
+3506	t	jimmy.potter.2.ctr@us.af.mil	Jimmy		Potter	5	5058467435	2467435		CN=POTTER.JIMMY.HR.1108210350,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1108210350		20	20	2	5	0	\N	\N	\N	1	\N	t	\N
+3513	t	maxim.lazoutchenkov@navy.mil	Maxim		Lazoutchenkov	3	7323237284			CN=LAZOUTCHENKOV.MAXIM.1514102283,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1514102283		20	35	1	3	0	\N	\N	\N	4	\N	f	\N
+3515	t	gloria.wu@navy.mil	Gloria		Wu	3	7323235264			CN=WU.GLORIA.1512156130,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1512156130		21	35	1	3	0	\N	\N	\N	4	\N	t	\N
+3523	t	adam.nalder@usmc.mil	Adam		Nalder	5	3156367657			CN=NALDER.ADAM.JOHN.1267095791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1267095791		6	53	3	7	0	\N	\N	\N	3	\N	t	\N
+3520	t	timothy.paterson@navy.mil	Timothy		Paterson	4	2524648231	451823		CN=PATERSON.TIMOTHY.ROBERT.1186333833,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1186333833		20	10	1	18	0	\N	\N	\N	4	\N	t	\N
+3521	t	leobardo.cegueda@usmc.mil	Leobardo		Cegueda	5	9104497252			CN=CEGUEDA.LEOBARDO.III.1469327740,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1469327740		3	25	3	2	0	\N	\N	\N	3	\N	f	\N
+3526	t	thomas.asplund@usmc.mil	Thomas		Asplund	5	5202271822			CN=ASPLUND.THOMAS.ERIC.1092417383,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1092417383		3	28	3	8	0	\N	\N	\N	3	\N	t	\N
+3531	t	myron.burrows.ctr@navy.mil	Myron		Burrows	4	2524646219			CN=BURROWS.MYRON.R.1024668360,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024668360		20	10	2	18	0	\N	\N	\N	4	\N	t	\N
+3542	t	rodrigo.hernandezpol@navy.mil	Rodrigo		Hernandezpolindara	5	9104495710			CN=HERNANDEZPOLINDARA.RODRIGO.ALONSO.1292949924,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1292949924		6	41	3	2	0	\N	\N	\N	3	\N	t	\N
+3549	t	george.graves@navy.mil	George		Graves	5	3017575550			CN=GRAVES.GEORGE.REUBEN.III.1117542552,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1117542552		21	38	1	9	0	\N	\N	\N	4	\N	t	\N
+3550	t	toby.hansenbrown@navy.mil	Toby		Hansen-Brown	5	3017572965			CN=HANSEN-BROWN.TOBY.C.1501755369,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1501755369		20	40	2	9	0	\N	\N	\N	4	\N	t	\N
+3555	t	robert.w.kirk@navy.mil	Robert		Kirk	3	2524646968			CN=KIRK.ROBERT.WILLIAM.III.1384613906,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1384613906		21	10	1	17	0	\N	\N	\N	4	\N	t	\N
+3561	t	clinton.duclos@usmc.mil	Clinton		Duclos	5	7167773682	6363245		CN=DUCLOS.CLINTON.JOHN.1233636122,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1233636122		7	50	3	7	0	\N	\N	\N	3	\N	t	\N
+3554	t	anthony.mccalpin@us.af.mil	Anthony		Mccalpin	5	5058535089	35089		CN=MCCALPIN.ANTHONY.JAMES.1287399649,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1141323233		5	20	3	5	0	\N	\N	\N	1	\N	f	\N
+3565	t	benjamin.glenn@us.af.mil	Benjamin		Glenn	2	3142381862	2381862		CN=GLENN.BENJAMIN.SCOTT.1387595887,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1387595887		5	4	3	13	0	\N	\N	\N	1	\N	t	\N
+3541	t	jesse.meno@us.af.mil	Jesse		Meno	4	8508844990	5794990		CN=MENO.JESSE.D.1184796771,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1184796771		9	8	3	11	0	\N	\N	\N	1	\N	t	\N
+3559	t	austin.m.lewis@usmc.mil	Austin		Lewis	5	8585776624			CN=LEWIS.AUSTIN.MICHAEL.1459200165,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1459200165		4	23	3	4	0	\N	\N	\N	3	\N	t	\N
+3567	t	john.hannah.1@us.af.mil	John		Hannah	5	5058467990	2467990		CN=HANNAH.JOHN.B.1058520400,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1058520400		8	6	3	5	0	\N	\N	\N	1	\N	t	\N
+3560	f	destin.lett@usmc.mil	Destin		Lett	5	3343980021			CN=LETT.DESTIN.TODD.1460082893,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460082893		4	23	3	4	0	\N	\N	\N	3	\N	f	\N
+3548	t	sung.m.kim@navy.mil	Sung		Kim	3	9104490013			CN=KIM.SUNG.MIN.1270032059,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1270032059		20	10	1	18	0	\N	\N	\N	4	\N	t	\N
+3551	t	michael.zier@navy.mil	Michael		Zier	3	2524646240			CN=ZIER.MICHAEL.J.1525518104,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1525518104		21	15	1	18	0	\N	\N	\N	4	\N	t	\N
+3543	t	amie.sparnell@navy.mil	Amie		Sparnell	3	2524646152			CN=SPARNELL.AMIE.A.1394878142,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1394878142		21	15	1	18	0	\N	\N	\N	3	\N	f	\N
+3544	t	jpimentel@bh.com	Jeremy		Pimentel	5	8582459987	5776833		CN=PIMENTEL.JEREMY.RUBEN.1298072811,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US11	1133281564		21	31	2	4	0	\N	\N	\N	3	\N	t	\N
+3546	t	drew.w.phillips@usmc.mil	Drew		Phillips	5	9104497226			CN=PHILLIPS.DREW.WILLIAM.1411144611,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411144611		5	25	3	2	0	\N	\N	\N	3	\N	t	\N
+3547	t	kristopher.n.turner@usmc.mil	Kristopher		Turner	5	9104497252			CN=TURNER.KRISTOPHER.NOAHKOHL.1510348083,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1510348083		3	25	3	2	0	\N	\N	\N	3	\N	t	\N
+3553	t	scott.r.porter@usmc.mil	Scott		Porter	5	8585779400			CN=PORTER.SCOTT.RUSSELL.1400420684,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1400420684		5	60	3	4	0	\N	\N	\N	3	\N	t	\N
+3558	t	danny.hare.ctr@navy.mil	Danny		Hare	4	2527207969			CN=HARE.DANNY.MACK.1185447940,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1185447940		20	10	2	18	0	\N	\N	\N	4	\N	t	\N
+3562	t	jacob.leckie@usmc.mil	Jacob		Leckie	5	3156366230			CN=LECKIE.JACOB.MATTHEW.1395164933,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1395164933		15	50	3	7	0	\N	\N	\N	3	\N	t	\N
+3563	f	andrew.ohlrich@lhd1.navy.mil	Andrew		Ohlrich	5	9104497073			CN=OHLRICH.ANDREW.R.1249318864,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1249318864		11	52	3	2	0	\N	\N	\N	3	\N	f	\N
+3566	t	gamal.meyers@navy.mil	Ga'Mal		Meyers	3	2524646248			CN=MEYERS.GA'MAL.Q.1057774823,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1057774823		21	10	1	17	0	\N	\N	\N	3	\N	t	\N
+3545	t	jared.brady@usmc.mil	Jared		Brady	5	9104495661	7525661		CN=BRADY.JARED.WESLEY.1272943202,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1272943202		20	61	2	2	0	\N	\N	\N	3	\N	t	\N
+3552	t	holly.ramirez.ctr@navy.mil	Holly		Ramirez	5	3017570314			CN=RAMIREZ.HOLLY.K.1134056726,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1134056726		20	40	2	9	0	\N	\N	\N	4	\N	t	\N
+3556	t	robert.crims@usmc.mil	Robert		Crims	5	8082571191			CN=CRIMS.ROBERT.LEE.1247526141,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1247526141		7	24	3	81	0	\N	\N	\N	3	\N	t	\N
+3557	t	johan.cotto@usmc.mil	Johan		Cotto	5	4132414747			CN=COTTO.JOHAN.ALBERTO.1396410695,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1396410695		5	57	3	8	0	\N	\N	\N	3	\N	t	\N
+3564	t	garrett.hurtt@usmc.mil	Garrett		Hurtt	5	9104497226			CN=HURTT.GARRETT.ALEXANDER.1387728100,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1387728100		5	25	3	2	0	\N	\N	\N	3	\N	t	\N
+3568	t	josh.wetlesen@usmc.mil	Josh		Wetlesen	5	8585776624			CN=WETLESEN.JOSH.RAY.1461783119,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1461783119		4	23	3	4	0	\N	\N	\N	3	\N	t	\N
+3572	t	bob@bob.com	Travis		Makarowski	4	2524646396			CN=MAKAROWSKI.TRAVIS.W.1141323233xd,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		19	159	2	17	0	\N	\N	\N	2	\N	f	\N
+3574	t	travis.maka@navy.mil	Travis		Makarowski	1	2343455432			CN=MAKAROWSKI.TRAVIS.W.1141323233x,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	-1		4	3	1	18	0	\N	\N	\N	2	\N	f	\N
+3573	t	steven.groninga@navy.mil	Steven		Groninga	4	2527208500			CN=GRONINGA.STEVEN.CHARLES.1065484494,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	f	\N
+2174	t	david.abbott.16@us.af.mil	David		Abbott	5	5058537389	2637389113		CN=ABBOTT.DAVID.J.1248049800,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494	ABBOTT.DAVID.J	20	6	1	5	0	\N	\N	\N	1	\N	f	\N
+11	t	fred.projecttasks2@squadron.mil	Fred	Q	Projecttasks2	\N	567-111-2234	\N	\N	CN=PROJECTTASKS2.FRED.Q.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:02.917	\N	\N	\N	\N	t	\N
+10	t	bob.projecttasks1@squadron.mil	Bob		Projecttasks1	\N	(111)555-1212	\N	\N	CN=PROJECTTASKS1.BOB.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 10:18:31.758	\N	\N	\N	\N	t	\N
+13	t	root.projecttasks4@navy.mil	Root	\N	Projecttasks4	\N	333-123-3333	\N	\N	CN=PROJECTTASKS4.ROOT.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:20:47.477	\N	\N	\N	\N	t	\N
+12	t	chris.projecttasks@squadron.mil	Chris	A	Projecttasks3	\N	123-111-1234	\N	\N	CN=PROJECTTASKS3.CHRIS.A.12345,OU=Contractor,OU=PKI,OU=Dod,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-08 05:19:29.179	\N	\N	\N	\N	t	\N
+34	t	sebastian.mills@fsr.mil	Sebastian	B	Mills	\N	1115551212	\N	\N	CN=MILLS.SEBASTION.B.1111111111,OU=FSR,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:01:04.665282	\N	\N	\N	\N	t	\N
+14	t	bmanager1@navy.mil	Bob	A	Manager1	\N		\N	\N	CN=MANAGER1.BOB.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:52:58.345	\N	\N	\N	\N	t	\N
+15	t	smanager2@navy.mil	Sue	B	Manager2	\N	\N	\N	\N	CN=MANAGER2.SUE.B.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:18.479	\N	\N	\N	\N	t	\N
+4	t	blah.blahblah@email.com	Blah	A	Blahblah	\N	1231231234	\N	\N	CN=BLAHBLAH.BLAH.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-09 05:18:50.651	\N	\N	\N	\N	t	\N
+38	t	sally.graham@oem.com	Sally	F	Graham	\N	1115551212	\N	\N	CN=GRAHAM.SALLY.F.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:04:20.433573	\N	\N	\N	\N	t	\N
+33	t	matt.bailey@fsr.mil	Matt	A	Bailey	\N	111-555-1212	\N	\N	CN=BAILEY.MATT.A.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 19:14:55.885	\N	\N	\N	\N	t	\N
+36	t	carol.fisher@fst.mil	Carol	D	Fisher	\N	1115551212	\N	\N	CN=FISHER.CAROL.D.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:02:21.730429	\N	\N	\N	\N	t	\N
+8	t	sean.tdtracker3@email.com	Sean	\N	Tdtracker3	\N	\N	\N	\N	CN=TDTRACKER3.SEAN.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:40:00.711216	\N	\N	\N	\N	t	\N
+41	t	jan.nolan@modteam.org	Jan		Nolan	\N	1115551212	\N	\N	CN=NOLAN.JAN.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:08:55.160078	\N	\N	\N	\N	t	\N
+26	t	harry.berry@all.com	Harry	\N	Berry	\N	1115551212	\N	\N	CN=BERRY.HARRY.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-10 13:41:00.863923	\N	\N	\N	\N	t	\N
+40	t	jane.mcgrath@modapprover.org	Jane	H	McGrath	\N	1115551212	\N	\N	CN=MCGRATH.JANE.H.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:31.403728	\N	\N	\N	\N	t	\N
+6	t	dave.tdtracker1@email.com	Dave		Tdtracker1	\N		\N	\N	CN=TDTRACKER1.DAVE.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 23:37:29.847	\N	\N	\N	\N	t	\N
+39	t	michelle.bower@modapprover.org	Michelle	G	Bower	\N	1115551212	\N	\N	CN=BOWER.MICHELLE.G.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:06:08.204674	\N	\N	\N	\N	t	\N
+16	t	gmanager3@navy.mil	Guy	C	Manager3	\N	\N	\N	\N	CN=MANAGER3.GUY.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-02-28 01:53:40.896	\N	\N	\N	\N	t	\N
+7	t	donna.tdtracker2	Donna	\N	Tdtracker2	\N	\N	\N	\N	CN=TDTRACKER2.DONNA.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 18:39:39.899019	\N	\N	\N	\N	t	\N
+42	t	charles.walsh@modteam.org	Charles	\N	Walsh	\N	1115551212	\N	\N	CN=WALSH.CHARLES.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:09:16.745487	\N	\N	\N	\N	t	\N
+9	t	superuser.tdtrackeradmin@email.com	Superuser		Tdtrackeradmin	\N		\N	\N	CN=TDTRACKERADMIN.SUPERUSER.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:12:40.507562	\N	\N	\N	\N	t	\N
+35	t	brian.davidson@fst.mil	Brian	C	Davidson	\N	1115551212	\N	\N	CN=DAVIDSON.BRIAN.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 21:01:55.564	\N	\N	\N	\N	t	\N
+2	t	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	CN=TEST.DAVID.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	\N
+3575	t	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4	252-464-8744			CN=MARSHALL.GEOFFREY.EDWARD.1510036804,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	f	\N
 \.
 
 
@@ -8366,17 +8432,6 @@ COPY metadata.fieldcategories (id, name, label) FROM stdin;
 
 
 --
--- Data for Name: flyway_schema_history; Type: TABLE DATA; Schema: metadata; Owner: appowner
---
-
-COPY metadata.flyway_schema_history (installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success) FROM stdin;
-1	1	<< Flyway Baseline >>	BASELINE	<< Flyway Baseline >>	\N	appowner	2020-06-16 18:09:14.627399	0	t
-2	1.1	initial setup	SQL	V1.1__initial_setup.sql	939152655	appowner	2020-06-16 18:09:21.151184	1806	t
-3	1.2	reset seq	SQL	V1.2__reset_seq.sql	85553540	appowner	2020-06-16 18:09:22.987161	77	t
-\.
-
-
---
 -- Data for Name: formeventactions; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
@@ -8587,31 +8642,38 @@ COPY metadata.urlactions (id, url, apiactionid, actiondata, appid, pre, post, me
 
 
 --
+-- Name: access_requests_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
+--
+
+SELECT pg_catalog.setval('app.access_requests_id_seq', 14, true);
+
+
+--
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 85, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 1, true);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, true);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 1, true);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1889, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1, true);
 
 
 --
@@ -8660,35 +8722,35 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 281, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 1, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 32, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 1, true);
 
 
 --
 -- Name: mastertypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.mastertypes_id_seq', 64, true);
+SELECT pg_catalog.setval('app.mastertypes_id_seq', 1, true);
 
 
 --
 -- Name: priority_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
+SELECT pg_catalog.setval('app.priority_id_seq', 1, true);
 
 
 --
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 18, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, true);
 
 
 --
@@ -8702,7 +8764,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, true);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 98, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 105, true);
 
 
 --
@@ -8716,21 +8778,28 @@ SELECT pg_catalog.setval('app.rolepermissions_id_seq', 1, true);
 -- Name: roles_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roles_id_seq', 42, true);
+SELECT pg_catalog.setval('app.roles_id_seq', 46, true);
+
+
+--
+-- Name: saar_process_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
+--
+
+SELECT pg_catalog.setval('app.saar_process_id_seq', 12, true);
 
 
 --
 -- Name: status_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.status_id_seq', 45, true);
+SELECT pg_catalog.setval('app.status_id_seq', 1, true);
 
 
 --
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 16, true);
+SELECT pg_catalog.setval('app.support_id_seq', 8, true);
 
 
 --
@@ -8800,35 +8869,35 @@ SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 46, true);
+SELECT pg_catalog.setval('app.users_id_seq', 70, true);
 
 
 --
 -- Name: workflow_actionresponse_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 30, true);
+SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 1, true);
 
 
 --
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 1, true);
 
 
 --
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 1, true);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 217, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 1, true);
 
 
 --
@@ -9007,6 +9076,14 @@ SELECT pg_catalog.setval('public.adhoc_queries_id_seq', 1, false);
 
 
 --
+-- Name: access_requests access_requests_pk; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.access_requests
+    ADD CONSTRAINT access_requests_pk PRIMARY KEY (id);
+
+
+--
 -- Name: activity activities_pkey; Type: CONSTRAINT; Schema: app; Owner: appowner
 --
 
@@ -9164,6 +9241,14 @@ ALTER TABLE ONLY app.rolerestrictions
 
 ALTER TABLE ONLY app.roles
     ADD CONSTRAINT roles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: saar_process saar_process_pk; Type: CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.saar_process
+    ADD CONSTRAINT saar_process_pk PRIMARY KEY (id);
 
 
 --
@@ -9367,14 +9452,6 @@ ALTER TABLE ONLY metadata.fieldcategories
 
 
 --
--- Name: flyway_schema_history flyway_schema_history_pk; Type: CONSTRAINT; Schema: metadata; Owner: appowner
---
-
-ALTER TABLE ONLY metadata.flyway_schema_history
-    ADD CONSTRAINT flyway_schema_history_pk PRIMARY KEY (installed_rank);
-
-
---
 -- Name: formeventactions formeventactions_pkey; Type: CONSTRAINT; Schema: metadata; Owner: appowner
 --
 
@@ -9484,6 +9561,13 @@ ALTER TABLE ONLY metadata.systemtabletypes
 
 ALTER TABLE ONLY metadata.urlactions
     ADD CONSTRAINT urlactions_pk PRIMARY KEY (id);
+
+
+--
+-- Name: access_requests_id_uindex; Type: INDEX; Schema: app; Owner: appowner
+--
+
+CREATE UNIQUE INDEX access_requests_id_uindex ON app.access_requests USING btree (id);
 
 
 --
@@ -9624,6 +9708,13 @@ CREATE UNIQUE INDEX rolepermissions_id_uindex ON app.rolerestrictions USING btre
 --
 
 CREATE UNIQUE INDEX roles_id_uindex ON app.roles USING btree (id);
+
+
+--
+-- Name: saar_process_id_uindex; Type: INDEX; Schema: app; Owner: appowner
+--
+
+CREATE UNIQUE INDEX saar_process_id_uindex ON app.saar_process USING btree (id);
 
 
 --
@@ -9802,13 +9893,6 @@ CREATE UNIQUE INDEX fieldcategories_id_uindex ON metadata.fieldcategories USING 
 
 
 --
--- Name: flyway_schema_history_s_idx; Type: INDEX; Schema: metadata; Owner: appowner
---
-
-CREATE INDEX flyway_schema_history_s_idx ON metadata.flyway_schema_history USING btree (success);
-
-
---
 -- Name: formeventactions_id_uindex; Type: INDEX; Schema: metadata; Owner: appowner
 --
 
@@ -9890,6 +9974,30 @@ CREATE UNIQUE INDEX systemtabletypes_id_uindex ON metadata.systemtabletypes USIN
 --
 
 CREATE UNIQUE INDEX urlactions_id_uindex ON metadata.urlactions USING btree (id);
+
+
+--
+-- Name: access_requests access_requests_applications_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.access_requests
+    ADD CONSTRAINT access_requests_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
+
+
+--
+-- Name: access_requests access_requests_roles_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.access_requests
+    ADD CONSTRAINT access_requests_roles_id_fk FOREIGN KEY (roleid) REFERENCES app.roles(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: access_requests access_requests_users_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.access_requests
+    ADD CONSTRAINT access_requests_users_id_fk FOREIGN KEY (requesterid) REFERENCES app.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -10154,6 +10262,30 @@ ALTER TABLE ONLY app.rolerestrictions
 
 ALTER TABLE ONLY app.roles
     ADD CONSTRAINT roles_applications_id_fk FOREIGN KEY (appid) REFERENCES metadata.applications(id);
+
+
+--
+-- Name: saar_process saar_process_users_id_fk; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.saar_process
+    ADD CONSTRAINT saar_process_users_id_fk FOREIGN KEY (userid) REFERENCES app.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: saar_process saar_process_users_id_fk_2; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.saar_process
+    ADD CONSTRAINT saar_process_users_id_fk_2 FOREIGN KEY (rejectedby) REFERENCES app.users(id);
+
+
+--
+-- Name: saar_process saar_process_users_id_fk_3; Type: FK CONSTRAINT; Schema: app; Owner: appowner
+--
+
+ALTER TABLE ONLY app.saar_process
+    ADD CONSTRAINT saar_process_users_id_fk_3 FOREIGN KEY (completedby) REFERENCES app.users(id);
 
 
 --
@@ -10810,6 +10942,20 @@ GRANT ALL ON FUNCTION metadata.workflowstateupdate(idtable integer, idtransition
 
 
 --
+-- Name: TABLE access_requests; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.access_requests TO appuser;
+
+
+--
+-- Name: SEQUENCE access_requests_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.access_requests_id_seq TO appuser;
+
+
+--
 -- Name: TABLE activity; Type: ACL; Schema: app; Owner: appowner
 --
 
@@ -10911,14 +11057,14 @@ GRANT ALL ON SEQUENCE app.bunos_id_seq TO appuser;
 -- Name: TABLE dashboardreports; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.dashboardreports TO appuser;
+GRANT ALL ON TABLE app.dashboardreports TO appuser;
 
 
 --
 -- Name: SEQUENCE dashboardreport_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.dashboardreport_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.dashboardreport_id_seq TO appuser;
 
 
 --
@@ -11076,6 +11222,20 @@ GRANT ALL ON SEQUENCE app.roles_id_seq TO appuser;
 
 
 --
+-- Name: TABLE saar_process; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.saar_process TO appuser;
+
+
+--
+-- Name: SEQUENCE saar_process_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.saar_process_id_seq TO appuser;
+
+
+--
 -- Name: TABLE status; Type: ACL; Schema: app; Owner: appowner
 --
 
@@ -11093,14 +11253,112 @@ GRANT ALL ON SEQUENCE app.status_id_seq TO appuser;
 -- Name: TABLE support; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE app.support TO appuser;
+GRANT ALL ON TABLE app.support TO appuser;
 
 
 --
 -- Name: SEQUENCE support_id_seq; Type: ACL; Schema: app; Owner: appowner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE app.support_id_seq TO appuser;
+GRANT ALL ON SEQUENCE app.support_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_activity; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_activity TO appuser;
+
+
+--
+-- Name: SEQUENCE system_activity_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_activity_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_affiliation; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_affiliation TO appuser;
+
+
+--
+-- Name: SEQUENCE system_affiliation_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_affiliation_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_aircrafttype; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_aircrafttype TO appuser;
+
+
+--
+-- Name: SEQUENCE system_aircrafttype_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_aircrafttype_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_branch; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_branch TO appuser;
+
+
+--
+-- Name: SEQUENCE system_branch_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_branch_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_designation; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_designation TO appuser;
+
+
+--
+-- Name: SEQUENCE system_designation_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_designation_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_rank; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_rank TO appuser;
+
+
+--
+-- Name: SEQUENCE system_rank_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_rank_id_seq TO appuser;
+
+
+--
+-- Name: TABLE system_site; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON TABLE app.system_site TO appuser;
+
+
+--
+-- Name: SEQUENCE system_site_id_seq; Type: ACL; Schema: app; Owner: appowner
+--
+
+GRANT ALL ON SEQUENCE app.system_site_id_seq TO appuser;
 
 
 --

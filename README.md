@@ -35,7 +35,7 @@ CREATE SCHEMA metadata;
 ALTER SCHEMA metadata OWNER TO appowner;
 ###### check schemas
 \dn  
-
+                       creqa
 ``` javascript
    List of schemas
    Name   |  Owner   
