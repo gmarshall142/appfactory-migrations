@@ -1,3 +1,5 @@
+-- noinspection SqlNoDataSourceInspectionForFile
+
 --
 -- PostgreSQL database dump
 --
@@ -14,6 +16,53 @@ SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: accessrequests(integer); Type: FUNCTION; Schema: app; Owner: appowner
+--
+
+CREATE FUNCTION app.accessrequests(iduser integer DEFAULT NULL::integer) RETURNS TABLE(id integer, requesterid integer, reason character varying, appid integer, roleid integer, name text, activity character varying, role character varying, siteadmins text[])
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE
+  userRoles integer[] := ARRAY []::integer[];
+  user_role RECORD;
+  user_roles CURSOR (id INTEGER) FOR SELECT * FROM app.getUserRoles(id);
+
+BEGIN
+  IF (iduser IS NOT NULL) THEN
+    OPEN user_roles(iduser);
+    LOOP
+      FETCH user_roles INTO user_role;
+      EXIT WHEN NOT FOUND;
+      userRoles := array_append(userRoles, user_role.roleid);
+    END LOOP;
+    CLOSE user_roles;
+  END IF;
+  RAISE NOTICE 'userRoles: %', userRoles;
+  RAISE NOTICE 'adminroles: %', ARRAY(select firstname || ' ' || lastname from app.getUsersInRoles('{43, 44}'));
+
+  RETURN QUERY
+    SELECT ar.id,
+           ar.requesterid,
+           ar.reason,
+           ar.appid,
+           ar.roleid,
+           users.firstname || ' ' || users.lastname as name,
+           sa.activity,
+           roles.name,
+           ARRAY(select firstname || ' ' || lastname from app.getUsersInRoles(ar.adminroles))::text[]
+    FROM app.access_requests ar
+         LEFT OUTER JOIN app.users ON users.id = ar.requesterid
+         LEFT OUTER JOIN app.system_activity sa ON sa.id = users.activityid
+         LEFT OUTER JOIN app.roles ON roles.id = ar.roleid
+    WHERE ar.adminroles && userRoles and ar.active = true;
+  END;
+$$;
+
+
+ALTER FUNCTION app.accessrequests(iduser integer) OWNER TO appowner;
 
 --
 -- Name: attachmentaddlink(text, integer, integer); Type: FUNCTION; Schema: app; Owner: appowner
@@ -3936,9 +3985,11 @@ ALTER SEQUENCE app.bunos_id_seq OWNED BY app.bunos.id;
 CREATE TABLE app.dashboardreports (
     id integer NOT NULL,
     userid integer NOT NULL,
-    adhocqueryid integer NOT NULL,
+    adhocqueryid integer,
     createdat timestamp without time zone,
-    updatedat timestamp without time zone DEFAULT now()
+    updatedat timestamp without time zone DEFAULT now(),
+    isquery boolean DEFAULT true,
+    redirect character varying(40)
 );
 
 
@@ -6805,7 +6856,7 @@ COPY app.bunos (id, identifier, description, createdat, updatedat) FROM stdin;
 -- Data for Name: dashboardreports; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.dashboardreports (id, userid, adhocqueryid, createdat, updatedat) FROM stdin;
+COPY app.dashboardreports (id, userid, adhocqueryid, createdat, updatedat, isquery, redirect) FROM stdin;
 \.
 
 
@@ -7395,6 +7446,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 2180	t	lance.p.aja@boeing.com	Lance		Aja	5	8585776833			CN=AJA.LANCE.P.1007718302,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1229745480	AJA.LANCE.P	20	32	2	79	0	\N	\N	\N	3	\N	f	\N
 2182	t	victor.alanis.ctr@navy.mil	Victor		Alanis	5	3017570171			CN=ALANIS.VICTOR.HUGO.JR.1129918043,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1129918043	ALANIS.VICTOR.HUGO.JR	20	39	2	9	0	\N	\N	\N	4	\N	f	1
 2184	t	jamie.albonetti@usmc.mil	Jamie		Albonetti	5	3156367659			CN=ALBONETTI.JAMIE.LEIGH.1470083596,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1470083596	ALBONETTI.JAMIE.LEIGH	15	53	3	7	0	\N	\N	\N	3	\N	f	1
+2250	f	andrew.boston@usmc.mil	Andrew	M	Boston	\N				CN=BOSTON.ANDREW.MARK.1387733848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BOSTON.ANDREW.MARK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
 2186	t	seth.aldrich@boeing.com	Seth		Aldrich	5	8585776835			CN=ALDRICH.SETH.O.1008962126,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1008962126	ALDRICH.SETH.O	20	31	2	4	0	\N	\N	\N	3	\N	f	1
 2188	t	christopher.almeria@us.af.mil	Christopher		Almeria	5	5058467990	2467990		CN=ALMERIA.CHRISTOPHER.J.1167705444,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1167705444	ALMERIA.CHRISTOPHER.J	8	6	3	5	0	\N	\N	\N	1	\N	f	2
 2190	t	richard.ammons@us.af.mil	Richard		Ammons	3	8508814474	6414474		CN=AMMONS.RICHARD.B.1246002807,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371	AMMONS.RICHARD.B	21	15	1	11	0	\N	\N	\N	4	\N	f	2
@@ -7429,7 +7481,6 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 2246	t	travis.borkowski@usmc.mil	Travis		Borkowski	5	8585778089			CN=BORKOWSKI.TRAVIS.CHRISTOPHER.1242523730,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1242523730	BORKOWSKI.TRAVIS.CHRISTOPHER	7	48	3	4	0	\N	\N	\N	3	\N	f	\N
 2248	t	brad.bosman@usmc.mil	Brad		Bosman	5	9104494357	4494357		CN=BOSMAN.BRAD.WILLIAM.1411008432,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411008432	BOSMAN.BRAD.WILLIAM	5	25	3	2	0	\N	\N	\N	3	\N	f	\N
 37	t	alexandra.poole@oem.com	Alexandra	E	Poole	\N	1115551212	\N	\N		\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:03:54.621326	\N	\N	\N	\N	t	\N
-2250	f	andrew.boston@usmc.mil	Andrew	M	Boston	\N				CN=BOSTON.ANDREW.MARK.1387733848,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1	BOSTON.ANDREW.MARK	\N	\N	\N	\N	1	\N	\N	\N	\N	\N	f	\N
 2252	t	kennth.bowden@usmc.mil	Kenneth		Bowden	5	9104497231			CN=BOWDEN.KENNETH.WEST.1365099894,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1365099894	BOWDEN.KENNETH.WEST	5	25	3	2	0	\N	\N	\N	3	\N	f	1
 2254	t	joshua.bowen.1@us.af.mil	Joshua		Bowen	5	0163854461	2384613		CN=BOWEN.JOSHUA.NATHAN.1258473244,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1258473244	BOWEN.JOSHUA.NATHAN	6	4	3	13	0	\N	\N	\N	1	\N	f	2
 3498	t	jason.kern@boeing.com	Kern		Jason	1	8584328223			CN=Jason.Kern.2829505,OU=people,O=boeing,C=us	2829505		20	42	2	4	0	\N	\N	\N	3	\N	t	\N
@@ -7464,6 +7515,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3042	t	timothy.j.vaughn@usmc.mil	Timothy		Vaughn	5	9104496065			CN=VAUGHN.TIMOTHY.JOSHUA.1024275180,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1024275180	VAUGHN.TIMOTHY.JOSHUA	4	25	3	2	0	\N	\N	\N	3	\N	f	1
 3044	t	leigha.mabe@usmc.mil	Leigha		Veganunez	3	2544627512			CN=VEGANUNEZ.LEIGHA.MARIE.1462636039,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462636039	VEGANUNEZ.LEIGHA.MARIE	3	25	3	77	0	\N	\N	\N	3	\N	f	1
 3046	t	vvillasenor@bh.com	Victor		Villasenor	5	8172401371		8585776830	CN=VILLASENOROJEDA.VICTOR.IVAN.1273605823,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	VILLASENOROJEDA.VICTOR.IVAN	20	31	2	8	0	\N	\N	\N	3	\N	f	1
+2	t	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	CN=TEST.DAVID.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	\N
 3048	t	mvonbergen@bh.com	Michael		Vonbergen	5	8508812651	6412651		CN=VON BERGEN.MICHAEL.EDWARD.1257076551,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257076551	VON BERGEN.MICHAEL.EDWARD	20	16	2	11	0	\N	\N	\N	1	\N	f	2
 3050	t	christopher.voss@usmc.mil	Christopher		Voss	5	3156367661	6367661		CN=VOSS.CHRISTOPHER.JIN.1138177820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1138177820	VOSS.CHRISTOPHER.JIN	12	53	3	7	0	\N	\N	\N	3	\N	f	\N
 3052	t	cory.walker@usmc.mil	Cory		Walker	5	7703612330			CN=WALKER.CORY.DAVID.1410844580,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410844580	WALKER.CORY.DAVID	15	60	3	4	0	\N	\N	\N	3	\N	f	\N
@@ -8209,7 +8261,6 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 42	t	charles.walsh@modteam.org	Charles	\N	Walsh	\N	1115551212	\N	\N	CN=WALSH.CHARLES.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 17:09:16.745487	\N	\N	\N	\N	t	\N
 9	t	superuser.tdtrackeradmin@email.com	Superuser		Tdtrackeradmin	\N		\N	\N	CN=TDTRACKERADMIN.SUPERUSER.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:12:40.507562	\N	\N	\N	\N	t	\N
 35	t	brian.davidson@fst.mil	Brian	C	Davidson	\N	1115551212	\N	\N	CN=DAVIDSON.BRIAN.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 21:01:55.564	\N	\N	\N	\N	t	\N
-2	t	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	CN=TEST.DAVID.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	\N
 3575	t	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4	252-464-8744			CN=MARSHALL.GEOFFREY.EDWARD.1510036804,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	f	\N
 \.
 
@@ -8645,35 +8696,35 @@ COPY metadata.urlactions (id, url, apiactionid, actiondata, appid, pre, post, me
 -- Name: access_requests_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.access_requests_id_seq', 14, true);
+SELECT pg_catalog.setval('app.access_requests_id_seq', 32, true);
 
 
 --
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 1, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 85, true);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 1, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1889, true);
 
 
 --
@@ -8701,7 +8752,7 @@ SELECT pg_catalog.setval('app.bunos_id_seq', 4469, true);
 -- Name: dashboardreport_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.dashboardreport_id_seq', 1, true);
+SELECT pg_catalog.setval('app.dashboardreport_id_seq', 4, true);
 
 
 --
@@ -8722,35 +8773,35 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 1, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 281, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 1, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 32, true);
 
 
 --
 -- Name: mastertypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.mastertypes_id_seq', 1, true);
+SELECT pg_catalog.setval('app.mastertypes_id_seq', 64, true);
 
 
 --
 -- Name: priority_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.priority_id_seq', 1, true);
+SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
 
 
 --
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 18, true);
 
 
 --
@@ -8764,7 +8815,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, true);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 105, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 106, true);
 
 
 --
@@ -8785,21 +8836,21 @@ SELECT pg_catalog.setval('app.roles_id_seq', 46, true);
 -- Name: saar_process_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.saar_process_id_seq', 12, true);
+SELECT pg_catalog.setval('app.saar_process_id_seq', 28, true);
 
 
 --
 -- Name: status_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.status_id_seq', 1, true);
+SELECT pg_catalog.setval('app.status_id_seq', 45, true);
 
 
 --
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 8, true);
+SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 
 
 --
@@ -8869,35 +8920,35 @@ SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 70, true);
+SELECT pg_catalog.setval('app.users_id_seq', 87, true);
 
 
 --
 -- Name: workflow_actionresponse_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 1, true);
+SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 30, true);
 
 
 --
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 1, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
 
 
 --
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 1, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 1, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 217, true);
 
 
 --
