@@ -1,5 +1,3 @@
--- noinspection SqlNoDataSourceInspectionForFile
-
 --
 -- PostgreSQL database dump
 --
@@ -1420,16 +1418,16 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric, iduser integer DEFAULT 
     idx := strpos(resp->>'whereStr', 'and');
     whereStr := substring(resp->>'whereStr', 0, idx);
 
---     RAISE NOTICE '----------------------------------------';
---     RAISE NOTICE 'tableIdColumn: %  tableName:  %', tableIdColumn, tableName;
---     RAISE NOTICE '';
---     RAISE NOTICE 'selectStr: .%.', selectStr;
---     RAISE NOTICE '';
---     RAISE NOTICE 'fromStr: .%.', fromStr;
---     RAISE NOTICE '';
---     RAISE NOTICE 'whereStr: .%.', whereStr;
---     RAISE NOTICE '';
---     RAISE NOTICE '----------------------------------------';
+    RAISE NOTICE '----------------------------------------';
+    RAISE NOTICE 'tableIdColumn: %  tableName:  %', tableIdColumn, tableName;
+    RAISE NOTICE '';
+    RAISE NOTICE 'selectStr: .%.', selectStr;
+    RAISE NOTICE '';
+    RAISE NOTICE 'fromStr: .%.', fromStr;
+    RAISE NOTICE '';
+    RAISE NOTICE 'whereStr: .%.', whereStr;
+    RAISE NOTICE '';
+    RAISE NOTICE '----------------------------------------';
 
     execStr := 'SELECT ' || selectStr ||
                ' FROM app.' || tableName || ' tbl' || fromStr ||
@@ -1924,8 +1922,9 @@ CREATE FUNCTION metadata.fetchdatamodel(idapp numeric, iduser integer DEFAULT NU
               where
               t.appid = idapp
               and t.tablename = cols.mastertable
+              and c.id = cols.refcolumn
               and c.apptableid = t.id
-              and c.columnname = metadata.getColumnFromDisplayName(cols.masterdisplay::text)
+--               and c.columnname = metadata.getColumnFromDisplayName(cols.masterdisplay::text)
               ) t
             ) as refcol
             from metadata.appcolumns as cols
@@ -2371,7 +2370,7 @@ CREATE FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids 
       FETCH ref into rec_field;
       EXIT WHEN NOT FOUND;
 
-      RAISE NOTICE 'LOOP columnname: %', rec_field.columnname;
+      RAISE NOTICE 'LOOP columnname: %  tableidcolumn: %', rec_field.columnname, rec_field.tableidcolumn;
       IF (rec_field.columnname != rec_field.tableidcolumn) THEN
 --       IF (rec_field.columnname != rec_field.tableidcolumn AND rec_field.columnname <> ALL ( ARRAY['updatedat'] ) ) THEN
         tableName := rec_field.tablename;
@@ -2383,9 +2382,10 @@ CREATE FUNCTION metadata.getcolumnelementsfromfielddata(ref refcursor, fieldids 
         valueFnd := false;
         FOREACH fieldid IN ARRAY fieldids
         LOOP
+--           RAISE NOTICE 'fieldid: %  appcolumnid: %  columnname: %', fieldid, rec_field.appcolumnid, rec_field.columnname;
           IF (fieldid = rec_field.appcolumnid AND rec_field.columnname <> ALL ( ARRAY['updatedat'] ) ) THEN
             valueFnd := true;
---             RAISE NOTICE 'columnname: %  datatype: %  jsonfield %  text: %', rec_field.columnname, rec_field.datatype, rec_field.jsonfield, fieldvals[idx];
+            RAISE NOTICE 'columnname: %  datatype: %  jsonfield %  text: %', rec_field.columnname, rec_field.datatype, rec_field.jsonfield, fieldvals[idx];
 
 --             RAISE NOTICE 'rec_field.datatype: %', rec_field.datatype;
             IF (rec_field.datatype = 'text' OR rec_field.datatype = 'timestamp' OR rec_field.datatype = 'json' OR rec_field.datatype = 'varchar' OR rec_field.datatype = 'integer[]') THEN
@@ -4107,7 +4107,8 @@ CREATE TABLE app.issues (
     priorityid integer,
     statusid integer,
     workflowstateid integer,
-    workflowactionid integer
+    workflowactionid integer,
+    driverid integer
 );
 
 
@@ -5202,7 +5203,8 @@ CREATE TABLE metadata.appcolumns (
     displayorder integer,
     active boolean DEFAULT true,
     allowedroles integer[],
-    allowededitroles integer[]
+    allowededitroles integer[],
+    refcolumn integer
 );
 
 
@@ -6891,7 +6893,7 @@ COPY app.issueattachments (id, issueid, attachmentid, createdat, updatedat) FROM
 -- Data for Name: issues; Type: TABLE DATA; Schema: app; Owner: appowner
 --
 
-COPY app.issues (id, appid, issuetypeid, createdat, updatedat, jsondata, subject, activityid, priorityid, statusid, workflowstateid, workflowactionid) FROM stdin;
+COPY app.issues (id, appid, issuetypeid, createdat, updatedat, jsondata, subject, activityid, priorityid, statusid, workflowstateid, workflowactionid, driverid) FROM stdin;
 \.
 
 
@@ -6967,6 +6969,8 @@ COPY app.roles (id, name, description, appid, createdat, updatedat, jsondata, ac
 --
 
 COPY app.saar_process (id, userid, saar_completed, ia_training, email_prdc, email_v22web, complete, rejectdate, rejectedby, completedby, createdat, updatedat) FROM stdin;
+30	89	\N	\N	\N	\N	\N	\N	\N	\N	2020-07-22 19:08:45.244581	2020-07-22 19:08:45.241
+33	94	2020-07-23 17:31:29.98	2020-07-23 17:31:29.98	\N	\N	\N	\N	\N	\N	2020-07-23 17:31:17.850938	2020-07-23 17:31:29.999
 \.
 
 
@@ -8262,6 +8266,9 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 9	t	superuser.tdtrackeradmin@email.com	Superuser		Tdtrackeradmin	\N		\N	\N	CN=TDTRACKERADMIN.SUPERUSER.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2018-12-07 19:12:40.507562	\N	\N	\N	\N	t	\N
 35	t	brian.davidson@fst.mil	Brian	C	Davidson	\N	1115551212	\N	\N	CN=DAVIDSON.BRIAN.C.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	2019-05-16 21:01:55.564	\N	\N	\N	\N	t	\N
 3575	t	geoff.marshal.ctr@navy.mil	Geoff		Marshall	4	252-464-8744			CN=MARSHALL.GEOFFREY.EDWARD.1510036804,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1065484494		12	10	1	18	0	\N	\N	\N	2	\N	f	\N
+89	t	markie.mark@navy.mil	Markie		Mark	1	666.999.0000			undefined	\N	\N	19	3	3	14	30	2020-07-22 19:08:45.236694	\N	\N	2	\N	t	\N
+93	t	test.dod@navy.mil	Test	W	Dod	3	999-000-1111			CN=DOD.TEST.WKRP.1510036804,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	20	9	3	14	\N	2020-07-23 17:29:41.469797	\N	\N	4	\N	f	\N
+94	t	test.nodod@navy.mil	Test		Nodod	3	111-222-3333			CN=NODOD.TEST.C.1510036804,OU=CONTRACTOR,OU=PKI,OU=xxx,O=U.S. Government,C=US	\N	\N	22	2	3	14	33	2020-07-23 17:31:17.841626	\N	\N	1	\N	t	\N
 \.
 
 
@@ -8329,7 +8336,7 @@ COPY metadata.apiactions (id, name, description) FROM stdin;
 -- Data for Name: appcolumns; Type: TABLE DATA; Schema: metadata; Owner: appowner
 --
 
-COPY metadata.appcolumns (id, apptableid, columnname, label, datatypeid, length, jsonfield, createdat, updatedat, mastertable, mastercolumn, name, masterdisplay, displayorder, active, allowedroles, allowededitroles) FROM stdin;
+COPY metadata.appcolumns (id, apptableid, columnname, label, datatypeid, length, jsonfield, createdat, updatedat, mastertable, mastercolumn, name, masterdisplay, displayorder, active, allowedroles, allowededitroles, refcolumn) FROM stdin;
 \.
 
 
@@ -8696,7 +8703,7 @@ COPY metadata.urlactions (id, url, apiactionid, actiondata, appid, pre, post, me
 -- Name: access_requests_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.access_requests_id_seq', 32, true);
+SELECT pg_catalog.setval('app.access_requests_id_seq', 40, true);
 
 
 --
@@ -8724,21 +8731,21 @@ SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1889, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1892, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 16, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 30, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 1, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 11, true);
 
 
 --
@@ -8773,35 +8780,35 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 281, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 282, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 32, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 36, true);
 
 
 --
 -- Name: mastertypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.mastertypes_id_seq', 64, true);
+SELECT pg_catalog.setval('app.mastertypes_id_seq', 307, true);
 
 
 --
 -- Name: priority_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
+SELECT pg_catalog.setval('app.priority_id_seq', 17, true);
 
 
 --
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 18, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 19, true);
 
 
 --
@@ -8815,7 +8822,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, true);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 106, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 105, true);
 
 
 --
@@ -8836,14 +8843,14 @@ SELECT pg_catalog.setval('app.roles_id_seq', 46, true);
 -- Name: saar_process_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.saar_process_id_seq', 28, true);
+SELECT pg_catalog.setval('app.saar_process_id_seq', 33, true);
 
 
 --
 -- Name: status_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.status_id_seq', 45, true);
+SELECT pg_catalog.setval('app.status_id_seq', 46, true);
 
 
 --
@@ -8906,7 +8913,7 @@ SELECT pg_catalog.setval('app.system_site_id_seq', 1, false);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 1, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 11, true);
 
 
 --
@@ -8920,35 +8927,35 @@ SELECT pg_catalog.setval('app.usergroups_id_seq', 49, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 87, true);
+SELECT pg_catalog.setval('app.users_id_seq', 94, true);
 
 
 --
 -- Name: workflow_actionresponse_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 30, true);
+SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 44, true);
 
 
 --
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 52, true);
 
 
 --
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 152, true);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 217, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 248, true);
 
 
 --
@@ -8969,7 +8976,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 579, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 677, true);
 
 
 --
@@ -8990,7 +8997,7 @@ SELECT pg_catalog.setval('metadata.appquery_id_seq', 1, true);
 -- Name: apptables_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.apptables_id_seq', 132, true);
+SELECT pg_catalog.setval('metadata.apptables_id_seq', 146, true);
 
 
 --
@@ -9032,14 +9039,14 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 288, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 349, true);
 
 
 --
 -- Name: formresources_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formresources_id_seq', 58, true);
+SELECT pg_catalog.setval('metadata.formresources_id_seq', 64, true);
 
 
 --
@@ -9067,7 +9074,7 @@ SELECT pg_catalog.setval('metadata.menuicons_id_seq', 28, true);
 -- Name: menuitems_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.menuitems_id_seq', 222, true);
+SELECT pg_catalog.setval('metadata.menuitems_id_seq', 234, true);
 
 
 --
@@ -9081,14 +9088,14 @@ SELECT pg_catalog.setval('metadata.menupaths_id_seq', 13, true);
 -- Name: pageforms_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pageforms_id_seq', 86, true);
+SELECT pg_catalog.setval('metadata.pageforms_id_seq', 95, true);
 
 
 --
 -- Name: pages_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pages_id_seq', 130, true);
+SELECT pg_catalog.setval('metadata.pages_id_seq', 139, true);
 
 
 --
