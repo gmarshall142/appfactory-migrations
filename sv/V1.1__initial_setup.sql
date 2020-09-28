@@ -1944,6 +1944,44 @@ $$;
 ALTER FUNCTION metadata.fetchdatamodel(idapp numeric, iduser integer) OWNER TO appowner;
 
 --
+-- Name: findlinkrecordsforvalue(integer, integer, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
+--
+
+CREATE FUNCTION metadata.findlinkrecordsforvalue(appcolumnid integer, idvalue integer, iduser integer DEFAULT NULL::integer) RETURNS json
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    rec_field RECORD;
+    result    JSON;
+    execStr   TEXT;
+    tableId   INTEGER;
+    tableAppId INTEGER;
+    tableNameStr TEXT;
+    relatedColumn TEXT;
+--     cur_fields scroll CURSOR (id INTEGER) FOR SELECT * FROM metadata.appformGetFields(id, iduser);
+
+BEGIN
+    select * into rec_field from metadata.appcolumns where id = appcolumnid;
+    tableId := rec_field.apptableid;
+    select appid, tablename into tableAppId, tableNameStr from metadata.apptables where id = tableId;
+--     RAISE NOTICE '********** appId: %  tableId: %', tableAppId, tableId;
+
+    relatedColumn := 'jsondata->>''' || rec_field.columnname || '''';
+
+    execStr := 'select * from app.' || tableNameStr || ' data where apptableid=' || tableId || ' and CAST(data.' || relatedColumn || ' AS INTEGER)=' || idvalue;
+
+--     RAISE NOTICE 'execStr:';
+--     RAISE NOTICE '%', execStr;
+
+    EXECUTE 'SELECT array_to_json(array_agg(row_to_json(t))) FROM (' || execStr || ') t;' INTO result;
+    RETURN result;
+END;
+$$;
+
+
+ALTER FUNCTION metadata.findlinkrecordsforvalue(appcolumnid integer, idvalue integer, iduser integer) OWNER TO appowner;
+
+--
 -- Name: findrelatedrecords(integer, integer, integer, text); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
@@ -8327,8 +8365,8 @@ relatedrecord	8
 COPY metadata.apiactions (id, name, description) FROM stdin;
 2	email	Send email to a list of recipients
 3	debug	Debugger action for testing
-1	database	Create database record as history or archive
 4	log	Write a log record
+1	state	Create database record as state change history
 \.
 
 
@@ -8710,42 +8748,42 @@ SELECT pg_catalog.setval('app.access_requests_id_seq', 40, true);
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 85, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 1, true);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, true);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 1, true);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1892, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 5, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 30, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 68, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 11, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 1, true);
 
 
 --
@@ -8780,7 +8818,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 282, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 2, true);
 
 
 --
@@ -8808,7 +8846,7 @@ SELECT pg_catalog.setval('app.priority_id_seq', 17, true);
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 19, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, true);
 
 
 --
@@ -8857,7 +8895,7 @@ SELECT pg_catalog.setval('app.status_id_seq', 46, true);
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 16, true);
+SELECT pg_catalog.setval('app.support_id_seq', 8, true);
 
 
 --
@@ -8913,7 +8951,7 @@ SELECT pg_catalog.setval('app.system_site_id_seq', 1, false);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 11, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 1, true);
 
 
 --
@@ -8941,7 +8979,7 @@ SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 44, true);
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 52, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 53, true);
 
 
 --
@@ -8976,7 +9014,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 677, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 700, true);
 
 
 --
@@ -8990,14 +9028,14 @@ SELECT pg_catalog.setval('metadata.applications_id_seq', 78, true);
 -- Name: appquery_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appquery_id_seq', 1, true);
+SELECT pg_catalog.setval('metadata.appquery_id_seq', 2, true);
 
 
 --
 -- Name: apptables_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.apptables_id_seq', 146, true);
+SELECT pg_catalog.setval('metadata.apptables_id_seq', 149, true);
 
 
 --
@@ -9039,14 +9077,14 @@ SELECT pg_catalog.setval('metadata.fieldcategories_id_seq', 2, true);
 -- Name: formeventactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 349, true);
+SELECT pg_catalog.setval('metadata.formeventactions_id_seq', 363, true);
 
 
 --
 -- Name: formresources_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.formresources_id_seq', 64, true);
+SELECT pg_catalog.setval('metadata.formresources_id_seq', 66, true);
 
 
 --
@@ -9074,7 +9112,7 @@ SELECT pg_catalog.setval('metadata.menuicons_id_seq', 28, true);
 -- Name: menuitems_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.menuitems_id_seq', 234, true);
+SELECT pg_catalog.setval('metadata.menuitems_id_seq', 236, true);
 
 
 --
@@ -9088,14 +9126,14 @@ SELECT pg_catalog.setval('metadata.menupaths_id_seq', 13, true);
 -- Name: pageforms_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pageforms_id_seq', 95, true);
+SELECT pg_catalog.setval('metadata.pageforms_id_seq', 98, true);
 
 
 --
 -- Name: pages_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.pages_id_seq', 139, true);
+SELECT pg_catalog.setval('metadata.pages_id_seq', 141, true);
 
 
 --
@@ -9123,7 +9161,7 @@ SELECT pg_catalog.setval('metadata.systemtabletypes_id_seq', 4, true);
 -- Name: urlactions_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.urlactions_id_seq', 23, true);
+SELECT pg_catalog.setval('metadata.urlactions_id_seq', 24, true);
 
 
 --
