@@ -8384,6 +8384,8 @@ COPY metadata.appcolumns (id, apptableid, columnname, label, datatypeid, length,
 
 COPY metadata.applications (id, name, shortname, description) FROM stdin;
 0	System		Application Factory System
+10	Test Application	Battle Tracker	Application for DEV Experimenting and demo
+78	TPDR	tpdr	TECHNICAL PUBLICATION DEFICIENCY REPORT (TPDR)
 \.
 
 
@@ -8392,6 +8394,8 @@ COPY metadata.applications (id, name, shortname, description) FROM stdin;
 --
 
 COPY metadata.appqueries (id, procname, appid, schema, description, createdat, updatedat, name, params) FROM stdin;
+1	findRelatedRecords	10	metadata	Find history records related to an issue.  Returns history attachments and creator attributes.	2019-09-17 13:25:53.949	2019-09-17 09:25:59	History	{appcolumnid,recordid,userid,serverurl}
+2	findLinkRecordsForValue	78	metadata	Find link records related to an issue.	2020-09-21 17:04:58.667	2020-09-21 17:05:01.807	Link Record	{appcolumnid,recordid,userid}
 \.
 
 
@@ -8748,42 +8752,42 @@ SELECT pg_catalog.setval('app.access_requests_id_seq', 40, true);
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 1, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 85, true);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 1, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 5, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1891, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 68, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 73, true);
 
 
 --
 -- Name: attachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.attachments_id_seq', 1, true);
+SELECT pg_catalog.setval('app.attachments_id_seq', 4, true);
 
 
 --
@@ -8818,7 +8822,7 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 2, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 282, true);
 
 
 --
@@ -8846,7 +8850,7 @@ SELECT pg_catalog.setval('app.priority_id_seq', 17, true);
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 18, true);
 
 
 --
@@ -8895,7 +8899,7 @@ SELECT pg_catalog.setval('app.status_id_seq', 46, true);
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 8, true);
+SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 
 
 --
@@ -8951,7 +8955,7 @@ SELECT pg_catalog.setval('app.system_site_id_seq', 1, false);
 -- Name: userattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.userattachments_id_seq', 1, true);
+SELECT pg_catalog.setval('app.userattachments_id_seq', 4, true);
 
 
 --
