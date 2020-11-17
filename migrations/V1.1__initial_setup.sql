@@ -1382,28 +1382,29 @@ $$;
 ALTER FUNCTION metadata.appdatadelete(idtable integer, idrec integer) OWNER TO appowner;
 
 --
--- Name: appdatafindall(numeric, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
+-- Name: appdatafindall(numeric, integer, integer, integer, text, text, text, boolean); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
-CREATE FUNCTION metadata.appdatafindall(idtable numeric, iduser integer DEFAULT NULL::integer) RETURNS json
+CREATE FUNCTION metadata.appdatafindall(idtable numeric, iduser integer DEFAULT NULL::integer, limitval integer DEFAULT NULL::integer, offsetval integer DEFAULT 0, searchcolumn text DEFAULT NULL::text, searchvalue text DEFAULT NULL::text, orderby text DEFAULT NULL::text, orderdesc boolean DEFAULT false) RETURNS json
     LANGUAGE plpgsql
     AS $$
-
-  DECLARE
-    resp JSON;
-    result JSON;
-    execStr TEXT;
-    tableName TEXT;
+DECLARE
+    resp          JSON;
+    result        JSON;
+    execStr       TEXT;
+    tableName     TEXT;
     tableIdColumn TEXT := 'id';
-    selectStr TEXT := '';
-    fromStr TEXT := '';
-    whereStr TEXT := '';
-    idx INTEGER;
+    selectStr     TEXT := '';
+    fromStr       TEXT := '';
+    whereStr      TEXT := '';
+    limitStr      TEXT := '';
+    orderbyStr    TEXT := ' ORDER BY ';
+    descStr       TEXT := '';
+    idx           INTEGER;
+    cur_fields CURSOR (id INTEGER)
+        FOR SELECT * FROM metadata.appformGetFields(id, iduser);
 
-    cur_fields CURSOR(id INTEGER)
-    FOR SELECT * FROM metadata.appformGetFields(id, iduser);
-
-	BEGIN
+BEGIN
     OPEN cur_fields(idtable);
 
     execStr := 'SELECT * from metadata.getColumnElementsFromRecord(''' || cur_fields || ''', 0);';
@@ -1411,28 +1412,49 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric, iduser integer DEFAULT 
 
     CLOSE cur_fields;
 
-    tableName := resp->>'tableName';
+    tableName := resp ->> 'tableName';
     tableIdColumn := 'id';
-    selectStr := resp->>'selectStr';
-    fromStr := resp->>'fromStr';
-    idx := strpos(resp->>'whereStr', 'and');
-    whereStr := substring(resp->>'whereStr', 0, idx);
+    selectStr := resp ->> 'selectStr';
+    fromStr := resp ->> 'fromStr';
+    idx := strpos(resp ->> 'whereStr', 'and');
+    whereStr := substring(resp ->> 'whereStr', 0, idx);
+
+    IF (orderby IS NULL) THEN
+        orderbyStr := orderbyStr || 'tbl.' || tableIdColumn;
+    ELSE
+        IF(orderdesc = true) THEN
+            descStr := ' DESC NULLS LAST ';
+        ELSE
+            descStr := ' ASC NULLS FIRST ';
+        END IF;
+        orderbyStr := orderbyStr || 'tbl.' || orderby || descStr;
+    END IF;
+
+    IF (limitVal is not null) THEN
+        limitStr := ' OFFSET ' || offsetVal || ' LIMIT ' || limitVal;
+    END IF;
+
+    IF(searchcolumn is not null AND searchvalue is not null) THEN
+        whereStr := whereStr || 'and CAST(tbl.' || searchcolumn || ' AS TEXT) ilike ''%' || searchvalue || '%'' ';
+    END IF;
 
     RAISE NOTICE '----------------------------------------';
-    RAISE NOTICE 'tableIdColumn: %  tableName:  %', tableIdColumn, tableName;
-    RAISE NOTICE '';
-    RAISE NOTICE 'selectStr: .%.', selectStr;
-    RAISE NOTICE '';
-    RAISE NOTICE 'fromStr: .%.', fromStr;
-    RAISE NOTICE '';
+--     RAISE NOTICE 'tableIdColumn: %  tableName:  %', tableIdColumn, tableName;
+--     RAISE NOTICE '';
+--     RAISE NOTICE 'selectStr: .%.', selectStr;
+--     RAISE NOTICE '';
+--     RAISE NOTICE 'fromStr: .%.', fromStr;
+--     RAISE NOTICE '';
     RAISE NOTICE 'whereStr: .%.', whereStr;
-    RAISE NOTICE '';
+--     RAISE NOTICE '';
+--     RAISE NOTICE 'limitStr: .%.', limitStr;
+    RAISE NOTICE 'orderbyStr: .%.', orderbyStr;
     RAISE NOTICE '----------------------------------------';
 
-    execStr := 'SELECT ' || selectStr ||
+    execStr := 'SELECT ' || selectStr || ', count(*) OVER() as total_count' ||
                ' FROM app.' || tableName || ' tbl' || fromStr ||
-               ' WHERE ' || whereStr ||
-               ' ORDER BY ' || 'tbl.' || tableIdColumn;
+               ' WHERE ' || whereStr || orderbyStr || limitStr;
+--                ' ORDER BY ' || 'tbl.' || tableIdColumn || limitStr;
     RAISE NOTICE '----------------------------------------';
     RAISE NOTICE 'execStr: %', execStr;
     RAISE NOTICE '----------------------------------------';
@@ -1440,16 +1462,16 @@ CREATE FUNCTION metadata.appdatafindall(idtable numeric, iduser integer DEFAULT 
     RAISE NOTICE 'result: %', result;
 
     IF (result is null) THEN
-  		RETURN '[]';
+        RETURN '[]';
     ELSE
-    	RETURN result;
-	  END IF;
+        RETURN result;
+    END IF;
 
-  END;
+END;
 $$;
 
 
-ALTER FUNCTION metadata.appdatafindall(idtable numeric, iduser integer) OWNER TO appowner;
+ALTER FUNCTION metadata.appdatafindall(idtable numeric, iduser integer, limitval integer, offsetval integer, searchcolumn text, searchvalue text, orderby text, orderdesc boolean) OWNER TO appowner;
 
 --
 -- Name: appdatafindbyid(integer, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -1624,47 +1646,72 @@ $$;
 ALTER FUNCTION metadata.appformfindbyid(idrec numeric) OWNER TO appowner;
 
 --
--- Name: appformgetdatatable(numeric, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
+-- Name: appformgetdatatable(numeric, integer, integer, integer, text, text, text, boolean); Type: FUNCTION; Schema: metadata; Owner: appowner
 --
 
-CREATE FUNCTION metadata.appformgetdatatable(idtable numeric, iduser integer DEFAULT NULL::integer) RETURNS json
+CREATE FUNCTION metadata.appformgetdatatable(idtable numeric, iduser integer DEFAULT NULL::integer, limitval integer DEFAULT NULL::integer, offsetval integer DEFAULT 0, searchcolumn text DEFAULT NULL::text, searchvalue text DEFAULT NULL::text, orderby text DEFAULT NULL::text, orderdesc boolean DEFAULT false) RETURNS json
     LANGUAGE plpgsql
     AS $$
 
-  DECLARE
-    result JSON;
+DECLARE
+    result       JSON;
     headerResult JSON;
-    execStr TEXT;
-    headerStr TEXT;
+    execStr      TEXT;
+    headerStr    TEXT;
     userArrayStr TEXT;
-    userIdStr TEXT := '';
-	  userRoles integer[] := metadata.getUserRolesArray(iduser);
+    userIdStr    TEXT      := '';
+    limitStr     TEXT      := '';
+    searchStr    text      := '';
+    orderbyStr   TEXT      := '';
+    userRoles    integer[] := metadata.getUserRolesArray(iduser);
 
-	BEGIN
+BEGIN
     userArrayStr := '''{' || array_to_string(userRoles, ',') || '}''';
 
     headerStr :=
-    'select col.label as text, col.columnname as value, col.displayorder, dt.name as datatype
-    from metadata.appcolumns as col
-    left outer join metadata.datatypes as dt on dt.id = col.datatypeid
-    where apptableid = ' || idtable || '
-    and (col.allowedroles is null OR col.allowedroles = ''{}'' OR col.allowedroles && ' || userArrayStr || ')
-    order by displayorder';
---     RAISE NOTICE 'headerStr: %', headerStr;
+                            'select col.label as text, col.columnname as value, col.displayorder, dt.name as datatype
+                             from metadata.appcolumns as col
+                             left outer join metadata.datatypes as dt on dt.id = col.datatypeid
+                             where apptableid = ' || idtable || '
+     and (col.allowedroles is null OR col.allowedroles = ''{}'' OR col.allowedroles && ' || userArrayStr || ')
+     order by displayorder ';
+--     RAISE NOTICE ''headerStr: %'', headerStr;
     EXECUTE 'SELECT array_to_json(array_agg(row_to_json(t))) FROM (' || headerStr || ') t;' INTO headerResult;
 
-    IF(iduser is not null) THEN
-      userIdStr := ', ' || iduser;
+    IF (iduser is not null) THEN
+        userIdStr := ', ' || iduser;
     END IF;
+    IF (limitVal is not null) THEN
+      limitStr := ', ' || limitVal || ', ' || offsetVal;
+    ELSE  
+      limitStr := ', NULL, ' || offsetVal;
+    END IF;
+    --     RAISE NOTICE '----------------------------------------';
+--     RAISE NOTICE 'limitStr: .%.', limitStr;
+--     RAISE NOTICE '----------------------------------------';
+    IF (orderby is not null) THEN
+        orderbyStr := ', ''' || orderby || ''', ' || orderdesc;
+    END IF;
+    --     RAISE NOTICE '----------------------------------------';
+--     RAISE NOTICE 'orderbyStr: .%.', orderbyStr;
+--     RAISE NOTICE '----------------------------------------';
+    IF (searchcolumn is not null AND searchvalue is not null) THEN
+        searchStr := ', ''' || searchcolumn || ''', ''' || searchvalue || '''';
+    ELSE
+        searchStr := ', NULL, NULL';
+    END IF;
+    RAISE NOTICE '----------------------------------------';
+    RAISE NOTICE 'searchStr: .%.', searchStr;
+    RAISE NOTICE '----------------------------------------';
 
-    execStr := 'SELECT * from metadata.appdataFindAll(' || idtable || userIdStr || ');';
+    execStr := 'SELECT * from metadata.appdataFindAll(' || idtable || userIdStr || limitStr || searchStr || orderbyStr || ');';
     EXECUTE execStr INTO result;
-		RETURN json_build_object('data', result, 'headers', headerResult);
-	END;
+    RETURN json_build_object('data', result, 'headers', headerResult);
+END;
 $$;
 
 
-ALTER FUNCTION metadata.appformgetdatatable(idtable numeric, iduser integer) OWNER TO appowner;
+ALTER FUNCTION metadata.appformgetdatatable(idtable numeric, iduser integer, limitval integer, offsetval integer, searchcolumn text, searchvalue text, orderby text, orderdesc boolean) OWNER TO appowner;
 
 --
 -- Name: appformgetfields(numeric, integer); Type: FUNCTION; Schema: metadata; Owner: appowner
@@ -1905,6 +1952,7 @@ CREATE FUNCTION metadata.fetchdatamodel(idapp numeric, iduser integer DEFAULT NU
             cols.label,
             cols.datatypeid,
             cols.mastertable,
+            cols.masterdisplay,
             cols.apptableid,
             cols.jsonfield,
             dt.name as datatype,
@@ -6907,15 +6955,15 @@ COPY app.dashboardreports (id, userid, adhocqueryid, createdat, updatedat, isque
 COPY app.groups (id, name, description, createdat, updatedat) FROM stdin;
 1	devs	AppFactory developers	2018-12-04 13:39:00.783889	2018-12-04 13:39:00.783889
 4	v22users	V-22 Users	2018-12-06 18:22:25.254	2018-12-06 18:22:25.254
-7	testgroup1	Test group 1	2018-12-07 12:59:50.29	2018-12-07 12:59:50.29
 9	testgroup3	Test group3	2018-12-07 13:00:27.999	2018-12-07 13:00:27.999
 6	admins	Project Administrators	2018-12-07 04:24:40.034	2018-12-07 18:19:23.555
 10	TD Tracker Users	TD Tracker users group	2018-12-07 18:30:02.817	2018-12-07 18:30:02.817
-11	managers1	Test managers 1	2019-02-27 20:54:24.989	2019-02-27 20:54:24.989
 17	Squadron	General squadron user	2019-05-16 15:16:14.505	2019-05-16 15:16:14.505
 16	FST	Fleet Support Team group	2019-05-16 19:15:36.04	2019-05-16 15:24:38.219
 15	FSR	Field Service Representative group	2019-05-16 19:15:22.826	2019-05-16 15:25:03.696
 18	OEM	Original Equipment Manufacturer group	2019-05-16 15:27:52.695	2019-05-16 15:27:52.695
+7	testgroup1	Test group 1	2018-12-07 22:59:50.29	2020-11-04 17:33:53.537
+11	managers1	Test managers 1	2019-02-28 01:54:24.989	2020-11-05 21:26:53.42
 \.
 
 
@@ -7257,7 +7305,6 @@ COPY app.usergroups (id, userid, groupid, createdat, updatedat) FROM stdin;
 23	7	10	2018-12-07 18:39:39.971015	2018-12-07 18:39:39.971015
 24	8	10	2018-12-07 18:40:00.775802	2018-12-07 18:40:00.775802
 25	10	7	2018-12-07 19:18:31.858278	2018-12-07 19:18:31.858278
-26	11	7	2018-12-07 19:19:03.011395	2018-12-07 19:19:03.011395
 27	12	7	2018-12-07 19:19:29.273873	2018-12-07 19:19:29.273873
 28	14	11	2019-02-27 20:54:55.895697	2019-02-27 20:54:55.895697
 29	15	11	2019-02-27 20:55:02.858622	2019-02-27 20:55:02.858622
@@ -7265,7 +7312,6 @@ COPY app.usergroups (id, userid, groupid, createdat, updatedat) FROM stdin;
 31	13	7	2019-02-27 21:18:21.334095	2019-02-27 21:18:21.334095
 32	13	6	2019-02-27 21:18:21.334095	2019-02-27 21:18:21.334095
 33	2174	6	2019-02-27 21:21:57.822569	2019-02-27 21:21:57.822569
-34	2174	11	2019-02-27 21:21:57.822569	2019-02-27 21:21:57.822569
 41	33	15	2019-05-16 17:00:30.211943	2019-05-16 17:00:30.211943
 42	34	15	2019-05-16 17:01:04.741426	2019-05-16 17:01:04.741426
 43	36	16	2019-05-16 17:02:21.810356	2019-05-16 17:02:21.810356
@@ -7275,6 +7321,7 @@ COPY app.usergroups (id, userid, groupid, createdat, updatedat) FROM stdin;
 47	10	17	2019-05-16 18:18:12.921876	2019-05-16 18:18:12.921876
 48	11	17	2019-05-16 18:18:17.95073	2019-05-16 18:18:17.95073
 49	12	17	2019-05-16 18:18:23.496915	2019-05-16 18:18:23.496915
+65	2	7	2020-11-04 17:33:38.627634	2020-11-04 17:33:38.627634
 \.
 
 
@@ -7557,6 +7604,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3044	t	leigha.mabe@usmc.mil	Leigha		Veganunez	3	2544627512			CN=VEGANUNEZ.LEIGHA.MARIE.1462636039,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1462636039	VEGANUNEZ.LEIGHA.MARIE	3	25	3	77	0	\N	\N	\N	3	\N	f	1
 3046	t	vvillasenor@bh.com	Victor		Villasenor	5	8172401371		8585776830	CN=VILLASENOROJEDA.VICTOR.IVAN.1273605823,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1133281564	VILLASENOROJEDA.VICTOR.IVAN	20	31	2	8	0	\N	\N	\N	3	\N	f	1
 2	t	david.abbott.16@us.af.mil	David		Test	5	5058537389	2637389113	\N	CN=TEST.DAVID.1510036804,OU=TEST,OU=PKI,OU=DoD,O=U.S. Government,C=US	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	\N
+3115	t	joshua.johannsen@usmc.mil	Joshua		Johannsen	5	9104497228			CN=JOHANNSEN.JOSHUA.EDWARD.1454919749,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454919749		4	25	3	2	0	\N	\N	\N	3	\N	f	1
 3048	t	mvonbergen@bh.com	Michael		Vonbergen	5	8508812651	6412651		CN=VON BERGEN.MICHAEL.EDWARD.1257076551,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1257076551	VON BERGEN.MICHAEL.EDWARD	20	16	2	11	0	\N	\N	\N	1	\N	f	2
 3050	t	christopher.voss@usmc.mil	Christopher		Voss	5	3156367661	6367661		CN=VOSS.CHRISTOPHER.JIN.1138177820,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1138177820	VOSS.CHRISTOPHER.JIN	12	53	3	7	0	\N	\N	\N	3	\N	f	\N
 3052	t	cory.walker@usmc.mil	Cory		Walker	5	7703612330			CN=WALKER.CORY.DAVID.1410844580,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1410844580	WALKER.CORY.DAVID	15	60	3	4	0	\N	\N	\N	3	\N	f	\N
@@ -7592,7 +7640,6 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3112	t	christopher.celestin@navy.mil	Christopher		Celestino	3	2524646651			CN=CELESTINO.CHRISTOPHER.ROBERT.1268041008,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1268041008		21	10	1	18	0	\N	\N	\N	4	\N	f	\N
 3113	f	seth.rosbrugh@us.af.mil	Seth		Rosbrugh	5	5752182564	7840910		CN=ROSBRUGH.SETH.LOUIS.1292506887,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		5	3	3	12	0	\N	\N	\N	1	\N	f	2
 3114	f	scott.m.hoffman.ctr@navy.mil	Scott		Hoffman	4	3018636512			CN=HOFFMAN.SCOTT.M.1046531236,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1046531236		20	38	2	9	0	\N	\N	\N	4	\N	f	2
-3115	t	joshua.johannsen@usmc.mil	Joshua		Johannsen	5	9104497228			CN=JOHANNSEN.JOSHUA.EDWARD.1454919749,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1454919749		4	25	3	2	0	\N	\N	\N	3	\N	f	1
 1770	t	shawn.shea@makin-island.usmc.mil	Shawn		Shea	1	8585279968			CN=SHEA.SHAWN.MICHAEL.1253214992,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1253214992		20	31	2	4	0	\N	\N	\N	3	\N	f	\N
 2000	t	paul.charron@navy.mil	Paul		Charron	3	2524646113			CN=CHARRON.PAUL.W.1513905404,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1513905404		21	15	1	18	0	\N	\N	\N	4	\N	f	1
 2010	t	jared.kuhn.1@us.af.mil	Jared		Kuhn	5	8508847543	5797543		CN=KUHN.JARED.THOMAS.1383075552,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1383075552		5	2	3	11	0	\N	\N	\N	1	\N	f	2
@@ -7939,6 +7986,7 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3512	t	liann.karni@usmc.mil	Liann		Karni	5	8585778155			CN=KARNI.LIANN.1411524791,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1411524791		5	43	3	4	0	\N	\N	\N	3	\N	t	\N
 3321	t	stephanie.dunks@usmc.mil	Stephanie		Dunks	4	9104497252			CN=DUNKS.STEPHANIE.MELIN.1407332810,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1407332810		5	25	3	2	0	\N	\N	\N	3	\N	f	1
 3275	t	xuewen.yin@usmc.mil	Xuewen		Yin	5	8585774289			CN=YIN.XUEWEN.1460937430,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1460937430		4	23	3	4	0	\N	\N	\N	3	\N	t	1
+3296	t	jerusha.kaapa@us.af.mil	Jerusha		Kaapa	5	5058533490			CN=KAAPA.JERUSHA.EMALANI LUAIPOU.1179193015,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1179193015		6	6	3	5	0	\N	\N	\N	1	\N	f	\N
 3277	t	christian.b.tocatlian@boeing.com	Christian		Tocatlian	5	6105916086			CN=Christian Tocatlian,OU=The Boeing Company,OU=VeriSign\\, Inc.,OU=ECA,O=U.S. Government,C=US	1141323233		20	9	2	9	0	\N	\N	\N	3	\N	f	\N
 3280	t	roderick.marcum@rolls-royce.com	Roderick		Marcum	5	9104495212			CN=MARCUM.RODERICK.DEAN.1084123877,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1084123877		20	32	2	2	0	\N	\N	\N	3	\N	f	\N
 3285	t	robert.graf.1.ctr@us.af.mil	Robert		Graf	5	5058534650	8634650		CN=GRAF.ROBERT.W.1021390271,OU=CONTRACTOR,OU=PKI,OU=DoD,O=U.S. Government,C=US	1060319371		20	6	2	5	0	\N	\N	\N	1	\N	t	2
@@ -7975,7 +8023,6 @@ COPY app.users (id, active, email, firstname, mi, lastname, designationid, phone
 3279	t	david.rupp@usmc.mil	David		Rupp	5	9104497374	7527374		CN=RUPP.DAVID.CHARLES.1036552197,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1036552197		8	54	3	2	0	\N	\N	\N	3	\N	f	\N
 3283	t	teodoro.luna@usmc.mil	Teodoro		Luna	5	9282696873			CN=LUNA.TEODORO.III.1265180554,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1265180554		6	62	3	4	0	\N	\N	\N	3	\N	f	1
 3294	t	michael.a.mitchell@navy.mil	Michael		Mitchell	4	2524648744	2524518		CN=MITCHELL.MICHAEL.A.JR.1275574836,OU=USN,OU=PKI,OU=DoD,O=U.S. Government,C=US	1275574836		21	10	1	18	0	\N	\N	\N	4	\N	f	1
-3296	t	jerusha.kaapa@us.af.mil	Jerusha		Kaapa	5	5058533490			CN=KAAPA.JERUSHA.EMALANI LUAIPOU.1179193015,OU=USAF,OU=PKI,OU=DoD,O=U.S. Government,C=US	1179193015		6	6	3	5	0	\N	\N	\N	1	\N	f	\N
 3300	t	carl.decker@usmc.mil	Carl		Decker	5	9104495971			CN=DECKER.CARL.ALBERT.JR.1080103405,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1080103405		7	51	3	2	0	\N	\N	\N	3	\N	f	1
 3303	t	christopher.battiest@usmc.mil	Christophe		Battiest	5	7607630576			CN=BATTIEST.CHRISTOPHE.M.1144405346,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1144405346		7	46	3	8	0	\N	\N	\N	3	\N	f	1
 3304	t	cliff.champ@usmc.mil	Cliff		Champ	5	7607631468			CN=CHAMP.CLIFF.HENRY.1293829248,OU=USMC,OU=PKI,OU=DoD,O=U.S. Government,C=US	1293829248		6	57	3	8	0	\N	\N	\N	3	\N	f	\N
@@ -8381,7 +8428,6 @@ COPY metadata.appcolumns (id, apptableid, columnname, label, datatypeid, length,
 
 COPY metadata.applications (id, name, shortname, description) FROM stdin;
 0	System		Application Factory System
-10	Test Application	Battle Tracker	Application for DEV Experimenting and demo
 \.
 
 
@@ -8714,6 +8760,7 @@ COPY metadata.systemtables (id, label, tablename, description, systemtabletypeid
 15	Workflow Transitions	workflow_statetransitions	Workflow state transitions.	1
 16	Workflow Status	workflow_status	Workflow additional statuses.	1
 18	Roles	roles	Application roles.	1
+19	Tasks	masterdata	Tasks associated with issues	1
 \.
 
 
@@ -8748,35 +8795,35 @@ SELECT pg_catalog.setval('app.access_requests_id_seq', 40, true);
 -- Name: activities_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.activities_id_seq', 1, true);
+SELECT pg_catalog.setval('app.activities_id_seq', 85, true);
 
 
 --
 -- Name: adhoc_queries_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 1, true);
+SELECT pg_catalog.setval('app.adhoc_queries_id_seq', 89, true);
 
 
 --
 -- Name: appbunos_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appbunos_id_seq', 1, true);
+SELECT pg_catalog.setval('app.appbunos_id_seq', 764, true);
 
 
 --
 -- Name: appdata_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdata_id_seq', 1, true);
+SELECT pg_catalog.setval('app.appdata_id_seq', 1889, true);
 
 
 --
 -- Name: appdataattachments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.appdataattachments_id_seq', 78, true);
+SELECT pg_catalog.setval('app.appdataattachments_id_seq', 86, true);
 
 
 --
@@ -8804,7 +8851,7 @@ SELECT pg_catalog.setval('app.dashboardreport_id_seq', 1, true);
 -- Name: groups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.groups_id_seq', 21, true);
+SELECT pg_catalog.setval('app.groups_id_seq', 18, true);
 
 
 --
@@ -8818,35 +8865,35 @@ SELECT pg_catalog.setval('app.issueattachments_id_seq', 1, true);
 -- Name: issues_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issues_id_seq', 1, true);
+SELECT pg_catalog.setval('app.issues_id_seq', 281, true);
 
 
 --
 -- Name: issuetypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.issuetypes_id_seq', 36, true);
+SELECT pg_catalog.setval('app.issuetypes_id_seq', 32, true);
 
 
 --
 -- Name: mastertypes_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.mastertypes_id_seq', 82, true);
+SELECT pg_catalog.setval('app.mastertypes_id_seq', 64, true);
 
 
 --
 -- Name: priority_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.priority_id_seq', 17, true);
+SELECT pg_catalog.setval('app.priority_id_seq', 14, true);
 
 
 --
 -- Name: reporttemplates_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.reporttemplates_id_seq', 1, true);
+SELECT pg_catalog.setval('app.reporttemplates_id_seq', 18, true);
 
 
 --
@@ -8860,7 +8907,7 @@ SELECT pg_catalog.setval('app.resourcetypes_id_seq', 1, true);
 -- Name: roleassignments_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roleassignments_id_seq', 112, true);
+SELECT pg_catalog.setval('app.roleassignments_id_seq', 101, true);
 
 
 --
@@ -8874,7 +8921,7 @@ SELECT pg_catalog.setval('app.rolepermissions_id_seq', 1, true);
 -- Name: roles_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.roles_id_seq', 47, true);
+SELECT pg_catalog.setval('app.roles_id_seq', 42, true);
 
 
 --
@@ -8888,14 +8935,14 @@ SELECT pg_catalog.setval('app.saar_process_id_seq', 33, true);
 -- Name: status_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.status_id_seq', 46, true);
+SELECT pg_catalog.setval('app.status_id_seq', 45, true);
 
 
 --
 -- Name: support_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.support_id_seq', 8, true);
+SELECT pg_catalog.setval('app.support_id_seq', 16, true);
 
 
 --
@@ -8958,42 +9005,42 @@ SELECT pg_catalog.setval('app.userattachments_id_seq', 1, true);
 -- Name: usergroups_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.usergroups_id_seq', 63, true);
+SELECT pg_catalog.setval('app.usergroups_id_seq', 65, true);
 
 
 --
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.users_id_seq', 107, true);
+SELECT pg_catalog.setval('app.users_id_seq', 108, true);
 
 
 --
 -- Name: workflow_actionresponse_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 44, true);
+SELECT pg_catalog.setval('app.workflow_actionresponse_id_seq', 30, true);
 
 
 --
 -- Name: workflow_actions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_actions_id_seq', 53, true);
+SELECT pg_catalog.setval('app.workflow_actions_id_seq', 39, true);
 
 
 --
 -- Name: workflow_states_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_states_id_seq', 152, true);
+SELECT pg_catalog.setval('app.workflow_states_id_seq', 107, true);
 
 
 --
 -- Name: workflow_statetransitions_id_seq; Type: SEQUENCE SET; Schema: app; Owner: appowner
 --
 
-SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 248, true);
+SELECT pg_catalog.setval('app.workflow_statetransitions_id_seq', 217, true);
 
 
 --
@@ -9014,7 +9061,7 @@ SELECT pg_catalog.setval('metadata.apiactions_id_seq', 4, true);
 -- Name: appcolumns_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 700, true);
+SELECT pg_catalog.setval('metadata.appcolumns_id_seq', 705, true);
 
 
 --
@@ -9147,7 +9194,7 @@ SELECT pg_catalog.setval('metadata.systemcategories_id_seq', 8, true);
 -- Name: systemtables_id_seq; Type: SEQUENCE SET; Schema: metadata; Owner: appowner
 --
 
-SELECT pg_catalog.setval('metadata.systemtables_id_seq', 18, true);
+SELECT pg_catalog.setval('metadata.systemtables_id_seq', 19, true);
 
 
 --
